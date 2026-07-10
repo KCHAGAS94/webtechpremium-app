@@ -9,12 +9,16 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { LiveTvScreen } from '@/components/live-tv-screen';
 
 const { width } = Dimensions.get('window');
 const SIDE_MENU_WIDTH = 120;
 
+type ScreenKey = 'home' | 'live' | 'movies' | 'series';
+
 export default function HomeScreen() {
   const [showSideMenu, setShowSideMenu] = useState(true);
+  const [view, setView] = useState<ScreenKey>('home');
 
   const menuItems = [
     {
@@ -55,6 +59,10 @@ export default function HomeScreen() {
     { id: 'logout', title: 'saída', icon: '🚪' },
   ];
 
+  if (view === 'live') {
+    return <LiveTvScreen onNavigate={(key) => setView(key)} />;
+  }
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
@@ -78,7 +86,11 @@ export default function HomeScreen() {
             <View style={styles.leftMenu}>
               <ScrollView contentContainerStyle={styles.menuContent}>
                 {menuItems.map((item) => (
-                  <TouchableOpacity key={item.id} style={styles.menuItemContainer}>
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.menuItemContainer}
+                    onPress={() => item.id === 'live' && setView('live')}
+                  >
                     <View
                       style={[
                         styles.menuItem,
@@ -104,7 +116,7 @@ export default function HomeScreen() {
             {/* Grid de Conteúdo */}
             <View style={styles.gridContainer}>
               <View style={styles.gridRow}>
-                <TouchableOpacity style={styles.gridItem}>
+                <TouchableOpacity style={styles.gridItem} onPress={() => setView('live')}>
                   <View style={styles.gridBox}>
                     <ThemedText style={styles.gridIcon}>📺</ThemedText>
                     <ThemedText style={styles.gridTitle}>TV ao Vivo</ThemedText>
