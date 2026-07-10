@@ -5,6 +5,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
@@ -322,48 +323,5 @@ const styles = StyleSheet.create({
   versionText: {
     fontSize: 12,
     color: '#666',
-  },
-});
-    fontSize: 24,
-  },
-  rightMenuTitle: {
-    fontSize: 10,
-    color: '#fff',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#1a1a3a',
-  },
-  footerText: {
-    fontSize: 14,
-    color: '#fff',
-  },
-  versionText: {
-    fontSize: 12,
-    color: '#666',
-  },
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
   },
 });

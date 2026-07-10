@@ -7,11 +7,23 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
+    "sdkVersion": "54.0.0",
+    "platforms": ["ios", "android", "web"],
     "android": {
-      "package": "com.webtechpremium.app"
+      "package": "com.webtechpremium.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0a0a1a"
+      }
     },
     "ios": {
-      "bundleIdentifier": "com.webtechpremium.app"
-    }
+      "bundleIdentifier": "com.webtechpremium.app",
+      "supportsTabletMode": true
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    },
+    "plugins": [],
+    "scheme": "webtechpremium"
   }
 }
