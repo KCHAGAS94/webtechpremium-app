@@ -58,8 +58,8 @@ export default function App() {
       <SafeAreaView style={styles.container}>
         <View style={styles.mainContent}>
           <View style={styles.logoSection}>
-            <Text style={styles.logoIcon}>🤖</Text>
-            <Text style={styles.logoText}>webtech</Text>
+            <Text allowFontScaling={false} style={styles.logoIcon}>🤖</Text>
+            <Text allowFontScaling={false} style={styles.logoText}>webtech</Text>
           </View>
 
           <View style={styles.contentArea}>
@@ -70,8 +70,10 @@ export default function App() {
                 onPress={() => handleMenuPress(tvItem.screen)}
                 activeOpacity={0.75}
               >
-                <Text style={styles.tvIcon}>{tvItem.icon}</Text>
-                <Text style={styles.tvLabel}>{tvItem.label}</Text>
+                <View style={styles.tvInnerFrame}>
+                  <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
+                  <Text allowFontScaling={false} style={styles.tvLabel}>{tvItem.label}</Text>
+                </View>
               </TouchableOpacity>
 
               <View style={styles.midColumn}>
@@ -81,8 +83,10 @@ export default function App() {
                   onPress={() => handleMenuPress(centerTop.screen)}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.midIcon}>{centerTop.icon}</Text>
-                  <Text style={styles.midLabel}>{centerTop.label}</Text>
+                  <View style={styles.midInnerFrame}>
+                    <Text allowFontScaling={false} style={styles.midIcon}>{centerTop.icon}</Text>
+                    <Text allowFontScaling={false} style={styles.midLabel}>{centerTop.label}</Text>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -91,8 +95,10 @@ export default function App() {
                   onPress={() => handleMenuPress(centerBottom.screen)}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.midIcon}>{centerBottom.icon}</Text>
-                  <Text style={styles.midLabel}>{centerBottom.label}</Text>
+                  <View style={styles.midInnerFrame}>
+                    <Text allowFontScaling={false} style={styles.midIcon}>{centerBottom.icon}</Text>
+                    <Text allowFontScaling={false} style={styles.midLabel}>{centerBottom.label}</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -103,8 +109,10 @@ export default function App() {
                   onPress={() => handleMenuPress(rightTop.screen)}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.midIcon}>{rightTop.icon}</Text>
-                  <Text style={styles.midLabel}>{rightTop.label}</Text>
+                  <View style={styles.midInnerFrame}>
+                    <Text allowFontScaling={false} style={styles.midIcon}>{rightTop.icon}</Text>
+                    <Text allowFontScaling={false} style={styles.midLabel}>{rightTop.label}</Text>
+                  </View>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -113,8 +121,10 @@ export default function App() {
                   onPress={() => handleMenuPress(rightBottom.screen)}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.midIcon}>{rightBottom.icon}</Text>
-                  <Text style={styles.midLabel}>{rightBottom.label}</Text>
+                  <View style={styles.midInnerFrame}>
+                    <Text allowFontScaling={false} style={styles.midIcon}>{rightBottom.icon}</Text>
+                    <Text allowFontScaling={false} style={styles.midLabel}>{rightBottom.label}</Text>
+                  </View>
                 </TouchableOpacity>
               </View>
 
@@ -125,8 +135,10 @@ export default function App() {
                   onPress={() => handleMenuPress(settingsItem.screen)}
                   activeOpacity={0.75}
                 >
-                  <Text style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
-                  <Text style={styles.sideMenuLabel}>{settingsItem.label}</Text>
+                  <View style={styles.sideInnerFrame}>
+                    <Text allowFontScaling={false} style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
+                    <Text allowFontScaling={false} style={styles.sideMenuLabel}>{settingsItem.label}</Text>
+                  </View>
                 </TouchableOpacity>
 
                 {sideMenuItems.map((item) => (
@@ -136,16 +148,18 @@ export default function App() {
                     onPress={() => handleMenuPress(item.screen)}
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.sideMenuIcon}>{item.icon}</Text>
-                    <Text style={styles.sideMenuLabel}>{item.label}</Text>
+                    <View style={styles.sideInnerFrame}>
+                      <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
+                      <Text allowFontScaling={false} style={styles.sideMenuLabel}>{item.label}</Text>
+                    </View>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
             <View style={styles.footer}>
-              <Text style={styles.expiryText}>Vencimento: 15/07/2026</Text>
-              <Text style={styles.versionText}>v3.8</Text>
+              <Text allowFontScaling={false} style={styles.expiryText}>Vencimento: 15/07/2026</Text>
+              <Text allowFontScaling={false} style={styles.versionText}>v3.8</Text>
             </View>
           </View>
         </View>
@@ -163,21 +177,21 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 8,
+    paddingHorizontal: 10,
+    paddingTop: 2,
+    paddingBottom: 4,
   },
   logoSection: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 4,
   },
   logoIcon: {
-    fontSize: 44,
+    fontSize: 14,
     marginBottom: 0,
     color: '#8b5cff',
   },
   logoText: {
-    fontSize: 56,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#8b5cff',
     letterSpacing: 1,
@@ -186,106 +200,142 @@ const styles = StyleSheet.create({
   contentArea: {
     flex: 1,
     justifyContent: 'space-between',
+    minHeight: 0,
   },
   layoutRow: {
     flex: 1,
     flexDirection: 'row',
-    gap: 18,
+    gap: 4,
+    minHeight: 0,
   },
   tvCard: {
-    flex: 1.35,
-    backgroundColor: '#170066',
+    flex: 1.2,
+    backgroundColor: 'transparent',
     borderColor: '#0286ff',
-    borderWidth: 2,
-    borderRadius: 18,
+    borderWidth: 0,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
   tvIcon: {
-    fontSize: 120,
-    marginBottom: 18,
+    fontSize: 38,
+    marginBottom: 4,
   },
   tvLabel: {
     color: '#ffffff',
-    fontSize: 48,
+    fontSize: 9,
     fontWeight: '600',
     textAlign: 'center',
+    lineHeight: 11,
+  },
+  tvInnerFrame: {
+    backgroundColor: '#170066',
+    borderColor: '#12b2ff',
+    borderWidth: 0.8,
+    borderRadius: 8,
+    width: '58%',
+    height: '66%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   midColumn: {
     flex: 1,
-    gap: 18,
+    gap: 4,
+    minHeight: 0,
   },
   midCard: {
     flex: 1,
-    backgroundColor: '#170066',
+    backgroundColor: 'transparent',
     borderColor: '#0286ff',
-    borderWidth: 2,
-    borderRadius: 14,
+    borderWidth: 0,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
   },
   midIcon: {
-    fontSize: 72,
-    marginBottom: 8,
+    fontSize: 24,
+    marginBottom: 1,
   },
   midLabel: {
     color: '#ffffff',
-    fontSize: 40,
+    fontSize: 8,
     fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 44,
+    lineHeight: 9,
+  },
+  midInnerFrame: {
+    backgroundColor: '#170066',
+    borderColor: '#12b2ff',
+    borderWidth: 0.8,
+    borderRadius: 8,
+    width: '72%',
+    height: '72%',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sideMenu: {
-    width: 360,
-    gap: 18,
+    width: 150,
+    gap: 4,
   },
   sideMenuItem: {
-    flex: 1,
-    backgroundColor: '#12004f',
+    height: 52,
+    backgroundColor: 'transparent',
     borderColor: '#0286ff',
-    borderWidth: 2,
-    borderRadius: 14,
-    paddingHorizontal: 24,
+    borderWidth: 0,
+    borderRadius: 8,
+    paddingHorizontal: 8,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+  },
+  sideInnerFrame: {
+    backgroundColor: '#12004f',
+    borderColor: '#12b2ff',
+    borderWidth: 0.8,
+    borderRadius: 8,
+    width: '92%',
+    height: '90%',
+    justifyContent: 'center',
+    alignItems: 'center',
     flexDirection: 'row',
-    gap: 16,
+    gap: 5,
+    paddingHorizontal: 8,
   },
   sideMenuIcon: {
-    fontSize: 54,
+    fontSize: 14,
     color: '#ffffff',
-    lineHeight: 70,
+    lineHeight: 18,
   },
   sideMenuLabel: {
+    flex: 1,
     color: '#ffffff',
-    fontSize: 42,
-    lineHeight: 70,
-    textAlign: 'left',
+    fontSize: 8,
+    lineHeight: 18,
+    textAlign: 'center',
   },
   footer: {
-    marginTop: 14,
-    borderTopWidth: 2,
+    marginTop: 2,
+    borderTopWidth: 0.6,
     borderTopColor: '#0286ff',
-    height: 72,
+    height: 28,
     justifyContent: 'center',
     position: 'relative',
   },
   expiryText: {
     color: '#ffffff',
-    fontSize: 34,
-    fontWeight: '700',
+    fontSize: 7,
+    fontWeight: '600',
     textAlign: 'center',
   },
   versionText: {
     position: 'absolute',
     right: 2,
-    top: 16,
+    top: 8,
     color: '#ffffff',
-    fontSize: 30,
+    fontSize: 7,
     fontWeight: '500',
   },
 });
