@@ -50,18 +50,13 @@ export default function App() {
 
   return (
     <LinearGradient
-      colors={['#040031', '#120066', '#040031']}
+      colors={['#050042', '#0d0569', '#050042']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradientBackground}
     >
       <SafeAreaView style={styles.container}>
         <View style={styles.mainContent}>
-          <View style={styles.logoSection}>
-            <Text allowFontScaling={false} style={styles.logoIcon}>🤖</Text>
-            <Text allowFontScaling={false} style={styles.logoText}>webtech</Text>
-          </View>
-
           <View style={styles.contentArea}>
             <View style={styles.layoutRow}>
               <TouchableOpacity
@@ -70,10 +65,8 @@ export default function App() {
                 onPress={() => handleMenuPress(tvItem.screen)}
                 activeOpacity={0.75}
               >
-                <View style={styles.tvInnerFrame}>
-                  <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
-                  <Text allowFontScaling={false} style={styles.tvLabel}>{tvItem.label}</Text>
-                </View>
+                <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
+                <Text allowFontScaling={false} style={styles.tvLabel}>{tvItem.label}</Text>
               </TouchableOpacity>
 
               <View style={styles.midColumn}>
@@ -83,10 +76,8 @@ export default function App() {
                   onPress={() => handleMenuPress(centerTop.screen)}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.midInnerFrame}>
-                    <Text allowFontScaling={false} style={styles.midIcon}>{centerTop.icon}</Text>
-                    <Text allowFontScaling={false} style={styles.midLabel}>{centerTop.label}</Text>
-                  </View>
+                  <Text allowFontScaling={false} style={styles.midIcon}>{centerTop.icon}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{centerTop.label}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -95,10 +86,8 @@ export default function App() {
                   onPress={() => handleMenuPress(centerBottom.screen)}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.midInnerFrame}>
-                    <Text allowFontScaling={false} style={styles.midIcon}>{centerBottom.icon}</Text>
-                    <Text allowFontScaling={false} style={styles.midLabel}>{centerBottom.label}</Text>
-                  </View>
+                  <Text allowFontScaling={false} style={styles.midIcon}>{centerBottom.icon}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{centerBottom.label}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -109,10 +98,8 @@ export default function App() {
                   onPress={() => handleMenuPress(rightTop.screen)}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.midInnerFrame}>
-                    <Text allowFontScaling={false} style={styles.midIcon}>{rightTop.icon}</Text>
-                    <Text allowFontScaling={false} style={styles.midLabel}>{rightTop.label}</Text>
-                  </View>
+                  <Text allowFontScaling={false} style={styles.midIcon}>{rightTop.icon}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{rightTop.label}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -121,10 +108,8 @@ export default function App() {
                   onPress={() => handleMenuPress(rightBottom.screen)}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.midInnerFrame}>
-                    <Text allowFontScaling={false} style={styles.midIcon}>{rightBottom.icon}</Text>
-                    <Text allowFontScaling={false} style={styles.midLabel}>{rightBottom.label}</Text>
-                  </View>
+                  <Text allowFontScaling={false} style={styles.midIcon}>{rightBottom.icon}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{rightBottom.label}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -135,10 +120,8 @@ export default function App() {
                   onPress={() => handleMenuPress(settingsItem.screen)}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.sideInnerFrame}>
-                    <Text allowFontScaling={false} style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
-                    <Text allowFontScaling={false} style={styles.sideMenuLabel}>{settingsItem.label}</Text>
-                  </View>
+                  <Text allowFontScaling={false} style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
+                  <Text allowFontScaling={false} style={styles.sideMenuLabel}>{settingsItem.label}</Text>
                 </TouchableOpacity>
 
                 {sideMenuItems.map((item) => (
@@ -148,18 +131,11 @@ export default function App() {
                     onPress={() => handleMenuPress(item.screen)}
                     activeOpacity={0.75}
                   >
-                    <View style={styles.sideInnerFrame}>
-                      <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
-                      <Text allowFontScaling={false} style={styles.sideMenuLabel}>{item.label}</Text>
-                    </View>
+                    <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
+                    <Text allowFontScaling={false} style={styles.sideMenuLabel}>{item.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
-            </View>
-
-            <View style={styles.footer}>
-              <Text allowFontScaling={false} style={styles.expiryText}>Vencimento: 15/07/2026</Text>
-              <Text allowFontScaling={false} style={styles.versionText}>v3.8</Text>
             </View>
           </View>
         </View>
@@ -177,165 +153,96 @@ const styles = StyleSheet.create({
   },
   mainContent: {
     flex: 1,
-    paddingHorizontal: 10,
-    paddingTop: 2,
-    paddingBottom: 4,
-  },
-  logoSection: {
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  logoIcon: {
-    fontSize: 14,
-    marginBottom: 0,
-    color: '#8b5cff',
-  },
-  logoText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#8b5cff',
-    letterSpacing: 1,
-    textTransform: 'lowercase',
+    paddingHorizontal: 24,
+    paddingVertical: 18,
   },
   contentArea: {
     flex: 1,
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     minHeight: 0,
   },
   layoutRow: {
     flex: 1,
     flexDirection: 'row',
-    gap: 4,
+    gap: 12,
     minHeight: 0,
+    maxHeight: 300,
   },
   tvCard: {
-    flex: 1.2,
-    backgroundColor: 'transparent',
-    borderColor: '#0286ff',
-    borderWidth: 0,
-    borderRadius: 12,
+    flex: 1.25,
+    backgroundColor: '#170066',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   tvIcon: {
-    fontSize: 38,
-    marginBottom: 4,
+    fontSize: 64,
+    marginBottom: 8,
   },
   tvLabel: {
     color: '#ffffff',
-    fontSize: 9,
+    fontSize: 17,
     fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 11,
-  },
-  tvInnerFrame: {
-    backgroundColor: '#170066',
-    borderColor: '#12b2ff',
-    borderWidth: 0.8,
-    borderRadius: 8,
-    width: '58%',
-    height: '66%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    lineHeight: 20,
   },
   midColumn: {
     flex: 1,
-    gap: 4,
+    gap: 12,
     minHeight: 0,
   },
   midCard: {
     flex: 1,
-    backgroundColor: 'transparent',
-    borderColor: '#0286ff',
-    borderWidth: 0,
-    borderRadius: 10,
+    backgroundColor: '#170066',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 6,
-    paddingVertical: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
   },
   midIcon: {
-    fontSize: 24,
-    marginBottom: 1,
+    fontSize: 40,
+    marginBottom: 6,
   },
   midLabel: {
     color: '#ffffff',
-    fontSize: 8,
+    fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
-    lineHeight: 9,
-  },
-  midInnerFrame: {
-    backgroundColor: '#170066',
-    borderColor: '#12b2ff',
-    borderWidth: 0.8,
-    borderRadius: 8,
-    width: '72%',
-    height: '72%',
-    alignItems: 'center',
-    justifyContent: 'center',
+    lineHeight: 16,
   },
   sideMenu: {
-    width: 150,
-    gap: 4,
+    width: 220,
+    gap: 12,
   },
   sideMenuItem: {
-    height: 52,
-    backgroundColor: 'transparent',
-    borderColor: '#0286ff',
-    borderWidth: 0,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sideInnerFrame: {
+    flex: 1,
     backgroundColor: '#12004f',
-    borderColor: '#12b2ff',
-    borderWidth: 0.8,
-    borderRadius: 8,
-    width: '92%',
-    height: '90%',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
-    gap: 5,
-    paddingHorizontal: 8,
+    gap: 12,
   },
   sideMenuIcon: {
-    fontSize: 14,
+    fontSize: 28,
     color: '#ffffff',
-    lineHeight: 18,
+    lineHeight: 32,
   },
   sideMenuLabel: {
     flex: 1,
     color: '#ffffff',
-    fontSize: 8,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
-  footer: {
-    marginTop: 2,
-    borderTopWidth: 0.6,
-    borderTopColor: '#0286ff',
-    height: 28,
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  expiryText: {
-    color: '#ffffff',
-    fontSize: 7,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  versionText: {
-    position: 'absolute',
-    right: 2,
-    top: 8,
-    color: '#ffffff',
-    fontSize: 7,
-    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: 'left',
   },
 });
