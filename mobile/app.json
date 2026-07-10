@@ -1,0 +1,34 @@
+// app.json - Configuração do Expo
+export default {
+  expo: {
+    name: "WebTech Premium",
+    slug: "webtech-premium",
+    version: "1.0.0",
+    assetBranding: {
+      "xxxhdpi": "./assets/adaptive-icon.png"
+    },
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    newArchEnabled: true,
+    ios: {
+      supportsTabletMode: true
+    },
+    android: {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      package: "com.webtechpremium.app"
+    },
+    web: {
+      bundler: "metro",
+      output: "static",
+      favicon: "./assets/favicon.png"
+    },
+    plugins: ["expo-router"],
+    experiments: {
+      typedRoutes: true
+    }
+  }
+};

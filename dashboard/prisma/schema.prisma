@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int     @id @default(autoincrement())
+  email     String  @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apps App[]
+}
+
+model App {
+  id        Int     @id @default(autoincrement())
+  name      String
+  macAddress String @unique
+  version   String
+  status    String @default("active") // active, inactive, suspended
+  userId    Int
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  sessions  Session[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Session {
+  id        Int     @id @default(autoincrement())
+  token     String  @unique
+  appId     Int
+  app       App     @relation(fields: [appId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([appId])
+}
+
+model M3UList {
+  id        Int     @id @default(autoincrement())
+  name      String
+  url       String
+  appId     Int
+  app       App     @relation(fields: [appId], references: [id], onDelete: Cascade)
+  isActive  Boolean @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([appId])
+}
