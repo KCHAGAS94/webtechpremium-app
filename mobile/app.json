@@ -3,7 +3,7 @@
     "name": "WebTech Premium",
     "slug": "webtech-premium",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
