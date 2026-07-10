@@ -159,14 +159,16 @@ const styles = StyleSheet.create({
   contentArea: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
     minHeight: 0,
   },
   layoutRow: {
     flex: 1,
     flexDirection: 'row',
-    gap: 12,
+    width: '95%',
+    gap: 8,
     minHeight: 0,
-    maxHeight: 300,
+    maxHeight: 286,
   },
   tvCard: {
     flex: 1.25,
@@ -192,7 +194,7 @@ const styles = StyleSheet.create({
   },
   midColumn: {
     flex: 1,
-    gap: 12,
+    gap: 8,
     minHeight: 0,
   },
   midCard: {
@@ -218,8 +220,8 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   sideMenu: {
-    width: 220,
-    gap: 12,
+    width: 255,
+    gap: 8,
   },
   sideMenuItem: {
     flex: 1,
