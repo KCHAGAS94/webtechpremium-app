@@ -4,7 +4,7 @@
     "slug": "webtech-premium",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
     "newArchEnabled": false,
     "sdkVersion": "54.0.0",
@@ -12,16 +12,15 @@
     "android": {
       "package": "com.webtechpremium.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/icon.png",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#0a0a1a"
       }
     },
     "ios": {
-      "bundleIdentifier": "com.webtechpremium.app",
-      "supportsTabletMode": true
+      "bundleIdentifier": "com.webtechpremium.app"
     },
     "web": {
-      "favicon": "./assets/icon.png"
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [],
     "scheme": "webtechpremium"
