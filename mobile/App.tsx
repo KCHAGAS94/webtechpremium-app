@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,13 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { LiveTvScreen } from './src/components/live-tv-screen';
+import { PlaylistSetupScreen } from './src/components/playlist-setup-screen';
+import { parseM3u, type M3uChannel } from './src/utils/m3u-parser';
+
+const PLAYLIST_URL_KEY = 'webtech.playlistUrl';
+const PLAYLIST_CHANNELS_KEY = 'webtech.playlistChannels';
 
 interface MenuItem {
   id: string;
@@ -31,6 +38,8 @@ const sideMenuItems: MenuItem[] = [
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
+  const [playlistUrl, setPlaylistUrl] = useState('');
+  const [channels, setChannels] = useState<M3uChannel[]>([]);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
   const rightTop = menuItems[2];
@@ -38,15 +47,64 @@ export default function App() {
   const rightBottom = menuItems[4];
   const settingsItem = menuItems[5];
 
+  useEffect(() => {
+    (async () => {
+      const [savedUrl, savedChannels] = await Promise.all([
+        AsyncStorage.getItem(PLAYLIST_URL_KEY),
+        AsyncStorage.getItem(PLAYLIST_CHANNELS_KEY),
+      ]);
+      if (savedUrl) setPlaylistUrl(savedUrl);
+      if (savedChannels) {
+        try {
+          setChannels(JSON.parse(savedChannels));
+        } catch {
+          // ignore corrupted cache
+        }
+      }
+    })();
+  }, []);
+
+  const handlePlaylistLoaded = async (url: string, loadedChannels: M3uChannel[]) => {
+    setPlaylistUrl(url);
+    setChannels(loadedChannels);
+    setCurrentScreen('tv');
+    await Promise.all([
+      AsyncStorage.setItem(PLAYLIST_URL_KEY, url),
+      AsyncStorage.setItem(PLAYLIST_CHANNELS_KEY, JSON.stringify(loadedChannels)),
+    ]);
+  };
+
   const handleMenuPress = (screen?: string) => {
     if (screen === 'exit') {
       console.log('Exiting...');
     } else if (screen === 'reload') {
       setCurrentScreen('home');
+    } else if (screen === 'tv' && channels.length === 0) {
+      setCurrentScreen('playlist');
     } else {
       setCurrentScreen(screen || 'home');
     }
   };
+
+  if (currentScreen === 'playlist') {
+    return (
+      <PlaylistSetupScreen
+        initialUrl={playlistUrl}
+        onLoaded={handlePlaylistLoaded}
+        onCancel={() => setCurrentScreen('home')}
+      />
+    );
+  }
+
+  if (currentScreen === 'tv') {
+    return (
+      <LiveTvScreen
+        channels={channels}
+        onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+        onChangePlaylist={() => setCurrentScreen('playlist')}
+      />
+    );
+  }
 
   return (
     <LinearGradient
