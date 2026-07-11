@@ -10,10 +10,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LiveTvScreen } from './src/components/live-tv-screen';
 import { PlaylistSetupScreen } from './src/components/playlist-setup-screen';
-import { parseM3u, type M3uChannel } from './src/utils/m3u-parser';
+import { loadChannels, saveChannels } from './src/utils/channel-storage';
+import { type M3uChannel } from './src/utils/m3u-parser';
 
 const PLAYLIST_URL_KEY = 'webtech.playlistUrl';
-const PLAYLIST_CHANNELS_KEY = 'webtech.playlistChannels';
 
 interface MenuItem {
   id: string;
@@ -51,16 +51,10 @@ export default function App() {
     (async () => {
       const [savedUrl, savedChannels] = await Promise.all([
         AsyncStorage.getItem(PLAYLIST_URL_KEY),
-        AsyncStorage.getItem(PLAYLIST_CHANNELS_KEY),
+        loadChannels(),
       ]);
       if (savedUrl) setPlaylistUrl(savedUrl);
-      if (savedChannels) {
-        try {
-          setChannels(JSON.parse(savedChannels));
-        } catch {
-          // ignore corrupted cache
-        }
-      }
+      if (savedChannels.length > 0) setChannels(savedChannels);
     })();
   }, []);
 
@@ -68,10 +62,7 @@ export default function App() {
     setPlaylistUrl(url);
     setChannels(loadedChannels);
     setCurrentScreen('tv');
-    await Promise.all([
-      AsyncStorage.setItem(PLAYLIST_URL_KEY, url),
-      AsyncStorage.setItem(PLAYLIST_CHANNELS_KEY, JSON.stringify(loadedChannels)),
-    ]);
+    await Promise.all([AsyncStorage.setItem(PLAYLIST_URL_KEY, url), saveChannels(loadedChannels)]);
   };
 
   const handleMenuPress = (screen?: string) => {

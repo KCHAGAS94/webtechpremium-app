@@ -22,6 +22,7 @@ export function PlaylistSetupScreen({ initialUrl, onLoaded, onCancel }: Props) {
   const [url, setUrl] = useState(initialUrl ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [progress, setProgress] = useState(0);
 
   const handleLoad = async () => {
     const trimmedUrl = url.trim();
@@ -31,6 +32,7 @@ export function PlaylistSetupScreen({ initialUrl, onLoaded, onCancel }: Props) {
     }
 
     setLoading(true);
+    setProgress(0);
     setError('');
 
     try {
@@ -39,7 +41,9 @@ export function PlaylistSetupScreen({ initialUrl, onLoaded, onCancel }: Props) {
         throw new Error(`HTTP ${response.status}`);
       }
       const raw = await response.text();
-      const channels = parseM3u(raw);
+      const channels = await parseM3u(raw, ({ processedLines, totalLines }) => {
+        setProgress(totalLines > 0 ? processedLines / totalLines : 0);
+      });
 
       if (channels.length === 0) {
         setError('Nenhum canal encontrado nessa lista.');
@@ -92,7 +96,14 @@ export function PlaylistSetupScreen({ initialUrl, onLoaded, onCancel }: Props) {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <View style={styles.loadingRow}>
+                  <ActivityIndicator color="#fff" />
+                  {progress > 0 && (
+                    <ThemedText style={styles.loadButtonText}>
+                      {Math.round(progress * 100)}%
+                    </ThemedText>
+                  )}
+                </View>
               ) : (
                 <ThemedText style={styles.loadButtonText}>Carregar lista</ThemedText>
               )}
@@ -177,5 +188,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

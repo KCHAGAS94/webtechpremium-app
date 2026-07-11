@@ -88,12 +88,16 @@ const ChannelRow = memo(function ChannelRow({
 });
 
 export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) {
-  // Single pass over the (potentially huge) channel list: group channels by
+  // Single pass over the (potentially huge) channel list: keep only groups
+  // classified as live TV (see content-classifier.ts) and group them by
   // `group-title` once per playlist load, instead of re-filtering the full
   // list every time the user switches category or types in the search box.
-  const { categories, channelsByGroup } = useMemo(() => {
+  const { categories, channelsByGroup, liveChannels } = useMemo(() => {
     const byGroup = new Map<string, M3uChannel[]>();
+    const live: M3uChannel[] = [];
     for (const channel of channels) {
+      if (channel.category !== 'live') continue;
+      live.push(channel);
       const list = byGroup.get(channel.groupTitle);
       if (list) {
         list.push(channel);
@@ -102,18 +106,18 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
       }
     }
     const cats: Category[] = [
-      { id: ALL_CATEGORY_ID, title: 'Tudo', count: channels.length },
+      { id: ALL_CATEGORY_ID, title: 'Tudo', count: live.length },
       ...Array.from(byGroup.entries()).map(([title, list]) => ({
         id: title,
         title,
         count: list.length,
       })),
     ];
-    return { categories: cats, channelsByGroup: byGroup };
+    return { categories: cats, channelsByGroup: byGroup, liveChannels: live };
   }, [channels]);
 
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
-  const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(channels[0]);
+  const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(liveChannels[0]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isBuffering, setIsBuffering] = useState(true);
@@ -137,9 +141,9 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
   // Cheap lookup instead of a full-list filter: only recomputes when the
   // playlist reloads or the selected category actually changes.
   const categoryChannels = useMemo(() => {
-    if (selectedCategory === ALL_CATEGORY_ID) return channels;
+    if (selectedCategory === ALL_CATEGORY_ID) return liveChannels;
     return channelsByGroup.get(selectedCategory) ?? [];
-  }, [channels, channelsByGroup, selectedCategory]);
+  }, [liveChannels, channelsByGroup, selectedCategory]);
 
   // Search only runs against the already-narrowed category subset, so typing
   // inside "CANAIS: ESPORTES" (35 items) never touches the other ~19k channels.
