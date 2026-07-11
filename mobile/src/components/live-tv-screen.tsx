@@ -1,5 +1,13 @@
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
@@ -22,53 +30,164 @@ const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: 'series', label: 'Séries' },
 ];
 
+const ALL_CATEGORY_ID = 'all';
+const SEARCH_DEBOUNCE_MS = 200;
+
+// Must stay in sync with categoryRow / channelRow paddingVertical + borderBottomWidth below,
+// so FlatList can skip cell measurement (getItemLayout) on very large lists.
+const CATEGORY_ROW_HEIGHT = 41;
+const CHANNEL_ROW_HEIGHT = 37;
+
 type Props = {
   channels: M3uChannel[];
   onNavigate: (key: NavKey) => void;
   onChangePlaylist: () => void;
 };
 
+const CategoryRow = memo(function CategoryRow({
+  item,
+  isActive,
+  onPress,
+}: {
+  item: Category;
+  isActive: boolean;
+  onPress: (id: string) => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.categoryRow} onPress={() => onPress(item.id)}>
+      <ThemedText
+        style={[styles.categoryTitle, isActive && styles.categoryTitleActive]}
+        numberOfLines={1}
+      >
+        {item.title}
+      </ThemedText>
+      <ThemedText style={styles.categoryCount}>{item.count}</ThemedText>
+    </TouchableOpacity>
+  );
+});
+
+const ChannelRow = memo(function ChannelRow({
+  item,
+  isSelected,
+  onPress,
+}: {
+  item: M3uChannel;
+  isSelected: boolean;
+  onPress: (channel: M3uChannel) => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.channelRow, isSelected && styles.channelRowSelected]}
+      onPress={() => onPress(item)}
+    >
+      <ThemedText style={styles.channelName} numberOfLines={1}>
+        {item.name}
+      </ThemedText>
+    </TouchableOpacity>
+  );
+});
+
 export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) {
-  const categories = useMemo<Category[]>(() => {
-    const counts = new Map<string, number>();
+  // Single pass over the (potentially huge) channel list: group channels by
+  // `group-title` once per playlist load, instead of re-filtering the full
+  // list every time the user switches category or types in the search box.
+  const { categories, channelsByGroup } = useMemo(() => {
+    const byGroup = new Map<string, M3uChannel[]>();
     for (const channel of channels) {
-      counts.set(channel.groupTitle, (counts.get(channel.groupTitle) ?? 0) + 1);
+      const list = byGroup.get(channel.groupTitle);
+      if (list) {
+        list.push(channel);
+      } else {
+        byGroup.set(channel.groupTitle, [channel]);
+      }
     }
-    return [
-      { id: 'all', title: 'Tudo', count: channels.length },
-      ...Array.from(counts.entries()).map(([title, count]) => ({
+    const cats: Category[] = [
+      { id: ALL_CATEGORY_ID, title: 'Tudo', count: channels.length },
+      ...Array.from(byGroup.entries()).map(([title, list]) => ({
         id: title,
         title,
-        count,
+        count: list.length,
       })),
     ];
+    return { categories: cats, channelsByGroup: byGroup };
   }, [channels]);
 
-  const [activeCategory, setActiveCategory] = useState('all');
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
   const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(channels[0]);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isBuffering, setIsBuffering] = useState(true);
 
   const player = useVideoPlayer(selectedChannel?.url ?? null, (instance) => {
     instance.play();
   });
 
-  const filteredChannels = useMemo(() => {
-    let list = channels;
-    if (activeCategory !== 'all') {
-      list = list.filter((c) => c.groupTitle === activeCategory);
-    }
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter((c) => c.name.toLowerCase().includes(q));
-    }
-    return list;
-  }, [channels, activeCategory, search]);
+  const videoViewRef = useRef<VideoView>(null);
 
-  const handleSelectChannel = (channel: M3uChannel) => {
+  const handleExpandFullscreen = useCallback(() => {
+    videoViewRef.current?.enterFullscreen();
+  }, []);
+
+  // Debounce the search text so we don't re-filter on every keystroke.
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handle);
+  }, [search]);
+
+  // Cheap lookup instead of a full-list filter: only recomputes when the
+  // playlist reloads or the selected category actually changes.
+  const categoryChannels = useMemo(() => {
+    if (selectedCategory === ALL_CATEGORY_ID) return channels;
+    return channelsByGroup.get(selectedCategory) ?? [];
+  }, [channels, channelsByGroup, selectedCategory]);
+
+  // Search only runs against the already-narrowed category subset, so typing
+  // inside "CANAIS: ESPORTES" (35 items) never touches the other ~19k channels.
+  const filteredChannels = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (!q) return categoryChannels;
+    return categoryChannels.filter((c) => c.name.toLowerCase().includes(q));
+  }, [categoryChannels, debouncedSearch]);
+
+  const handleSelectChannel = useCallback((channel: M3uChannel) => {
     setSelectedChannel(channel);
     setIsBuffering(true);
-  };
+  }, []);
+
+  const renderCategory = useCallback(
+    ({ item }: { item: Category }) => (
+      <CategoryRow item={item} isActive={item.id === selectedCategory} onPress={setSelectedCategory} />
+    ),
+    [selectedCategory]
+  );
+
+  const renderChannel = useCallback(
+    ({ item }: { item: M3uChannel }) => (
+      <ChannelRow item={item} isSelected={item.id === selectedChannel?.id} onPress={handleSelectChannel} />
+    ),
+    [selectedChannel?.id, handleSelectChannel]
+  );
+
+  const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
+  const channelKeyExtractor = useCallback((item: M3uChannel) => item.id, []);
+
+  const getCategoryItemLayout = useCallback(
+    (_: unknown, index: number) => ({
+      length: CATEGORY_ROW_HEIGHT,
+      offset: CATEGORY_ROW_HEIGHT * index,
+      index,
+    }),
+    []
+  );
+
+  const getChannelItemLayout = useCallback(
+    (_: unknown, index: number) => ({
+      length: CHANNEL_ROW_HEIGHT,
+      offset: CHANNEL_ROW_HEIGHT * index,
+      index,
+    }),
+    []
+  );
 
   return (
     <ThemedView style={styles.container}>
@@ -109,24 +228,14 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
           <View style={styles.categoriesColumn}>
             <FlatList
               data={categories}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.categoryRow}
-                  onPress={() => setActiveCategory(item.id)}
-                >
-                  <ThemedText
-                    style={[
-                      styles.categoryTitle,
-                      item.id === activeCategory && styles.categoryTitleActive,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {item.title}
-                  </ThemedText>
-                  <ThemedText style={styles.categoryCount}>{item.count}</ThemedText>
-                </TouchableOpacity>
-              )}
+              keyExtractor={categoryKeyExtractor}
+              renderItem={renderCategory}
+              extraData={selectedCategory}
+              getItemLayout={getCategoryItemLayout}
+              initialNumToRender={16}
+              maxToRenderPerBatch={16}
+              windowSize={7}
+              removeClippedSubviews
             />
           </View>
 
@@ -134,20 +243,14 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
           <View style={styles.channelsColumn}>
             <FlatList
               data={filteredChannels}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                const isSelected = item.id === selectedChannel?.id;
-                return (
-                  <TouchableOpacity
-                    style={[styles.channelRow, isSelected && styles.channelRowSelected]}
-                    onPress={() => handleSelectChannel(item)}
-                  >
-                    <ThemedText style={styles.channelName} numberOfLines={1}>
-                      {item.name}
-                    </ThemedText>
-                  </TouchableOpacity>
-                );
-              }}
+              keyExtractor={channelKeyExtractor}
+              renderItem={renderChannel}
+              extraData={selectedChannel?.id}
+              getItemLayout={getChannelItemLayout}
+              initialNumToRender={16}
+              maxToRenderPerBatch={16}
+              windowSize={7}
+              removeClippedSubviews
             />
           </View>
 
@@ -155,11 +258,13 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
           <View style={styles.previewColumn}>
             <View style={styles.previewPlayer}>
               {selectedChannel ? (
-                <>
+                <Pressable style={styles.previewPressable} onPress={handleExpandFullscreen}>
                   <VideoView
+                    ref={videoViewRef}
                     style={styles.video}
                     player={player}
-                    nativeControls
+                    nativeControls={false}
+                    fullscreenOptions={{ enable: true, orientation: 'landscape' }}
                     onFirstFrameRender={() => setIsBuffering(false)}
                   />
                   {isBuffering && (
@@ -167,7 +272,10 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
                       <ActivityIndicator color="#4dd6ff" size="large" />
                     </View>
                   )}
-                </>
+                  <View style={styles.expandHint} pointerEvents="none">
+                    <ThemedText style={styles.expandHintIcon}>⤢</ThemedText>
+                  </View>
+                </Pressable>
               ) : (
                 <ThemedText style={styles.previewPlaceholder}>▶</ThemedText>
               )}
@@ -305,6 +413,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  previewPressable: {
+    width: '100%',
+    height: '100%',
+  },
   video: {
     width: '100%',
     height: '100%',
@@ -314,6 +426,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  expandHint: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  expandHintIcon: {
+    fontSize: 14,
+    color: '#fff',
   },
   previewPlaceholder: {
     fontSize: 40,
