@@ -27,7 +27,8 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-video"
+      "expo-video",
+      "expo-brightness"
     ],
     "scheme": "webtechpremium"
   }

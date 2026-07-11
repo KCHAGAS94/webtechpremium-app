@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
+import { FullscreenPlayer } from '@/components/fullscreen-player';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { ContentCategory } from '@/utils/content-classifier';
@@ -137,15 +138,18 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isBuffering, setIsBuffering] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const player = useVideoPlayer(selectedChannel?.url ?? null, (instance) => {
     instance.play();
   });
 
-  const videoViewRef = useRef<VideoView>(null);
-
   const handleExpandFullscreen = useCallback(() => {
-    videoViewRef.current?.enterFullscreen();
+    setIsFullscreen(true);
+  }, []);
+
+  const handleCloseFullscreen = useCallback(() => {
+    setIsFullscreen(false);
   }, []);
 
   // Debounce the search text so we don't re-filter on every keystroke.
@@ -280,11 +284,9 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
               {selectedChannel ? (
                 <Pressable style={styles.previewPressable} onPress={handleExpandFullscreen}>
                   <VideoView
-                    ref={videoViewRef}
                     style={styles.video}
                     player={player}
                     nativeControls={false}
-                    fullscreenOptions={{ enable: true, orientation: 'landscape' }}
                     onFirstFrameRender={() => setIsBuffering(false)}
                   />
                   {isBuffering && (
@@ -309,6 +311,10 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
           </View>
         </View>
       </SafeAreaView>
+
+      {isFullscreen && selectedChannel && (
+        <FullscreenPlayer player={player} title={selectedChannel.name} onClose={handleCloseFullscreen} />
+      )}
     </ThemedView>
   );
 }
