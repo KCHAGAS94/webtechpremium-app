@@ -13,9 +13,10 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import type { ContentCategory } from '@/utils/content-classifier';
 import type { M3uChannel } from '@/utils/m3u-parser';
 
-type NavKey = 'home' | 'live' | 'movies' | 'series';
+export type NavKey = 'home' | 'live' | 'movies' | 'series';
 
 type Category = {
   id: string;
@@ -30,6 +31,14 @@ const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: 'series', label: 'Séries' },
 ];
 
+// Per-category copy so the same screen reads naturally whether it's browsing
+// live channels, movies, or series.
+const CONTENT_LABELS: Record<ContentCategory, { searchPlaceholder: string; emptyPreview: string }> = {
+  live: { searchPlaceholder: 'Buscar canal', emptyPreview: 'Selecione um canal' },
+  movies: { searchPlaceholder: 'Buscar filme', emptyPreview: 'Selecione um filme' },
+  series: { searchPlaceholder: 'Buscar série', emptyPreview: 'Selecione uma série' },
+};
+
 const ALL_CATEGORY_ID = 'all';
 const SEARCH_DEBOUNCE_MS = 200;
 
@@ -40,6 +49,10 @@ const CHANNEL_ROW_HEIGHT = 37;
 
 type Props = {
   channels: M3uChannel[];
+  /** Which content bucket this screen browses (see content-classifier.ts). */
+  category: ContentCategory;
+  /** Which header nav item to highlight as active. */
+  activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
   onChangePlaylist: () => void;
 };
@@ -87,17 +100,20 @@ const ChannelRow = memo(function ChannelRow({
   );
 });
 
-export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) {
+export function ContentBrowserScreen({ channels, category, activeNav, onNavigate, onChangePlaylist }: Props) {
+  const labels = CONTENT_LABELS[category];
+
   // Single pass over the (potentially huge) channel list: keep only groups
-  // classified as live TV (see content-classifier.ts) and group them by
-  // `group-title` once per playlist load, instead of re-filtering the full
-  // list every time the user switches category or types in the search box.
-  const { categories, channelsByGroup, liveChannels } = useMemo(() => {
+  // classified into this screen's `category` (see content-classifier.ts) and
+  // group them by `group-title` once per playlist load, instead of
+  // re-filtering the full list every time the user switches category or
+  // types in the search box.
+  const { categories, channelsByGroup, bucketChannels } = useMemo(() => {
     const byGroup = new Map<string, M3uChannel[]>();
-    const live: M3uChannel[] = [];
+    const bucket: M3uChannel[] = [];
     for (const channel of channels) {
-      if (channel.category !== 'live') continue;
-      live.push(channel);
+      if (channel.category !== category) continue;
+      bucket.push(channel);
       const list = byGroup.get(channel.groupTitle);
       if (list) {
         list.push(channel);
@@ -106,18 +122,18 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
       }
     }
     const cats: Category[] = [
-      { id: ALL_CATEGORY_ID, title: 'Tudo', count: live.length },
+      { id: ALL_CATEGORY_ID, title: 'Tudo', count: bucket.length },
       ...Array.from(byGroup.entries()).map(([title, list]) => ({
         id: title,
         title,
         count: list.length,
       })),
     ];
-    return { categories: cats, channelsByGroup: byGroup, liveChannels: live };
-  }, [channels]);
+    return { categories: cats, channelsByGroup: byGroup, bucketChannels: bucket };
+  }, [channels, category]);
 
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
-  const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(liveChannels[0]);
+  const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(bucketChannels[0]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isBuffering, setIsBuffering] = useState(true);
@@ -141,16 +157,16 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
   // Cheap lookup instead of a full-list filter: only recomputes when the
   // playlist reloads or the selected category actually changes.
   const categoryChannels = useMemo(() => {
-    if (selectedCategory === ALL_CATEGORY_ID) return liveChannels;
+    if (selectedCategory === ALL_CATEGORY_ID) return bucketChannels;
     return channelsByGroup.get(selectedCategory) ?? [];
-  }, [liveChannels, channelsByGroup, selectedCategory]);
+  }, [bucketChannels, channelsByGroup, selectedCategory]);
 
   // Search only runs against the already-narrowed category subset, so typing
   // inside "CANAIS: ESPORTES" (35 items) never touches the other ~19k channels.
   const filteredChannels = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     if (!q) return categoryChannels;
-    return categoryChannels.filter((c) => c.name.toLowerCase().includes(q));
+    return categoryChannels.filter((c: M3uChannel) => c.name.toLowerCase().includes(q));
   }, [categoryChannels, debouncedSearch]);
 
   const handleSelectChannel = useCallback((channel: M3uChannel) => {
@@ -202,7 +218,7 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
             {NAV_ITEMS.map((item) => (
               <TouchableOpacity key={item.key} onPress={() => onNavigate(item.key)}>
                 <ThemedText
-                  style={[styles.headerNavItem, item.key === 'live' && styles.headerNavItemActive]}
+                  style={[styles.headerNavItem, item.key === activeNav && styles.headerNavItemActive]}
                 >
                   {item.label}
                 </ThemedText>
@@ -215,7 +231,7 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
             <TextInput
               value={search}
               onChangeText={setSearch}
-              placeholder="Buscar canal"
+              placeholder={labels.searchPlaceholder}
               placeholderTextColor="#8888aa"
               style={styles.searchInput}
             />
@@ -287,7 +303,7 @@ export function LiveTvScreen({ channels, onNavigate, onChangePlaylist }: Props) 
 
             <View style={styles.previewInfo}>
               <ThemedText style={styles.previewTitle}>
-                {selectedChannel?.name ?? 'Selecione um canal'}
+                {selectedChannel?.name ?? labels.emptyPreview}
               </ThemedText>
             </View>
           </View>

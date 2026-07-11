@@ -8,12 +8,22 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LiveTvScreen } from './src/components/live-tv-screen';
+import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
 import { PlaylistSetupScreen } from './src/components/playlist-setup-screen';
 import { loadChannels, saveChannels } from './src/utils/channel-storage';
+import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 
 const PLAYLIST_URL_KEY = 'webtech.playlistUrl';
+
+// Maps a dashboard/menu screen key to the content bucket its browser screen
+// should show (see content-classifier.ts). Same screen component for all
+// three - only the category (and which nav item lights up) changes.
+const CONTENT_SCREENS: Partial<Record<string, ContentCategory>> = {
+  tv: 'live',
+  movies: 'movies',
+  series: 'series',
+};
 
 interface MenuItem {
   id: string;
@@ -70,7 +80,7 @@ export default function App() {
       console.log('Exiting...');
     } else if (screen === 'reload') {
       setCurrentScreen('home');
-    } else if (screen === 'tv' && channels.length === 0) {
+    } else if (screen && screen in CONTENT_SCREENS && channels.length === 0) {
       setCurrentScreen('playlist');
     } else {
       setCurrentScreen(screen || 'home');
@@ -87,10 +97,13 @@ export default function App() {
     );
   }
 
-  if (currentScreen === 'tv') {
+  const contentCategory = CONTENT_SCREENS[currentScreen];
+  if (contentCategory) {
     return (
-      <LiveTvScreen
+      <ContentBrowserScreen
         channels={channels}
+        category={contentCategory}
+        activeNav={currentScreen === 'tv' ? 'live' : (currentScreen as NavKey)}
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
         onChangePlaylist={() => setCurrentScreen('playlist')}
       />
