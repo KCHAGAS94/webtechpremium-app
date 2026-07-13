@@ -7,16 +7,15 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
+import { DeviceActivationScreen } from './src/components/device-activation-screen';
 import { MoviesScreen } from './src/components/movies-screen';
-import { PlaylistSetupScreen } from './src/components/playlist-setup-screen';
 import { SeriesScreen } from './src/components/series-screen';
 import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
-
-const PLAYLIST_URL_KEY = 'webtech.playlistUrl';
+import { loadPlaylist } from './src/utils/playlist-loader';
+import { getActivePlaylist } from './src/utils/playlist-storage';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
 // should show (see content-classifier.ts). Same screen component for all
@@ -50,8 +49,8 @@ const sideMenuItems: MenuItem[] = [
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
-  const [playlistUrl, setPlaylistUrl] = useState('');
   const [channels, setChannels] = useState<M3uChannel[]>([]);
+  const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
   const rightTop = menuItems[2];
@@ -61,20 +60,46 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      const [savedUrl, savedChannels] = await Promise.all([
-        AsyncStorage.getItem(PLAYLIST_URL_KEY),
+      const [activePlaylist, cachedChannels] = await Promise.all([
+        getActivePlaylist(),
         loadChannels(),
       ]);
-      if (savedUrl) setPlaylistUrl(savedUrl);
-      if (savedChannels.length > 0) setChannels(savedChannels);
+
+      if (cachedChannels.length > 0) {
+        setChannels(cachedChannels);
+        return;
+      }
+
+      if (activePlaylist) {
+        try {
+          const { tv, filmes, series } = await loadPlaylist(activePlaylist.url);
+          const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
+          setChannels(freshChannels);
+          await saveChannels(freshChannels);
+        } catch {
+          // Boot-time auto-load is best-effort; user can retry from "mudar lista de reprodução".
+        }
+      }
     })();
   }, []);
 
-  const handlePlaylistLoaded = async (url: string, loadedChannels: M3uChannel[]) => {
-    setPlaylistUrl(url);
-    setChannels(loadedChannels);
-    setCurrentScreen('tv');
-    await Promise.all([AsyncStorage.setItem(PLAYLIST_URL_KEY, url), saveChannels(loadedChannels)]);
+  const handleReloadPlaylist = async () => {
+    setReloadingPlaylist(true);
+    try {
+      const activePlaylist = await getActivePlaylist();
+      if (!activePlaylist) return;
+      const { tv, filmes, series } = await loadPlaylist(activePlaylist.url);
+      const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
+      if (freshChannels.length > 0) {
+        setChannels(freshChannels);
+        await saveChannels(freshChannels);
+        setCurrentScreen('home');
+      }
+    } catch {
+      // Reload is best-effort; user stays on the activation screen to retry.
+    } finally {
+      setReloadingPlaylist(false);
+    }
   };
 
   const handleMenuPress = (screen?: string) => {
@@ -91,11 +116,7 @@ export default function App() {
 
   if (currentScreen === 'playlist') {
     return (
-      <PlaylistSetupScreen
-        initialUrl={playlistUrl}
-        onLoaded={handlePlaylistLoaded}
-        onCancel={() => setCurrentScreen('home')}
-      />
+      <DeviceActivationScreen onReload={handleReloadPlaylist} reloading={reloadingPlaylist} />
     );
   }
 
