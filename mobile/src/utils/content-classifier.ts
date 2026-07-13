@@ -7,7 +7,8 @@ export type ContentCategory = 'live' | 'movies' | 'series';
 // those brands don't steal groups that are actually live TV.
 const LIVE_PREFIX_HINTS = ['CANAIS', 'CANAL', 'CHANNELS', 'CHANNEL'];
 
-const MOVIE_HINTS = ['FILME', 'FILMES', 'MOVIE', 'MOVIES', 'CINEMA', 'LANCAMENTO', 'LANCAMENTOS'];
+const MOVIE_HINTS = ['FILME', 'FILMES', 'MOVIE', 'MOVIES', 'CINEMA', 'LANCAMENTO', 'LANCAMENTOS', '4K', 'COLETANEA',
+  'COLETANEAS'];
 
 const SERIES_HINTS = [
   'SERIE',
@@ -18,6 +19,10 @@ const SERIES_HINTS = [
   'HBO',
   'EPISODIO',
   'EPISODIOS',
+  'NOVELA',
+  'NOVELAS',
+  'SHOW',
+  'SHOWS',
 ];
 
 const LIVE_HINTS = [

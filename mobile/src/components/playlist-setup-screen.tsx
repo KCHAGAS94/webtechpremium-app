@@ -10,7 +10,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { parseM3u, type M3uChannel } from '@/utils/m3u-parser';
+import type { M3uChannel } from '@/utils/m3u-parser';
+import { loadPlaylist } from '@/utils/playlist-loader';
 
 type Props = {
   initialUrl?: string;
@@ -36,14 +37,13 @@ export function PlaylistSetupScreen({ initialUrl, onLoaded, onCancel }: Props) {
     setError('');
 
     try {
-      const response = await fetch(trimmedUrl);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const raw = await response.text();
-      const channels = await parseM3u(raw, ({ processedLines, totalLines }) => {
+      const { tv, filmes, series } = await loadPlaylist(trimmedUrl, ({ processedLines, totalLines }) => {
         setProgress(totalLines > 0 ? processedLines / totalLines : 0);
       });
+      // App state (and on-disk cache) still keep one flat list tagged per
+      // item's `category` — loadPlaylist's tv/filmes/series split is done
+      // once here just to validate the playlist actually has content.
+      const channels: M3uChannel[] = [...tv, ...filmes, ...series];
 
       if (channels.length === 0) {
         setError('Nenhum canal encontrado nessa lista.');

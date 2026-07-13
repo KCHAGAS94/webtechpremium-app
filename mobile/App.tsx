@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
 import { MoviesScreen } from './src/components/movies-screen';
 import { PlaylistSetupScreen } from './src/components/playlist-setup-screen';
+import { SeriesScreen } from './src/components/series-screen';
 import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
@@ -103,6 +104,17 @@ export default function App() {
       <MoviesScreen
         channels={channels}
         activeNav="movies"
+        onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+        onChangePlaylist={() => setCurrentScreen('playlist')}
+      />
+    );
+  }
+
+  if (currentScreen === 'series') {
+    return (
+      <SeriesScreen
+        channels={channels}
+        activeNav="series"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
         onChangePlaylist={() => setCurrentScreen('playlist')}
       />
