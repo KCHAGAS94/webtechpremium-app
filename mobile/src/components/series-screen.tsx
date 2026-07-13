@@ -309,10 +309,10 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
               keyExtractor={categoryKeyExtractor}
               renderItem={renderCategory}
               extraData={selectedCategory}
-              initialNumToRender={16}
-              maxToRenderPerBatch={16}
-              windowSize={7}
-              removeClippedSubviews
+              initialNumToRender={10}
+              maxToRenderPerBatch={10}
+              windowSize={5}
+              removeClippedSubviews={true}
             />
           </View>
 
@@ -340,10 +340,10 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
                 renderItem={renderCard}
                 numColumns={NUM_COLUMNS}
                 extraData={favorites}
-                initialNumToRender={20}
-                maxToRenderPerBatch={20}
-                windowSize={7}
-                removeClippedSubviews
+                initialNumToRender={10}
+                maxToRenderPerBatch={10}
+                windowSize={5}
+                removeClippedSubviews={true}
                 contentContainerStyle={styles.gridContent}
               />
             )}
