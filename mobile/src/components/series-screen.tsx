@@ -148,17 +148,27 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
     };
   }, [bucketChannels]);
 
+  // Categories should count shows (folders), not raw episodes — a group with
+  // one show and 200 episodes must show "1", not "200".
+  const showCountByGroup = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const show of allShows) {
+      counts.set(show.groupTitle, (counts.get(show.groupTitle) ?? 0) + 1);
+    }
+    return counts;
+  }, [allShows]);
+
   const categoryList = useMemo<Category[]>(
     () => [
       { id: ALL_CATEGORY_ID, title: 'Tudo', count: allShows.length },
       { id: FAVORITES_CATEGORY_ID, title: 'Favorito', count: favorites.size },
-      ...Array.from(channelsByGroup.entries()).map(([title, list]) => ({
+      ...Array.from(channelsByGroup.keys()).map((title) => ({
         id: title,
         title,
-        count: list.length,
+        count: showCountByGroup.get(title) ?? 0,
       })),
     ],
-    [allShows.length, channelsByGroup, favorites.size]
+    [allShows.length, channelsByGroup, favorites.size, showCountByGroup]
   );
 
   // Every episode of a show shares the same source group-title (see
