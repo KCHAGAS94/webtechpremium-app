@@ -273,7 +273,7 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
 
           <View style={styles.gridColumn}>
             <View style={styles.gridToolbar}>
-              <ThemedText style={styles.sortLabel}>Ordenar por Adicionado ⌄</ThemedText>
+              <ThemedText style={styles.sortLabel}>Ordenar por Adicionado </ThemedText>
               <ThemedText style={styles.totalLabel}>
                 {categoryList.find((c) => c.id === selectedCategory)?.title ?? 'Tudo'}(
                 {filteredChannels.length})

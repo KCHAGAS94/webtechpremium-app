@@ -124,6 +124,7 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
   const [playingEpisode, setPlayingEpisode] = useState<SeriesEpisode | null>(null);
   const [allShows, setAllShows] = useState<SeriesShow[]>([]);
   const [isGrouping, setIsGrouping] = useState(true);
+  const [sortOrder, setSortOrder] = useState<'az' | 'za'>('az');
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
@@ -182,11 +183,21 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
     return allShows.filter((s) => s.groupTitle === selectedCategory);
   }, [allShows, selectedCategory, favorites]);
 
-  const filteredShows = useMemo(() => {
+  const searchedShows = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
     if (!q) return categoryShows;
     return categoryShows.filter((s) => s.name.toLowerCase().includes(q));
   }, [categoryShows, debouncedSearch]);
+
+  const filteredShows = useMemo(() => {
+    const sorted = [...searchedShows].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+    if (sortOrder === 'za') sorted.reverse();
+    return sorted;
+  }, [searchedShows, sortOrder]);
+
+  const handleToggleSort = useCallback(() => {
+    setSortOrder((current) => (current === 'az' ? 'za' : 'az'));
+  }, []);
 
   const handleOpenDetails = useCallback((show: SeriesShow) => {
     setViewingShow(show);
@@ -307,7 +318,11 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
 
           <View style={styles.gridColumn}>
             <View style={styles.gridToolbar}>
-              <ThemedText style={styles.sortLabel}>Ordenar por Adicionado ⌄</ThemedText>
+              <TouchableOpacity onPress={handleToggleSort}>
+                <ThemedText style={styles.sortLabel}>
+                  Ordenar por {sortOrder === 'az' ? 'A - Z' : 'Z - A'} 
+                </ThemedText>
+              </TouchableOpacity>
               <ThemedText style={styles.totalLabel}>
                 {categoryList.find((c) => c.id === selectedCategory)?.title ?? 'Tudo'}(
                 {filteredShows.length})
