@@ -1,10 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
-const mockUsers = [];
+type User = {
+  id: number;
+  name: string;
+  mac: string;
+  usuario: string;
+  password: string;
+  expiracaoData: string;
+  m3u: string;
+  dns: string;
+  expirado: boolean;
+};
 
-type User = typeof mockUsers[0];
+const mockUsers: User[] = [];
+
+// Formats free-typed input into AA:BB:CC:DD:EE:FF as the user types: strips
+// anything but hex chars, uppercases, and inserts ':' every 2 characters.
+function formatMacAddress(value: string): string {
+  const hex = value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
+  return hex.match(/.{1,2}/g)?.join(':') ?? hex;
+}
 
 function EditModal({ user, onClose, onSave }: { user: User | null; onClose: () => void; onSave: (user: User) => void }) {
   const [formData, setFormData] = useState<User>(
@@ -15,7 +32,7 @@ function EditModal({ user, onClose, onSave }: { user: User | null; onClose: () =
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData({ ...formData, [name]: name === 'mac' ? formatMacAddress(value) : value });
   };
 
   const handleSave = () => {
@@ -56,7 +73,9 @@ function EditModal({ user, onClose, onSave }: { user: User | null; onClose: () =
                 name="mac"
                 value={formData.mac}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+                maxLength={17}
+                placeholder="00:1A:3M:A3:02:11"
+                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
               />
             </div>
 
@@ -155,16 +174,35 @@ export default function UsuariosPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isAdding, setIsAdding] = useState(false);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const response = await fetch('/api/painel/devices');
+        const data = await response.json();
+        setUsers(data.devices ?? []);
+      } catch (error) {
+        console.error('Falha ao carregar dispositivos do painel', error);
+      }
+    })();
+  }, []);
+
   const filteredUsers = users.filter(
     (user) =>
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.mac.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.usuario.toLowerCase().includes(searchTerm.toLowerCase())
+      (user.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.mac ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.usuario ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = (id: number) => {
-    if (confirm('Tem certeza que deseja deletar este usuário?')) {
-      setUsers(users.filter((user) => user.id !== id));
+  const handleDelete = async (user: User) => {
+    if (!confirm('Tem certeza que deseja deletar este usuário?')) return;
+
+    setUsers(users.filter((u) => u.id !== user.id));
+    try {
+      await fetch(`/api/painel/devices?mac=${encodeURIComponent(user.mac)}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('Falha ao remover dispositivo do painel', error);
     }
   };
 
@@ -183,12 +221,34 @@ export default function UsuariosPage() {
     setIsAdding(true);
   };
 
-  const handleSave = (updatedUser: User) => {
-    if (isAdding) {
-      setUsers([...users, updatedUser]);
-    } else {
-      setUsers(users.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+  const handleSave = async (updatedUser: User) => {
+    try {
+      const response = await fetch('/api/painel/devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mac: updatedUser.mac,
+          name: updatedUser.name,
+          m3u: updatedUser.m3u,
+          usuario: updatedUser.usuario,
+          password: updatedUser.password,
+          dns: updatedUser.dns,
+          expiracaoData: updatedUser.expiracaoData,
+          expirado: updatedUser.expirado,
+        }),
+      });
+      const { app } = await response.json();
+
+      const savedUser: User = app ? { ...updatedUser, id: app.id } : updatedUser;
+      if (isAdding) {
+        setUsers([...users, savedUser]);
+      } else {
+        setUsers(users.map((user) => (user.id === updatedUser.id ? savedUser : user)));
+      }
+    } catch (error) {
+      console.error('Falha ao salvar dispositivo no painel', error);
     }
+
     setEditingUser(null);
     setIsAdding(false);
   };
@@ -255,9 +315,13 @@ export default function UsuariosPage() {
                   </span>
                 </td>
                 <td className="px-6 py-3">
-                  <a href={user.dns} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline text-xs truncate">
-                    {user.dns.substring(0, 50)}...
-                  </a>
+                  {user.dns ? (
+                    <a href={user.dns} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline text-xs truncate">
+                      {user.dns.substring(0, 50)}...
+                    </a>
+                  ) : (
+                    <span className="text-gray-400 text-xs">—</span>
+                  )}
                 </td>
                 <td className="px-6 py-3 flex justify-center gap-2">
                   <button
@@ -270,7 +334,7 @@ export default function UsuariosPage() {
                     ✏️
                   </button>
                   <button
-                    onClick={() => handleDelete(user.id)}
+                    onClick={() => handleDelete(user)}
                     className="text-red-500 hover:text-red-700 font-semibold text-xl"
                   >
                     🗑️

@@ -1,85 +1,27 @@
-import React, { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import React, { useState } from 'react';
+import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { M3uChannel } from '@/utils/m3u-parser';
-import { loadPlaylist } from '@/utils/playlist-loader';
-import {
-  addPlaylist,
-  getActivePlaylistId,
-  getSavedPlaylists,
-  removePlaylist,
-  setActivePlaylistId,
-  type SavedPlaylist,
-} from '@/utils/playlist-storage';
+import type { PanelPlaylist } from '@/utils/panel-api';
 
 type Props = {
-  onActivated: (channels: M3uChannel[]) => void;
-  onActiveRemoved: () => void;
+  playlists: PanelPlaylist[];
+  activePlaylistId: number | null;
+  onSelect: (playlist: PanelPlaylist) => Promise<void> | void;
   onClose: () => void;
 };
 
-export function PlaylistManagerScreen({ onActivated, onActiveRemoved, onClose }: Props) {
-  const [playlists, setPlaylists] = useState<SavedPlaylist[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const [newUrl, setNewUrl] = useState('');
-  const [newName, setNewName] = useState('');
-  const [activatingId, setActivatingId] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+export function PlaylistManagerScreen({ playlists, activePlaylistId, onSelect, onClose }: Props) {
+  const [activatingId, setActivatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    (async () => {
-      const [savedPlaylists, savedActiveId] = await Promise.all([
-        getSavedPlaylists(),
-        getActivePlaylistId(),
-      ]);
-      setPlaylists(savedPlaylists);
-      setActiveId(savedActiveId);
-    })();
-  }, []);
-
-  const handleAdd = async () => {
-    const trimmedUrl = newUrl.trim();
-    if (!trimmedUrl) {
-      setError('Cole a URL da lista M3U.');
-      return;
-    }
-    setError('');
-    const playlist = await addPlaylist(trimmedUrl, newName);
-    setPlaylists((prev) => [...prev, playlist]);
-    setNewUrl('');
-    setNewName('');
-  };
-
-  const handleActivate = async (playlist: SavedPlaylist) => {
+  const handleSelect = async (playlist: PanelPlaylist) => {
     setActivatingId(playlist.id);
-    setProgress(0);
     setError('');
     try {
-      const { tv, filmes, series } = await loadPlaylist(
-        playlist.url,
-        ({ processedLines, totalLines }) => {
-          setProgress(totalLines > 0 ? processedLines / totalLines : 0);
-        }
-      );
-      const channels: M3uChannel[] = [...tv, ...filmes, ...series];
-      if (channels.length === 0) {
-        setError('Nenhum canal encontrado nessa lista.');
-        return;
-      }
-      await setActivePlaylistId(playlist.id);
-      setActiveId(playlist.id);
-      onActivated(channels);
+      await onSelect(playlist);
     } catch (err) {
       setError(
         err instanceof Error
@@ -88,15 +30,6 @@ export function PlaylistManagerScreen({ onActivated, onActiveRemoved, onClose }:
       );
     } finally {
       setActivatingId(null);
-    }
-  };
-
-  const handleDelete = async (playlist: SavedPlaylist) => {
-    await removePlaylist(playlist.id);
-    setPlaylists((prev) => prev.filter((p) => p.id !== playlist.id));
-    if (playlist.id === activeId) {
-      setActiveId(null);
-      onActiveRemoved();
     }
   };
 
@@ -110,51 +43,23 @@ export function PlaylistManagerScreen({ onActivated, onActiveRemoved, onClose }:
           </TouchableOpacity>
         </View>
 
-        <View style={styles.addRow}>
-          <TextInput
-            value={newName}
-            onChangeText={setNewName}
-            placeholder="Nome da lista (opcional)"
-            placeholderTextColor="#8888aa"
-            autoCapitalize="none"
-            autoCorrect={false}
-            style={styles.nameInput}
-          />
-          <View style={styles.urlRow}>
-            <TextInput
-              value={newUrl}
-              onChangeText={setNewUrl}
-              placeholder="http://servidor:porta/get.php?username=...&password=...&type=m3u_plus&output=ts"
-              placeholderTextColor="#8888aa"
-              autoCapitalize="none"
-              autoCorrect={false}
-              style={styles.urlInput}
-              multiline
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-              <ThemedText style={styles.addButtonText}>+</ThemedText>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <ThemedText style={styles.subtitle}>
+          Listas vinculadas a este dispositivo no painel.
+        </ThemedText>
 
         {!!error && <ThemedText style={styles.error}>{error}</ThemedText>}
 
         <FlatList
           data={playlists}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.list}
-          ListEmptyComponent={
-            <ThemedText style={styles.emptyText}>
-              Nenhuma lista salva ainda. Adicione uma URL acima.
-            </ThemedText>
-          }
           renderItem={({ item }) => {
-            const isActive = item.id === activeId;
+            const isActive = item.id === activePlaylistId;
             const isActivating = activatingId === item.id;
             return (
               <TouchableOpacity
                 style={[styles.item, isActive && styles.itemActive]}
-                onPress={() => handleActivate(item)}
+                onPress={() => handleSelect(item)}
                 disabled={!!activatingId}
                 activeOpacity={0.75}
               >
@@ -166,24 +71,7 @@ export function PlaylistManagerScreen({ onActivated, onActiveRemoved, onClose }:
                   {isActive && <ThemedText style={styles.activeBadge}>Ativa</ThemedText>}
                 </View>
 
-                {isActivating ? (
-                  <View style={styles.itemActionColumn}>
-                    <ActivityIndicator color="#fff" />
-                    {progress > 0 && (
-                      <ThemedText style={styles.itemProgress}>
-                        {Math.round(progress * 100)}%
-                      </ThemedText>
-                    )}
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDelete(item)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <ThemedText style={styles.deleteButtonText}>🗑️</ThemedText>
-                  </TouchableOpacity>
-                )}
+                {isActivating && <ActivityIndicator color="#fff" />}
               </TouchableOpacity>
             );
           }}
@@ -207,7 +95,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   title: {
     fontSize: 22,
@@ -219,52 +107,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  addRow: {
-    backgroundColor: '#12004f',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1aa2ff',
-    padding: 16,
-    gap: 10,
+  subtitle: {
+    fontSize: 13,
+    color: '#c7c7e6',
     marginBottom: 16,
-  },
-  nameInput: {
-    borderWidth: 1,
-    borderColor: '#4dd6ff',
-    borderRadius: 10,
-    padding: 10,
-    color: '#fff',
-    fontSize: 13,
-  },
-  urlRow: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-  },
-  urlInput: {
-    flex: 1,
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: '#4dd6ff',
-    borderRadius: 10,
-    padding: 10,
-    color: '#fff',
-    fontSize: 13,
-    textAlignVertical: 'top',
-  },
-  addButton: {
-    backgroundColor: '#2a5fd6',
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    lineHeight: 26,
   },
   error: {
     color: '#ff6b6b',
@@ -274,12 +120,6 @@ const styles = StyleSheet.create({
   list: {
     gap: 12,
     paddingBottom: 24,
-  },
-  emptyText: {
-    color: '#c7c7e6',
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: 24,
   },
   item: {
     flexDirection: 'row',
@@ -321,19 +161,5 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
-  },
-  itemActionColumn: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  itemProgress: {
-    color: '#fff',
-    fontSize: 11,
-  },
-  deleteButton: {
-    padding: 6,
-  },
-  deleteButtonText: {
-    fontSize: 20,
   },
 });

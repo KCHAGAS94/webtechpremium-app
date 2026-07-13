@@ -29,8 +29,14 @@ model App {
   status    String @default("active") // active, inactive, suspended
   userId    Int
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  // Panel-only fields the "Usuários" screen edits (usuario, password, dns,
+  // expiracaoData, expirado) that don't have dedicated columns yet — stored
+  // as one JSON blob instead of a migration per field.
+  metadata  Json?
+
   sessions  Session[]
+  m3uLists  M3UList[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

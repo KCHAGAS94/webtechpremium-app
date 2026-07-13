@@ -10,12 +10,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
 import { DeviceActivationScreen } from './src/components/device-activation-screen';
 import { MoviesScreen } from './src/components/movies-screen';
+import { PlaylistManagerScreen } from './src/components/playlist-manager-screen';
 import { SeriesScreen } from './src/components/series-screen';
-import { loadChannels, saveChannels } from './src/utils/channel-storage';
+import { MOCK_MAC } from './src/config/device';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
+import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
-import { getActivePlaylist } from './src/utils/playlist-storage';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
 // should show (see content-classifier.ts). Same screen component for all
@@ -50,6 +51,8 @@ const sideMenuItems: MenuItem[] = [
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [channels, setChannels] = useState<M3uChannel[]>([]);
+  const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
+  const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
@@ -58,27 +61,35 @@ export default function App() {
   const rightBottom = menuItems[4];
   const settingsItem = menuItems[5];
 
+  const activatePlaylist = async (playlist: PanelPlaylist) => {
+    const { tv, filmes, series } = await loadPlaylist(playlist.url);
+    const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
+    setActivePlaylistId(playlist.id);
+    setChannels(freshChannels);
+    setCurrentScreen('home');
+  };
+
+  const fetchAndActivateFromPanel = async () => {
+    const panelPlaylists = await fetchDevicePlaylists(MOCK_MAC);
+    setPlaylists(panelPlaylists);
+
+    if (panelPlaylists.length === 0) {
+      setActivePlaylistId(null);
+      setChannels([]);
+      setCurrentScreen('playlist');
+      return;
+    }
+
+    await activatePlaylist(panelPlaylists[0]);
+  };
+
   useEffect(() => {
     (async () => {
-      const [activePlaylist, cachedChannels] = await Promise.all([
-        getActivePlaylist(),
-        loadChannels(),
-      ]);
-
-      if (cachedChannels.length > 0) {
-        setChannels(cachedChannels);
-        return;
-      }
-
-      if (activePlaylist) {
-        try {
-          const { tv, filmes, series } = await loadPlaylist(activePlaylist.url);
-          const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
-          setChannels(freshChannels);
-          await saveChannels(freshChannels);
-        } catch {
-          // Boot-time auto-load is best-effort; user can retry from "mudar lista de reprodução".
-        }
+      try {
+        await fetchAndActivateFromPanel();
+      } catch {
+        // No painel reachable at boot: stay on the activation/lock screen.
+        setCurrentScreen('playlist');
       }
     })();
   }, []);
@@ -86,15 +97,7 @@ export default function App() {
   const handleReloadPlaylist = async () => {
     setReloadingPlaylist(true);
     try {
-      const activePlaylist = await getActivePlaylist();
-      if (!activePlaylist) return;
-      const { tv, filmes, series } = await loadPlaylist(activePlaylist.url);
-      const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
-      if (freshChannels.length > 0) {
-        setChannels(freshChannels);
-        await saveChannels(freshChannels);
-        setCurrentScreen('home');
-      }
+      await fetchAndActivateFromPanel();
     } catch {
       // Reload is best-effort; user stays on the activation screen to retry.
     } finally {
@@ -115,8 +118,23 @@ export default function App() {
   };
 
   if (currentScreen === 'playlist') {
+    if (playlists.length === 0) {
+      return (
+        <DeviceActivationScreen
+          macAddress={MOCK_MAC}
+          onReload={handleReloadPlaylist}
+          reloading={reloadingPlaylist}
+        />
+      );
+    }
+
     return (
-      <DeviceActivationScreen onReload={handleReloadPlaylist} reloading={reloadingPlaylist} />
+      <PlaylistManagerScreen
+        playlists={playlists}
+        activePlaylistId={activePlaylistId}
+        onSelect={activatePlaylist}
+        onClose={() => setCurrentScreen('home')}
+      />
     );
   }
 
