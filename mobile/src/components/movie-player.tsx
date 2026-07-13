@@ -1,0 +1,426 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useEvent } from 'expo';
+import { VideoView, type VideoPlayer } from 'expo-video';
+import * as Brightness from 'expo-brightness';
+
+import { SeekBar } from '@/components/seek-bar';
+import { ThemedText } from '@/components/themed-text';
+import { VerticalSlider } from '@/components/vertical-slider';
+
+const AUTO_HIDE_MS = 4000;
+const SKIP_SECONDS = 10;
+
+type Props = {
+  player: VideoPlayer;
+  title: string;
+  year?: string | null;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onClose: () => void;
+  /** Defaults to `onClose` — the details screen already shows full metadata. */
+  onInfo?: () => void;
+};
+
+function formatTime(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds) || totalSeconds < 0) return '00:00';
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const mm = String(minutes).padStart(2, '0');
+  const ss = String(seconds).padStart(2, '0');
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+/**
+ * Fullscreen VOD player for Movies (and future Series) — kept separate from
+ * FullscreenPlayer (which stays Live TV-only) because VOD needs its own
+ * top-bar tools (info, subtitles/audio, resize) that don't apply to a live
+ * stream, and it always shows seek/skip controls instead of branching on
+ * `isLive`.
+ */
+export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite, onClose, onInfo }: Props) {
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [brightness, setBrightness] = useState(1);
+  const [contentFit, setContentFit] = useState<'contain' | 'cover'>('contain');
+  const [subtitlesOn, setSubtitlesOn] = useState(false);
+  const [audioTrackIndex, setAudioTrackIndex] = useState(-1);
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const { volume } = useEvent(player, 'volumeChange', { volume: player.volume });
+  const { currentTime } = useEvent(player, 'timeUpdate', {
+    currentTime: player.currentTime,
+    currentLiveTimestamp: null,
+    currentOffsetFromLive: null,
+    bufferedPosition: player.bufferedPosition,
+  });
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
+  const duration = player.duration;
+
+  useEffect(() => {
+    player.timeUpdateEventInterval = 1;
+    return () => {
+      // The player can already be torn down natively by the time this runs
+      // (e.g. it errored out right before unmount), in which case writing to
+      // it throws "shared object already released" instead of no-op'ing.
+      try {
+        player.timeUpdateEventInterval = 0;
+      } catch {}
+    };
+  }, [player]);
+
+  useEffect(() => {
+    let cancelled = false;
+    Brightness.getBrightnessAsync().then((current) => {
+      if (!cancelled) setBrightness(current);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+  }, []);
+
+  const scheduleHide = useCallback(() => {
+    clearHideTimer();
+    hideTimer.current = setTimeout(() => setControlsVisible(false), AUTO_HIDE_MS);
+  }, [clearHideTimer]);
+
+  const showControls = useCallback(() => {
+    setControlsVisible(true);
+    scheduleHide();
+  }, [scheduleHide]);
+
+  useEffect(() => {
+    if (isScrubbing) {
+      clearHideTimer();
+    } else {
+      scheduleHide();
+    }
+    return clearHideTimer;
+  }, [isScrubbing, clearHideTimer, scheduleHide]);
+
+  const handleTapVideo = useCallback(() => {
+    if (controlsVisible) {
+      clearHideTimer();
+      setControlsVisible(false);
+    } else {
+      showControls();
+    }
+  }, [controlsVisible, clearHideTimer, showControls]);
+
+  const handleTogglePlayPause = useCallback(() => {
+    if (player.playing) player.pause();
+    else player.play();
+    showControls();
+  }, [player, showControls]);
+
+  const handleSkip = useCallback(
+    (seconds: number) => {
+      player.seekBy(seconds);
+      showControls();
+    },
+    [player, showControls]
+  );
+
+  const handleSeek = useCallback(
+    (fraction: number) => {
+      if (duration > 0) player.currentTime = fraction * duration;
+    },
+    [player, duration]
+  );
+
+  const handleVolumeChange = useCallback(
+    (next: number) => {
+      player.volume = next;
+    },
+    [player]
+  );
+
+  const handleBrightnessChange = useCallback((next: number) => {
+    setBrightness(next);
+    Brightness.setBrightnessAsync(next).catch(() => {});
+  }, []);
+
+  const handleScrubStart = useCallback(() => setIsScrubbing(true), []);
+  const handleScrubEnd = useCallback(() => setIsScrubbing(false), []);
+
+  const handleToggleSubtitles = useCallback(() => {
+    const tracks = player.availableSubtitleTracks ?? [];
+    if (tracks.length === 0) return;
+    setSubtitlesOn((wasOn) => {
+      player.subtitleTrack = wasOn ? null : tracks[0];
+      return !wasOn;
+    });
+    showControls();
+  }, [player, showControls]);
+
+  const handleCycleAudioTrack = useCallback(() => {
+    const tracks = player.availableAudioTracks ?? [];
+    if (tracks.length === 0) return;
+    setAudioTrackIndex((current) => {
+      const next = current + 1 >= tracks.length ? 0 : current + 1;
+      player.audioTrack = tracks[next];
+      return next;
+    });
+    showControls();
+  }, [player, showControls]);
+
+  const handleToggleResize = useCallback(() => {
+    setContentFit((current) => (current === 'contain' ? 'cover' : 'contain'));
+    showControls();
+  }, [showControls]);
+
+  const handleInfo = onInfo ?? onClose;
+
+  const progress = duration > 0 ? currentTime / duration : 0;
+
+  return (
+    <Modal visible animationType="fade" onRequestClose={onClose}>
+      <StatusBar hidden />
+      <View style={styles.container}>
+        {status !== 'error' && (
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo}>
+            <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit={contentFit} />
+          </Pressable>
+        )}
+
+        {status === 'loading' && (
+          <View style={styles.statusOverlay} pointerEvents="none">
+            <ActivityIndicator color="#4dd6ff" size="large" />
+          </View>
+        )}
+
+        {status === 'error' && (
+          <View style={styles.statusOverlay}>
+            <ThemedText style={styles.errorText}>
+              Não foi possível carregar o filme{error?.message ? `: ${error.message}` : '.'}
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} style={styles.errorBackButton}>
+              <ThemedText style={styles.errorBackButtonText}>Voltar</ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {controlsVisible && (
+          <View style={styles.overlay} pointerEvents="box-none">
+            <View style={styles.topBar}>
+              <View style={styles.topBarLeft}>
+                <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.iconButton}>
+                  <ThemedText style={styles.backIcon}>‹</ThemedText>
+                </TouchableOpacity>
+                <View style={styles.titleGroup}>
+                  <ThemedText style={styles.title} numberOfLines={1}>
+                    {title}
+                    {year ? ` (${year})` : ''}
+                  </ThemedText>
+                </View>
+              </View>
+
+              <View style={styles.topBarRight}>
+                <TouchableOpacity onPress={handleInfo} hitSlop={12} style={styles.iconButton}>
+                  <ThemedText style={styles.toolIcon}>ⓘ</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onToggleFavorite} hitSlop={12} style={styles.iconButton}>
+                  <ThemedText style={[styles.toolIcon, isFavorite && styles.toolIconActive]}>
+                    {isFavorite ? '♥' : '♡'}
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleToggleSubtitles} hitSlop={12} style={styles.iconButton}>
+                  <ThemedText style={[styles.toolIcon, subtitlesOn && styles.toolIconActive]}>💬</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleCycleAudioTrack} hitSlop={12} style={styles.iconButton}>
+                  <ThemedText style={[styles.toolIcon, audioTrackIndex >= 0 && styles.toolIconActive]}>
+                    🎵
+                  </ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleToggleResize} hitSlop={12} style={styles.iconButton}>
+                  <ThemedText style={[styles.toolIcon, contentFit === 'cover' && styles.toolIconActive]}>
+                    ⛶
+                  </ThemedText>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={styles.middleRow} pointerEvents="box-none">
+              <VerticalSlider
+                icon="☀"
+                value={brightness}
+                onChange={handleBrightnessChange}
+                onInteractionStart={handleScrubStart}
+                onInteractionEnd={handleScrubEnd}
+                accessibilityLabel="Brilho"
+              />
+
+              <View style={styles.centerControls}>
+                <TouchableOpacity onPress={() => handleSkip(-SKIP_SECONDS)} style={styles.controlButton}>
+                  <ThemedText style={styles.controlIcon}>⏪</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleTogglePlayPause} style={styles.playButton}>
+                  <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleSkip(SKIP_SECONDS)} style={styles.controlButton}>
+                  <ThemedText style={styles.controlIcon}>⏩</ThemedText>
+                </TouchableOpacity>
+              </View>
+
+              <VerticalSlider
+                icon="🔊"
+                value={volume}
+                onChange={handleVolumeChange}
+                onInteractionStart={handleScrubStart}
+                onInteractionEnd={handleScrubEnd}
+                accessibilityLabel="Volume"
+              />
+            </View>
+
+            <View style={styles.bottomBar}>
+              <ThemedText style={styles.time}>{formatTime(currentTime)}</ThemedText>
+              <SeekBar
+                progress={progress}
+                onSeek={handleSeek}
+                onScrubStart={handleScrubStart}
+                onScrubEnd={handleScrubEnd}
+              />
+              <ThemedText style={styles.time}>{formatTime(duration)}</ThemedText>
+            </View>
+          </View>
+        )}
+      </View>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.25)',
+    justifyContent: 'space-between',
+  },
+  statusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 32,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  errorText: {
+    fontSize: 15,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  errorBackButton: {
+    borderWidth: 1,
+    borderColor: '#4dd6ff',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  errorBackButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4dd6ff',
+  },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  topBarLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  topBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  titleGroup: {
+    flex: 1,
+  },
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  backIcon: {
+    fontSize: 24,
+    color: '#fff',
+    marginTop: -2,
+  },
+  toolIcon: {
+    fontSize: 17,
+    color: '#fff',
+  },
+  toolIconActive: {
+    color: '#4dd6ff',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  middleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+  },
+  centerControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 28,
+  },
+  controlButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  controlIcon: {
+    fontSize: 26,
+    color: '#fff',
+  },
+  playButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  playIcon: {
+    fontSize: 28,
+    color: '#fff',
+  },
+  bottomBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  time: {
+    fontSize: 12,
+    color: '#fff',
+    minWidth: 44,
+  },
+});

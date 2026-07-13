@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
+import { MoviesScreen } from './src/components/movies-screen';
 import { PlaylistSetupScreen } from './src/components/playlist-setup-screen';
 import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
@@ -93,6 +94,17 @@ export default function App() {
         initialUrl={playlistUrl}
         onLoaded={handlePlaylistLoaded}
         onCancel={() => setCurrentScreen('home')}
+      />
+    );
+  }
+
+  if (currentScreen === 'movies') {
+    return (
+      <MoviesScreen
+        channels={channels}
+        activeNav="movies"
+        onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+        onChangePlaylist={() => setCurrentScreen('playlist')}
       />
     );
   }

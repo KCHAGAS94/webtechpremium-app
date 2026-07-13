@@ -6,7 +6,6 @@
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": false,
     "sdkVersion": "54.0.0",
     "platforms": [
       "ios",
