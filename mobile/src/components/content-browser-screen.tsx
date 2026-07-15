@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEvent } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { FullscreenPlayer } from '@/components/fullscreen-player';
@@ -140,9 +141,21 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [isBuffering, setIsBuffering] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const player = useVideoPlayer(selectedChannel?.url ?? null, (instance) => {
+  // Xtream/live stream URLs (e.g. get.php?...&output=hls) rarely end in
+  // `.m3u8`, so expo-video's `auto` content-type detection (by extension)
+  // misses them and falls back to a progressive-download demuxer, which
+  // can't parse an HLS playlist. Live channels need `contentType: 'hls'`
+  // forced explicitly; movies/series keep `auto` since those already work.
+  const videoSource = useMemo(() => {
+    if (!selectedChannel) return null;
+    if (category === 'live') return { uri: selectedChannel.url, contentType: 'hls' as const };
+    return selectedChannel.url;
+  }, [selectedChannel, category]);
+
+  const player = useVideoPlayer(videoSource, (instance) => {
     instance.play();
   });
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
 
   const handleExpandFullscreen = useCallback(() => {
     setIsFullscreen(true);
@@ -289,9 +302,16 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                     nativeControls={false}
                     onFirstFrameRender={() => setIsBuffering(false)}
                   />
-                  {isBuffering && (
+                  {isBuffering && status !== 'error' && (
                     <View style={styles.bufferingOverlay}>
                       <ActivityIndicator color="#4dd6ff" size="large" />
+                    </View>
+                  )}
+                  {status === 'error' && (
+                    <View style={styles.bufferingOverlay}>
+                      <ThemedText style={styles.previewErrorText}>
+                        Não foi possível carregar{error?.message ? `: ${error.message}` : '.'}
+                      </ThemedText>
                     </View>
                   )}
                   <View style={styles.expandHint} pointerEvents="none">
@@ -452,6 +472,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 16,
+  },
+  previewErrorText: {
+    fontSize: 13,
+    color: '#fff',
+    textAlign: 'center',
   },
   expandHint: {
     position: 'absolute',

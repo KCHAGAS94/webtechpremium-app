@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEvent } from 'expo';
 import { VideoView, type VideoPlayer } from 'expo-video';
@@ -48,6 +48,7 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
     currentOffsetFromLive: null,
     bufferedPosition: player.bufferedPosition,
   });
+  const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
   const duration = player.duration;
   const isLive = player.isLive || !Number.isFinite(duration) || duration <= 0;
 
@@ -146,9 +147,28 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
     <Modal visible animationType="fade" onRequestClose={onClose}>
       <StatusBar hidden />
       <View style={styles.container}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo}>
-          <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
-        </Pressable>
+        {status !== 'error' && (
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo}>
+            <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
+          </Pressable>
+        )}
+
+        {status === 'loading' && (
+          <View style={styles.statusOverlay} pointerEvents="none">
+            <ActivityIndicator color="#4dd6ff" size="large" />
+          </View>
+        )}
+
+        {status === 'error' && (
+          <View style={styles.statusOverlay}>
+            <ThemedText style={styles.errorText}>
+              Não foi possível carregar o canal{error?.message ? `: ${error.message}` : '.'}
+            </ThemedText>
+            <TouchableOpacity onPress={onClose} style={styles.errorBackButton}>
+              <ThemedText style={styles.errorBackButtonText}>Voltar</ThemedText>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
@@ -231,6 +251,31 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.25)',
     justifyContent: 'space-between',
+  },
+  statusOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 32,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  errorText: {
+    fontSize: 15,
+    color: '#fff',
+    textAlign: 'center',
+  },
+  errorBackButton: {
+    borderWidth: 1,
+    borderColor: '#4dd6ff',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  errorBackButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4dd6ff',
   },
   topBar: {
     flexDirection: 'row',
