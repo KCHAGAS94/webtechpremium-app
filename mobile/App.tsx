@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   View,
   Text,
   TouchableOpacity,
@@ -57,6 +58,8 @@ export default function App() {
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
+  const [reloadingChannels, setReloadingChannels] = useState(false);
+  const [reloadChannelsError, setReloadChannelsError] = useState('');
   // True only for the initial boot check (cache lookup, or first-run painel
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
@@ -153,10 +156,19 @@ export default function App() {
       setCurrentScreen('playlist');
       return;
     }
+    setReloadingChannels(true);
+    setReloadChannelsError('');
     try {
       await activatePlaylist(active);
-    } catch {
-      // Best-effort: keep showing the previously loaded channels on failure.
+    } catch (err) {
+      // Previously failed silently, so a network hiccup looked exactly like
+      // the button doing nothing. Now it's visible (banner below) instead
+      // of just keeping the stale channels with no explanation.
+      setReloadChannelsError(
+        err instanceof Error ? `Falha ao recarregar: ${err.message}` : 'Falha ao recarregar a lista.'
+      );
+    } finally {
+      setReloadingChannels(false);
     }
   };
 
@@ -302,20 +314,38 @@ export default function App() {
                   <Text allowFontScaling={false} style={styles.sideMenuLabel}>{settingsItem.label}</Text>
                 </TouchableOpacity>
 
-                {sideMenuItems.map((item) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.sideMenuItem}
-                    onPress={() => handleMenuPress(item.screen)}
-                    activeOpacity={0.75}
-                  >
-                    <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
-                    <Text allowFontScaling={false} style={styles.sideMenuLabel}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
+                {sideMenuItems.map((item) => {
+                  const isReloadItem = item.screen === 'reload';
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.sideMenuItem}
+                      onPress={() => handleMenuPress(item.screen)}
+                      activeOpacity={0.75}
+                      disabled={isReloadItem && reloadingChannels}
+                    >
+                      {isReloadItem && reloadingChannels ? (
+                        <ActivityIndicator color="#4dd6ff" style={styles.sideMenuSpinner} />
+                      ) : (
+                        <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
+                      )}
+                      <Text allowFontScaling={false} style={styles.sideMenuLabel}>
+                        {isReloadItem && reloadingChannels ? 'recarregando...' : item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           </View>
+
+          {!!reloadChannelsError && (
+            <View style={styles.reloadErrorBanner}>
+              <Text allowFontScaling={false} style={styles.reloadErrorText}>
+                {reloadChannelsError}
+              </Text>
+            </View>
+          )}
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -418,11 +448,29 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     lineHeight: 32,
   },
+  sideMenuSpinner: {
+    width: 28,
+  },
   sideMenuLabel: {
     flex: 1,
     color: '#ffffff',
     fontSize: 12,
     lineHeight: 16,
     textAlign: 'left',
+  },
+  reloadErrorBanner: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(120, 0, 0, 0.85)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  reloadErrorText: {
+    color: '#ffffff',
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
