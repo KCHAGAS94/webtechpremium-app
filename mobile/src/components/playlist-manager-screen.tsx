@@ -17,6 +17,8 @@ type Props = {
 export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress, onSelect, onClose }: Props) {
   const [activatingId, setActivatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
+  const expirationDate = activePlaylist?.expiracaoData;
 
   const handleSelect = async (playlist: PanelPlaylist) => {
     setActivatingId(playlist.id);
@@ -77,11 +79,20 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
             }}
           />
 
+          <View style={styles.separator} />
+
           <View style={styles.macPanel}>
             <ThemedText style={styles.macLabel}>Endereço MAC</ThemedText>
             <ThemedText style={styles.macValue}>{macAddress}</ThemedText>
             <ThemedText style={styles.macHint}>
               Use este endereço para vincular listas a este dispositivo no painel.
+            </ThemedText>
+
+            <ThemedText style={styles.macLabel}>Data de Expiração</ThemedText>
+            <ThemedText style={styles.expirationValue}>{expirationDate || 'Não informada'}</ThemedText>
+            <ThemedText style={styles.macHint}>
+              Renove sua assinatura em{' '}
+              <ThemedText style={styles.renewLink}>webtech.pro.kchagas.com.br</ThemedText>
             </ThemedText>
           </View>
         </View>
@@ -97,7 +108,7 @@ const styles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 110,
     paddingTop: 12,
   },
   header: {
@@ -126,10 +137,16 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginBottom: 12,
   },
+  separator: {
+    alignSelf: 'stretch',
+    width: 1,
+    backgroundColor: 'rgba(77, 214, 255, 0.35)',
+  },
   body: {
     flex: 1,
     flexDirection: 'row',
-    gap: 20,
+    alignItems: 'flex-start',
+    gap: 40,
   },
   listColumn: {
     flex: 1,
@@ -137,6 +154,8 @@ const styles = StyleSheet.create({
   list: {
     gap: 12,
     paddingBottom: 24,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   item: {
     flexDirection: 'row',
@@ -176,16 +195,20 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   macPanel: {
-    width: 220,
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(18, 0, 79, 0.55)',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(77, 214, 255, 0.35)',
-    paddingHorizontal: 16,
-    paddingVertical: 18,
+    width: 320,
+    paddingHorizontal: 24,
+    paddingVertical: 26,
     alignItems: 'center',
     gap: 8,
+  },
+  expirationValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  renewLink: {
+    color: '#4dd6ff',
+    fontWeight: '600',
   },
   macLabel: {
     fontSize: 10,
