@@ -132,6 +132,7 @@ export default function App() {
       <PlaylistManagerScreen
         playlists={playlists}
         activePlaylistId={activePlaylistId}
+        macAddress={MOCK_MAC}
         onSelect={activatePlaylist}
         onClose={() => setCurrentScreen('home')}
       />

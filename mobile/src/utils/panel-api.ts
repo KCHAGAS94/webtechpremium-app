@@ -4,6 +4,7 @@ export type PanelPlaylist = {
   id: number;
   name: string;
   url: string;
+  expiracaoData: string | null;
 };
 
 // Panel-managed playlists for a device: the user (or reseller) links M3U

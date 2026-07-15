@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
       id: lista.id,
       name: lista.nome,
       url: buildHlsUrl(lista.servidor.url, lista.usuario, lista.senha),
+      expiracaoData: lista.dataExpiracao ? lista.dataExpiracao.toISOString().slice(0, 10) : null,
     }));
 
   return NextResponse.json(playlists, { status: 200 });
