@@ -60,6 +60,7 @@ export default function App() {
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
   const [reloadingChannels, setReloadingChannels] = useState(false);
   const [reloadChannelsError, setReloadChannelsError] = useState('');
+  const [reloadBlockedMessage, setReloadBlockedMessage] = useState('');
   // True only for the initial boot check (cache lookup, or first-run painel
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
@@ -70,6 +71,12 @@ export default function App() {
   const centerBottom = menuItems[3];
   const rightBottom = menuItems[4];
   const settingsItem = menuItems[5];
+
+  useEffect(() => {
+    if (!reloadBlockedMessage) return;
+    const timer = setTimeout(() => setReloadBlockedMessage(''), 2000);
+    return () => clearTimeout(timer);
+  }, [reloadBlockedMessage]);
 
   const activatePlaylist = async (playlist: PanelPlaylist) => {
     const { tv, filmes, series } = await loadPlaylist(playlist.url);
@@ -173,6 +180,10 @@ export default function App() {
   };
 
   const handleMenuPress = (screen?: string) => {
+    if (reloadingChannels) {
+      setReloadBlockedMessage('Aguarde o fim do carregamento...');
+      return;
+    }
     if (screen === 'exit') {
       console.log('Exiting...');
     } else if (screen === 'reload') {
@@ -322,7 +333,6 @@ export default function App() {
                       style={styles.sideMenuItem}
                       onPress={() => handleMenuPress(item.screen)}
                       activeOpacity={0.75}
-                      disabled={isReloadItem && reloadingChannels}
                     >
                       {isReloadItem && reloadingChannels ? (
                         <ActivityIndicator color="#4dd6ff" style={styles.sideMenuSpinner} />
@@ -339,10 +349,10 @@ export default function App() {
             </View>
           </View>
 
-          {!!reloadChannelsError && (
+          {!!(reloadBlockedMessage || reloadChannelsError) && (
             <View style={styles.reloadErrorBanner}>
               <Text allowFontScaling={false} style={styles.reloadErrorText}>
-                {reloadChannelsError}
+                {reloadBlockedMessage || reloadChannelsError}
               </Text>
             </View>
           )}
