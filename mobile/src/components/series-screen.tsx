@@ -45,6 +45,16 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+// Grouping is the expensive part of opening this screen (a regex per
+// episode across a potentially huge playlist). `channels` is owned by
+// App.tsx and keeps the same array reference across Home <-> Séries
+// navigation — it only changes when a playlist is actually (re)loaded (see
+// App.tsx's activatePlaylist, which always builds a fresh array) — so
+// caching the grouped result by that reference means revisiting this screen
+// with the same list is instant, while a real reload still regroups from
+// scratch exactly as before.
+const seriesGroupCache = new WeakMap<M3uChannel[], SeriesShow[]>();
+
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
@@ -197,10 +207,27 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
   // (async, chunked in groupSeriesShows) instead of in a synchronous useMemo
   // is what keeps navigating into this screen from stalling like it used to.
   useEffect(() => {
+    const cached = seriesGroupCache.get(channels);
+    if (cached) {
+      setAllShows(cached);
+      setIsGrouping(false);
+      return;
+    }
+
     let cancelled = false;
     setIsGrouping(true);
-    groupSeriesShows(bucketChannels).then((shows) => {
+    groupSeriesShows(bucketChannels, (partialShows) => {
+      // First batch arrives: let the user start browsing/searching right
+      // away instead of waiting for the whole (possibly 100k+ episode)
+      // catalog to finish — the rest keeps grouping in the background and
+      // just keeps updating the grid as more shows are found.
       if (!cancelled) {
+        setAllShows(partialShows);
+        setIsGrouping(false);
+      }
+    }).then((shows) => {
+      if (!cancelled) {
+        seriesGroupCache.set(channels, shows);
         setAllShows(shows);
         setIsGrouping(false);
       }
@@ -208,7 +235,19 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [bucketChannels]);
+  }, [channels, bucketChannels]);
+
+  // TEMP diagnostic: which parsed show names are swallowing the most
+  // episodes — remove once the missing-series report is resolved.
+  const topShowsDebug = useMemo(() => {
+    return [...allShows]
+      .map((show) => ({
+        name: show.name,
+        count: Array.from(show.episodesBySeason.values()).reduce((sum, eps) => sum + eps.length, 0),
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+  }, [allShows]);
 
   // Categories should count shows (folders), not raw episodes — a group with
   // one show and 200 episodes must show "1", not "200".
@@ -436,6 +475,14 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
                 {categoryList.find((c) => c.id === selectedCategory)?.title ?? 'Tudo'}(
                 {filteredShows.length})
               </ThemedText>
+              {/* TEMP diagnostic: raw episode count vs grouped show count,
+                  to tell apart "classifier missed episodes" from "grouping
+                  folded them together" — remove once the missing-series
+                  report is resolved. */}
+              <ThemedText style={styles.debugLabel}>
+                {bucketChannels.length} episódios brutos · maiores grupos:{' '}
+                {topShowsDebug.map((s) => `"${s.name}" (${s.count})`).join(', ')}
+              </ThemedText>
             </View>
 
             {isGrouping ? (
@@ -574,6 +621,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
     fontWeight: '600',
+  },
+  debugLabel: {
+    fontSize: 11,
+    color: '#ff9f4d',
   },
   gridContent: {
     paddingHorizontal: 12,

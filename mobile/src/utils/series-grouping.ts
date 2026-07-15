@@ -25,9 +25,22 @@ export type SeriesShow = {
 
 // "Show Name S01E02", "Show Name S1 E2", "Show.Name.S01.E02.Title" — the
 // dominant Xtream/M3U convention for series item names.
-const SEASON_EPISODE_PATTERN = /^(.*?)[\s._-]*S\s*(\d{1,2})\s*[\s._-]*E\s*(\d{1,3})[\s._-]*(.*)$/i;
+//
+// Deliberately NOT the more "obvious" `^(.*?)[\s._-]*S\s*(\d)...[\s._-]*(.*)$`
+// shape: two adjacent star-quantified classes that both match whitespace
+// (`\s*` immediately followed by `[\s._-]*`) are ambiguous — on a title
+// with a long run of spaces/dots that ultimately doesn't match (common in
+// messy M3U titles), the engine tries exponentially many ways to split that
+// run between the two quantifiers before giving up. A single provider list
+// with a handful of such titles was enough to stall the whole "Séries"
+// screen for the better part of a minute. These patterns use exactly one
+// quantified separator class between any two fixed points, and skip the
+// leading `.*?`/trailing `.*` entirely — `parseEpisodeInfo` below slices the
+// show name / episode title around the match position instead, since
+// `cleanTitle` already strips the separator chars from both sides anyway.
+const SEASON_EPISODE_PATTERN = /S\s*(\d{1,2})[\s._-]*E\s*(\d{1,3})/i;
 // "Show Name 1x02"
-const NUMERIC_PATTERN = /^(.*?)[\s._-]*(\d{1,2})x(\d{1,3})[\s._-]*(.*)$/i;
+const NUMERIC_PATTERN = /(\d{1,2})x(\d{1,3})/i;
 
 function cleanTitle(value: string): string {
   return value.replace(/^[\s._-]+|[\s._-]+$/g, '').trim();
@@ -52,13 +65,19 @@ function yieldToEventLoop(): Promise<void> {
  * get grouped with anything else.
  */
 export function parseEpisodeInfo(rawName: string): ParsedEpisode {
-  const match = rawName.match(SEASON_EPISODE_PATTERN) ?? rawName.match(NUMERIC_PATTERN);
+  const match = SEASON_EPISODE_PATTERN.exec(rawName) ?? NUMERIC_PATTERN.exec(rawName);
 
   if (!match) {
     return { showName: cleanTitle(rawName), season: 1, episode: 1, episodeTitle: null };
   }
 
-  const [, showNameRaw, seasonRaw, episodeRaw, titleRaw] = match;
+  // Slice around the match instead of relying on leading `(.*?)`/trailing
+  // `(.*)` capture groups (see the comment above SEASON_EPISODE_PATTERN) —
+  // cleanTitle already trims whatever separator chars are left dangling on
+  // either side.
+  const showNameRaw = rawName.slice(0, match.index);
+  const titleRaw = rawName.slice(match.index + match[0].length);
+  const [, seasonRaw, episodeRaw] = match;
   const showName = cleanTitle(showNameRaw) || cleanTitle(rawName);
   const episodeTitle = cleanTitle(titleRaw);
 
@@ -79,9 +98,15 @@ export function parseEpisodeInfo(rawName: string): ParsedEpisode {
  *
  * Async and chunked (see GROUP_CHUNK_SIZE above) so grouping tens of
  * thousands of episodes doesn't block the JS thread on the Séries screen's
- * first render.
+ * first render. `onProgress`, if given, is called with the shows found *so
+ * far* at every yield point — on a catalog with 100k+ episodes, the caller
+ * can show/browse the first batch of shows immediately instead of blocking
+ * on the entire list, letting the rest keep grouping in the background.
  */
-export async function groupSeriesShows(channels: M3uChannel[]): Promise<SeriesShow[]> {
+export async function groupSeriesShows(
+  channels: M3uChannel[],
+  onProgress?: (shows: SeriesShow[]) => void
+): Promise<SeriesShow[]> {
   const shows = new Map<string, SeriesShow>();
 
   let sinceYield = 0;
@@ -115,6 +140,11 @@ export async function groupSeriesShows(channels: M3uChannel[]): Promise<SeriesSh
     sinceYield += 1;
     if (sinceYield >= GROUP_CHUNK_SIZE) {
       sinceYield = 0;
+      // Snapshot before yielding, not after: the caller can start rendering
+      // this batch of shows during the same tick the event loop is freed
+      // up, instead of waiting for the entire (possibly 100k+ episode)
+      // catalog to finish.
+      onProgress?.(Array.from(shows.values()));
       await yieldToEventLoop();
     }
   }
