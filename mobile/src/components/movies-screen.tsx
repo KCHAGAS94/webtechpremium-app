@@ -1,6 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
 
 import { MovieDetailsScreen } from '@/components/movie-details-screen';
@@ -10,6 +11,8 @@ import { ThemedView } from '@/components/themed-view';
 import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { parseMovieTitle } from '@/utils/movie-info';
+import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
+import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 
 const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: 'home', label: 'Casa' },
@@ -58,25 +61,61 @@ const PosterCard = memo(function PosterCard({
 // be — mounting/unmounting this component owns the useVideoPlayer lifecycle.
 function MovieVodPlayer({
   movie,
+  resumeFrom,
   isFavorite,
   onToggleFavorite,
   onClose,
+  onProgress,
 }: {
   movie: M3uChannel;
+  resumeFrom: number;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
+  onProgress: (positionSeconds: number, durationSeconds: number) => void;
 }) {
   const player = useVideoPlayer(movie.url);
   const { title, year } = parseMovieTitle(movie.name);
+  const { currentTime } = useEvent(player, 'timeUpdate', {
+    currentTime: 0,
+    currentLiveTimestamp: null,
+    currentOffsetFromLive: null,
+    bufferedPosition: 0,
+  });
+
+  // `onProgress` is an inline callback re-created on every parent render
+  // (and calling it updates parent state, which re-renders). Depending on
+  // it directly in the effect below would re-fire on every render, not just
+  // every 5s tick — a `setState` loop that trips React's "Maximum update
+  // depth exceeded". A ref keeps the effect's own deps limited to the
+  // player's actual progress ticks.
+  const onProgressRef = useRef(onProgress);
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
 
   // Starting playback from useVideoPlayer's setup callback fires before the
   // VideoView below has ever attached a surface to this (brand new) player —
   // unlike Live TV, which reuses an already-playing preview player when it
   // expands to fullscreen. Waiting for mount ensures a surface exists first.
   useEffect(() => {
+    if (resumeFrom > 0) player.currentTime = resumeFrom;
     player.play();
-  }, [player]);
+    player.timeUpdateEventInterval = 5;
+    return () => {
+      try {
+        player.timeUpdateEventInterval = 0;
+      } catch {}
+    };
+  }, [player, resumeFrom]);
+
+  // Reports progress every ~5s (see timeUpdateEventInterval above) so
+  // "Retomar para assistir" survives an app kill, not just a clean close.
+  useEffect(() => {
+    if (currentTime > 0 && player.duration > 0) {
+      onProgressRef.current(currentTime, player.duration);
+    }
+  }, [currentTime, player]);
 
   return (
     <MoviePlayer
@@ -115,20 +154,40 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
   }, [channels]);
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [history, setHistory] = useState<Map<string, WatchHistoryEntry>>(new Map());
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [viewingMovie, setViewingMovie] = useState<M3uChannel | null>(null);
   const [playingMovie, setPlayingMovie] = useState<M3uChannel | null>(null);
 
+  // Favorites/history live on disk (see favorites-storage.ts,
+  // watch-history-storage.ts), keyed by movie title — not M3uChannel.id,
+  // which is just positional and gets reshuffled by every playlist reload.
+  // Loaded once per screen mount; only actually changes when the user
+  // favorites something or watches further, never as a side effect of
+  // `channels` refreshing.
+  useEffect(() => {
+    loadFavorites('movies').then(setFavorites);
+    loadWatchHistory().then((entries) => {
+      setHistory(new Map(entries.filter((e) => e.kind === 'movie').map((e) => [e.key, e])));
+    });
+  }, []);
+
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [search]);
 
+  const continueWatchingChannels = useMemo(() => {
+    return bucketChannels
+      .filter((c) => history.has(c.name))
+      .sort((a, b) => (history.get(b.name)?.updatedAt ?? 0) - (history.get(a.name)?.updatedAt ?? 0));
+  }, [bucketChannels, history]);
+
   const categoryList = useMemo<Category[]>(
     () => [
-      { id: CONTINUE_WATCHING_CATEGORY_ID, title: 'Retomar para assistir', count: 0 },
+      { id: CONTINUE_WATCHING_CATEGORY_ID, title: 'Retomar para assistir', count: continueWatchingChannels.length },
       { id: ALL_CATEGORY_ID, title: 'Tudo', count: bucketChannels.length },
       { id: FAVORITES_CATEGORY_ID, title: 'Favorito', count: favorites.size },
       ...Array.from(channelsByGroup.entries()).map(([title, list]) => ({
@@ -137,17 +196,17 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
         count: list.length,
       })),
     ],
-    [bucketChannels.length, channelsByGroup, favorites.size]
+    [bucketChannels.length, channelsByGroup, favorites.size, continueWatchingChannels.length]
   );
 
   const categoryChannels = useMemo(() => {
     if (selectedCategory === ALL_CATEGORY_ID) return bucketChannels;
-    if (selectedCategory === CONTINUE_WATCHING_CATEGORY_ID) return [];
+    if (selectedCategory === CONTINUE_WATCHING_CATEGORY_ID) return continueWatchingChannels;
     if (selectedCategory === FAVORITES_CATEGORY_ID) {
-      return bucketChannels.filter((c) => favorites.has(c.id));
+      return bucketChannels.filter((c) => favorites.has(c.name));
     }
     return channelsByGroup.get(selectedCategory) ?? [];
-  }, [bucketChannels, channelsByGroup, selectedCategory, favorites]);
+  }, [bucketChannels, channelsByGroup, selectedCategory, favorites, continueWatchingChannels]);
 
   const filteredChannels = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
@@ -171,14 +230,42 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
     setPlayingMovie(null);
   }, []);
 
-  const handleToggleFavorite = useCallback((movieId: string) => {
+  const handleToggleFavorite = useCallback((movieName: string) => {
     setFavorites((prev) => {
       const next = new Set(prev);
-      if (next.has(movieId)) next.delete(movieId);
-      else next.add(movieId);
+      if (next.has(movieName)) next.delete(movieName);
+      else next.add(movieName);
+      saveFavorites('movies', next);
       return next;
     });
   }, []);
+
+  const handleProgress = useCallback(
+    (movie: M3uChannel, positionSeconds: number, durationSeconds: number) => {
+      upsertWatchHistoryProgress({
+        key: movie.name,
+        kind: 'movie',
+        title: movie.name,
+        logo: movie.logo,
+        positionSeconds,
+        durationSeconds,
+      });
+      setHistory((prev) => {
+        const next = new Map(prev);
+        next.set(movie.name, {
+          key: movie.name,
+          kind: 'movie',
+          title: movie.name,
+          logo: movie.logo,
+          positionSeconds,
+          durationSeconds,
+          updatedAt: Date.now(),
+        });
+        return next;
+      });
+    },
+    []
+  );
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
@@ -208,17 +295,19 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
       <>
         <MovieDetailsScreen
           movie={viewingMovie}
-          isFavorite={favorites.has(viewingMovie.id)}
-          onToggleFavorite={() => handleToggleFavorite(viewingMovie.id)}
+          isFavorite={favorites.has(viewingMovie.name)}
+          onToggleFavorite={() => handleToggleFavorite(viewingMovie.name)}
           onPlay={handlePlay}
           onBack={handleCloseDetails}
         />
         {playingMovie && (
           <MovieVodPlayer
             movie={playingMovie}
-            isFavorite={favorites.has(playingMovie.id)}
-            onToggleFavorite={() => handleToggleFavorite(playingMovie.id)}
+            resumeFrom={history.get(playingMovie.name)?.positionSeconds ?? 0}
+            isFavorite={favorites.has(playingMovie.name)}
+            onToggleFavorite={() => handleToggleFavorite(playingMovie.name)}
             onClose={handleClosePlayer}
+            onProgress={(position, duration) => handleProgress(playingMovie, position, duration)}
           />
         )}
       </>

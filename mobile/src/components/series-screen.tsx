@@ -1,6 +1,7 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
 
 import { MoviePlayer } from '@/components/movie-player';
@@ -10,6 +11,16 @@ import { ThemedView } from '@/components/themed-view';
 import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/series-grouping';
+import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
+import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
+
+// Stable identity for an episode's watch-history entry: survives a playlist
+// reload the same way movie titles do (see favorites-storage.ts) since it's
+// derived from the show id + season/episode, not the reload-volatile
+// M3uChannel.id.
+function episodeHistoryKey(showId: string, season: number, episode: number): string {
+  return `${showId}::S${season}E${episode}`;
+}
 
 const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: 'home', label: 'Casa' },
@@ -20,6 +31,7 @@ const NAV_ITEMS: { key: NavKey; label: string }[] = [
 
 const ALL_CATEGORY_ID = 'all';
 const FAVORITES_CATEGORY_ID = 'favorites';
+const CONTINUE_WATCHING_CATEGORY_ID = 'continue';
 const SEARCH_DEBOUNCE_MS = 200;
 const NUM_COLUMNS = 5;
 
@@ -63,21 +75,53 @@ const PosterCard = memo(function PosterCard({
 function SeriesVodPlayer({
   episode,
   showName,
+  resumeFrom,
   isFavorite,
   onToggleFavorite,
   onClose,
+  onProgress,
 }: {
   episode: SeriesEpisode;
   showName: string;
+  resumeFrom: number;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
+  onProgress: (positionSeconds: number, durationSeconds: number) => void;
 }) {
   const player = useVideoPlayer(episode.channel.url);
+  const { currentTime } = useEvent(player, 'timeUpdate', {
+    currentTime: 0,
+    currentLiveTimestamp: null,
+    currentOffsetFromLive: null,
+    bufferedPosition: 0,
+  });
+
+  // `onProgress` is an inline callback re-created every parent render (and
+  // calling it updates parent state, re-rendering it) — depending on it
+  // directly here would retrigger the effect on every render, not just
+  // every 5s tick, tripping React's "Maximum update depth exceeded".
+  const onProgressRef = useRef(onProgress);
+  useEffect(() => {
+    onProgressRef.current = onProgress;
+  }, [onProgress]);
 
   useEffect(() => {
+    if (resumeFrom > 0) player.currentTime = resumeFrom;
     player.play();
-  }, [player]);
+    player.timeUpdateEventInterval = 5;
+    return () => {
+      try {
+        player.timeUpdateEventInterval = 0;
+      } catch {}
+    };
+  }, [player, resumeFrom]);
+
+  useEffect(() => {
+    if (currentTime > 0 && player.duration > 0) {
+      onProgressRef.current(currentTime, player.duration);
+    }
+  }, [currentTime, player]);
 
   const title = `${showName} - S${pad2(episode.season)}E${pad2(episode.episode)}`;
 
@@ -117,6 +161,7 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
   }, [channels]);
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [history, setHistory] = useState<Map<string, WatchHistoryEntry>>(new Map());
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -125,6 +170,17 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
   const [allShows, setAllShows] = useState<SeriesShow[]>([]);
   const [isGrouping, setIsGrouping] = useState(true);
   const [sortOrder, setSortOrder] = useState<'az' | 'za'>('az');
+
+  // Same reload-proof persistence approach as movies-screen.tsx: favorites
+  // by show id, watch progress by `${showId}::S{season}E{episode}` — both
+  // stable across a playlist "recarregar", only actually changing when the
+  // user acts or the list itself changes.
+  useEffect(() => {
+    loadFavorites('series').then(setFavorites);
+    loadWatchHistory().then((entries) => {
+      setHistory(new Map(entries.filter((e) => e.kind === 'episode').map((e) => [e.key, e])));
+    });
+  }, []);
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
@@ -159,8 +215,25 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
     return counts;
   }, [allShows]);
 
+  // A show has "progress" if any of its episodes has a watch-history entry
+  // — the key encodes the show id, so this is an O(episodes-with-history)
+  // lookup, not a re-scan of every episode.
+  const continueWatchingShows = useMemo(() => {
+    if (history.size === 0) return [];
+    const latestByShow = new Map<string, number>();
+    for (const entry of history.values()) {
+      if (!entry.showId) continue;
+      const current = latestByShow.get(entry.showId) ?? 0;
+      if (entry.updatedAt > current) latestByShow.set(entry.showId, entry.updatedAt);
+    }
+    return allShows
+      .filter((s) => latestByShow.has(s.id))
+      .sort((a, b) => (latestByShow.get(b.id) ?? 0) - (latestByShow.get(a.id) ?? 0));
+  }, [allShows, history]);
+
   const categoryList = useMemo<Category[]>(
     () => [
+      { id: CONTINUE_WATCHING_CATEGORY_ID, title: 'Retomar para assistir', count: continueWatchingShows.length },
       { id: ALL_CATEGORY_ID, title: 'Tudo', count: allShows.length },
       { id: FAVORITES_CATEGORY_ID, title: 'Favorito', count: favorites.size },
       ...Array.from(channelsByGroup.keys()).map((title) => ({
@@ -169,7 +242,7 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
         count: showCountByGroup.get(title) ?? 0,
       })),
     ],
-    [allShows.length, channelsByGroup, favorites.size, showCountByGroup]
+    [allShows.length, channelsByGroup, favorites.size, showCountByGroup, continueWatchingShows.length]
   );
 
   // Every episode of a show shares the same source group-title (see
@@ -177,11 +250,12 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
   // cheap O(shows) pass — no need to re-group a subset from scratch.
   const categoryShows = useMemo(() => {
     if (selectedCategory === ALL_CATEGORY_ID) return allShows;
+    if (selectedCategory === CONTINUE_WATCHING_CATEGORY_ID) return continueWatchingShows;
     if (selectedCategory === FAVORITES_CATEGORY_ID) {
       return allShows.filter((s) => favorites.has(s.id));
     }
     return allShows.filter((s) => s.groupTitle === selectedCategory);
-  }, [allShows, selectedCategory, favorites]);
+  }, [allShows, selectedCategory, favorites, continueWatchingShows]);
 
   const searchedShows = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
@@ -220,9 +294,45 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
       const next = new Set(prev);
       if (next.has(showId)) next.delete(showId);
       else next.add(showId);
+      saveFavorites('series', next);
       return next;
     });
   }, []);
+
+  const handleProgress = useCallback(
+    (showId: string, episode: SeriesEpisode, positionSeconds: number, durationSeconds: number) => {
+      const key = episodeHistoryKey(showId, episode.season, episode.episode);
+      const title = `${episode.channel.name}`;
+      upsertWatchHistoryProgress({
+        key,
+        kind: 'episode',
+        title,
+        logo: episode.channel.logo,
+        positionSeconds,
+        durationSeconds,
+        showId,
+        season: episode.season,
+        episode: episode.episode,
+      });
+      setHistory((prev) => {
+        const next = new Map(prev);
+        next.set(key, {
+          key,
+          kind: 'episode',
+          title,
+          logo: episode.channel.logo,
+          positionSeconds,
+          durationSeconds,
+          updatedAt: Date.now(),
+          showId,
+          season: episode.season,
+          episode: episode.episode,
+        });
+        return next;
+      });
+    },
+    []
+  );
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
@@ -261,9 +371,16 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
           <SeriesVodPlayer
             episode={playingEpisode}
             showName={viewingShow.name}
+            resumeFrom={
+              history.get(episodeHistoryKey(viewingShow.id, playingEpisode.season, playingEpisode.episode))
+                ?.positionSeconds ?? 0
+            }
             isFavorite={favorites.has(viewingShow.id)}
             onToggleFavorite={() => handleToggleFavorite(viewingShow.id)}
             onClose={handleClosePlayer}
+            onProgress={(position, duration) =>
+              handleProgress(viewingShow.id, playingEpisode, position, duration)
+            }
           />
         )}
       </>

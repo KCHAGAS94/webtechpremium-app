@@ -105,11 +105,30 @@ export default function App() {
     }
   };
 
+  // Re-downloads and re-parses the *currently active* playlist's channels
+  // (same URL, fresh content) without touching `playlists`/`activePlaylistId`.
+  // Favorites and watch history live in AsyncStorage keyed by title/show id
+  // (see favorites-storage.ts, watch-history-storage.ts), not by channel
+  // list index, so they're untouched by this — they only change if the user
+  // acts on them or the list itself changes (a title added/removed).
+  const handleReloadChannels = async () => {
+    const active = playlists.find((p) => p.id === activePlaylistId);
+    if (!active) {
+      setCurrentScreen('playlist');
+      return;
+    }
+    try {
+      await activatePlaylist(active);
+    } catch {
+      // Best-effort: keep showing the previously loaded channels on failure.
+    }
+  };
+
   const handleMenuPress = (screen?: string) => {
     if (screen === 'exit') {
       console.log('Exiting...');
     } else if (screen === 'reload') {
-      setCurrentScreen('home');
+      handleReloadChannels();
     } else if (screen && screen in CONTENT_SCREENS && channels.length === 0) {
       setCurrentScreen('playlist');
     } else {
