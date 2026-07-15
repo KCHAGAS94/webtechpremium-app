@@ -64,6 +64,7 @@ export default function App() {
   const [reloadChannelsError, setReloadChannelsError] = useState('');
   const [reloadBlockedMessage, setReloadBlockedMessage] = useState('');
   const [exitModalVisible, setExitModalVisible] = useState(false);
+  const [accountModalVisible, setAccountModalVisible] = useState(false);
   // True only for the initial boot check (cache lookup, or first-run painel
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
@@ -74,6 +75,8 @@ export default function App() {
   const centerBottom = menuItems[3];
   const rightBottom = menuItems[4];
   const settingsItem = menuItems[5];
+  const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
+  const playlistExpiration = activePlaylist?.expiracaoData;
 
   useEffect(() => {
     if (!reloadBlockedMessage) return;
@@ -189,6 +192,8 @@ export default function App() {
     }
     if (screen === 'exit') {
       setExitModalVisible(true);
+    } else if (screen === 'account') {
+      setAccountModalVisible(true);
     } else if (screen === 'reload') {
       handleReloadChannels();
     } else if (screen && screen in CONTENT_SCREENS && channels.length === 0) {
@@ -397,6 +402,46 @@ export default function App() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={accountModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setAccountModalVisible(false)}
+      >
+        <View style={styles.exitModalOverlay}>
+          <View style={styles.accountModalBox}>
+            <Text allowFontScaling={false} style={styles.accountModalTitle}>Conta</Text>
+
+            <View style={styles.accountRow}>
+              <Text allowFontScaling={false} style={styles.accountRowLabel}>Endereço Mac</Text>
+              <Text allowFontScaling={false} style={styles.accountRowValue}>{MOCK_MAC}</Text>
+            </View>
+            <View style={styles.accountRow}>
+              <Text allowFontScaling={false} style={styles.accountRowLabel}>Estado da conta</Text>
+              <Text allowFontScaling={false} style={styles.accountRowValue}>Free Trial</Text>
+            </View>
+            <View style={styles.accountRow}>
+              <Text allowFontScaling={false} style={styles.accountRowLabel}>Data de validade</Text>
+              <Text allowFontScaling={false} style={styles.accountRowValue}>
+                {playlistExpiration || 'Não informada'}
+              </Text>
+            </View>
+            <Text allowFontScaling={false} style={styles.accountRenewHint}>
+              Renove sua assinatura em{'\n'}
+              <Text style={styles.accountRenewLink}>webtech.pro.kchagas.com.br</Text>
+            </Text>
+
+            <TouchableOpacity
+              style={styles.accountModalClose}
+              onPress={() => setAccountModalVisible(false)}
+              activeOpacity={0.75}
+            >
+              <Text allowFontScaling={false} style={styles.exitModalButtonText}>Fechar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -568,5 +613,61 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  accountModalBox: {
+    backgroundColor: '#12004f',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    width: 320,
+  },
+  accountModalTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(77, 214, 255, 0.25)',
+    paddingVertical: 10,
+    gap: 12,
+  },
+  accountRowLabel: {
+    color: '#c7c7e6',
+    fontSize: 12,
+  },
+  accountRowValue: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'right',
+  },
+  accountRenewHint: {
+    color: '#8888aa',
+    fontSize: 11,
+    textAlign: 'center',
+    lineHeight: 15,
+    marginTop: 14,
+  },
+  accountRenewLink: {
+    color: '#4dd6ff',
+    fontWeight: '600',
+  },
+  accountModalClose: {
+    marginTop: 16,
+    alignSelf: 'center',
+    backgroundColor: '#170066',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
   },
 });
