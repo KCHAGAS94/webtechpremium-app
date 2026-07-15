@@ -106,8 +106,14 @@ function SeriesVodPlayer({
     onProgressRef.current = onProgress;
   }, [onProgress]);
 
+  // `resumeFrom` is recomputed by the parent from `history` on every
+  // progress tick (~5s) — captured once here so the seek-and-play effect
+  // only runs at mount, not on every tick (which was re-seeking to the last
+  // saved position and restarting playback every ~5s).
+  const resumeFromRef = useRef(resumeFrom);
+
   useEffect(() => {
-    if (resumeFrom > 0) player.currentTime = resumeFrom;
+    if (resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
     player.play();
     player.timeUpdateEventInterval = 5;
     return () => {
@@ -115,7 +121,7 @@ function SeriesVodPlayer({
         player.timeUpdateEventInterval = 0;
       } catch {}
     };
-  }, [player, resumeFrom]);
+  }, [player]);
 
   useEffect(() => {
     if (currentTime > 0 && player.duration > 0) {
@@ -287,6 +293,13 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
 
   const handleClosePlayer = useCallback(() => {
     setPlayingEpisode(null);
+    // See movies-screen.tsx's handleClosePlayer: refresh history state once
+    // here instead of on every progress tick, so the grid behind the player
+    // doesn't re-render a multi-thousand-item FlatList every ~5s during
+    // playback.
+    loadWatchHistory().then((entries) => {
+      setHistory(new Map(entries.filter((e) => e.kind === 'episode').map((e) => [e.key, e])));
+    });
   }, []);
 
   const handleToggleFavorite = useCallback((showId: string) => {
@@ -299,36 +312,20 @@ export function SeriesScreen({ channels, activeNav, onNavigate, onChangePlaylist
     });
   }, []);
 
+  // Fire-and-forget persistence only — see handleClosePlayer above for why
+  // this deliberately skips setHistory during playback.
   const handleProgress = useCallback(
     (showId: string, episode: SeriesEpisode, positionSeconds: number, durationSeconds: number) => {
-      const key = episodeHistoryKey(showId, episode.season, episode.episode);
-      const title = `${episode.channel.name}`;
       upsertWatchHistoryProgress({
-        key,
+        key: episodeHistoryKey(showId, episode.season, episode.episode),
         kind: 'episode',
-        title,
+        title: episode.channel.name,
         logo: episode.channel.logo,
         positionSeconds,
         durationSeconds,
         showId,
         season: episode.season,
         episode: episode.episode,
-      });
-      setHistory((prev) => {
-        const next = new Map(prev);
-        next.set(key, {
-          key,
-          kind: 'episode',
-          title,
-          logo: episode.channel.logo,
-          positionSeconds,
-          durationSeconds,
-          updatedAt: Date.now(),
-          showId,
-          season: episode.season,
-          episode: episode.episode,
-        });
-        return next;
       });
     },
     []

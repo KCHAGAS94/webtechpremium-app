@@ -94,12 +94,19 @@ function MovieVodPlayer({
     onProgressRef.current = onProgress;
   }, [onProgress]);
 
+  // `resumeFrom` is recomputed by the parent from `history` on every
+  // progress tick (~5s), so it keeps changing while playing — captured once
+  // in a ref so the seek-and-play effect below only runs at mount, not on
+  // every tick (which was re-seeking to the last saved position and
+  // restarting playback every ~5s).
+  const resumeFromRef = useRef(resumeFrom);
+
   // Starting playback from useVideoPlayer's setup callback fires before the
   // VideoView below has ever attached a surface to this (brand new) player —
   // unlike Live TV, which reuses an already-playing preview player when it
   // expands to fullscreen. Waiting for mount ensures a surface exists first.
   useEffect(() => {
-    if (resumeFrom > 0) player.currentTime = resumeFrom;
+    if (resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
     player.play();
     player.timeUpdateEventInterval = 5;
     return () => {
@@ -107,7 +114,7 @@ function MovieVodPlayer({
         player.timeUpdateEventInterval = 0;
       } catch {}
     };
-  }, [player, resumeFrom]);
+  }, [player]);
 
   // Reports progress every ~5s (see timeUpdateEventInterval above) so
   // "Retomar para assistir" survives an app kill, not just a clean close.
@@ -228,6 +235,14 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
 
   const handleClosePlayer = useCallback(() => {
     setPlayingMovie(null);
+    // The grid (and its "Retomar para assistir" bucket) only needs to
+    // reflect the final position once playback stops — reloading here
+    // instead of on every tick is what keeps the screen behind the player
+    // from re-rendering a multi-thousand-item FlatList every 5s while a
+    // video is actively decoding on top of it.
+    loadWatchHistory().then((entries) => {
+      setHistory(new Map(entries.filter((e) => e.kind === 'movie').map((e) => [e.key, e])));
+    });
   }, []);
 
   const handleToggleFavorite = useCallback((movieName: string) => {
@@ -240,6 +255,9 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
     });
   }, []);
 
+  // Fire-and-forget persistence only — deliberately does NOT touch React
+  // state (see handleClosePlayer above) so a tick every ~5s during playback
+  // doesn't re-render this screen's FlatLists behind the player.
   const handleProgress = useCallback(
     (movie: M3uChannel, positionSeconds: number, durationSeconds: number) => {
       upsertWatchHistoryProgress({
@@ -249,19 +267,6 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
         logo: movie.logo,
         positionSeconds,
         durationSeconds,
-      });
-      setHistory((prev) => {
-        const next = new Map(prev);
-        next.set(movie.name, {
-          key: movie.name,
-          kind: 'movie',
-          title: movie.name,
-          logo: movie.logo,
-          positionSeconds,
-          durationSeconds,
-          updatedAt: Date.now(),
-        });
-        return next;
       });
     },
     []
