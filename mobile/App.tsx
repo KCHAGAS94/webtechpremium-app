@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
+  Modal,
   View,
   Text,
   TouchableOpacity,
@@ -61,6 +63,7 @@ export default function App() {
   const [reloadingChannels, setReloadingChannels] = useState(false);
   const [reloadChannelsError, setReloadChannelsError] = useState('');
   const [reloadBlockedMessage, setReloadBlockedMessage] = useState('');
+  const [exitModalVisible, setExitModalVisible] = useState(false);
   // True only for the initial boot check (cache lookup, or first-run painel
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
@@ -185,7 +188,7 @@ export default function App() {
       return;
     }
     if (screen === 'exit') {
-      console.log('Exiting...');
+      setExitModalVisible(true);
     } else if (screen === 'reload') {
       handleReloadChannels();
     } else if (screen && screen in CONTENT_SCREENS && channels.length === 0) {
@@ -193,6 +196,11 @@ export default function App() {
     } else {
       setCurrentScreen(screen || 'home');
     }
+  };
+
+  const handleConfirmExit = () => {
+    setExitModalVisible(false);
+    BackHandler.exitApp();
   };
 
   if (currentScreen === 'playlist') {
@@ -358,6 +366,37 @@ export default function App() {
           )}
         </View>
       </SafeAreaView>
+
+      <Modal
+        visible={exitModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setExitModalVisible(false)}
+      >
+        <View style={styles.exitModalOverlay}>
+          <View style={styles.exitModalBox}>
+            <Text allowFontScaling={false} style={styles.exitModalTitle}>
+              Deseja sair do app?
+            </Text>
+            <View style={styles.exitModalActions}>
+              <TouchableOpacity
+                style={[styles.exitModalButton, styles.exitModalButtonNo]}
+                onPress={() => setExitModalVisible(false)}
+                activeOpacity={0.75}
+              >
+                <Text allowFontScaling={false} style={styles.exitModalButtonText}>Não</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.exitModalButton, styles.exitModalButtonYes]}
+                onPress={handleConfirmExit}
+                activeOpacity={0.75}
+              >
+                <Text allowFontScaling={false} style={styles.exitModalButtonText}>Sim</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -482,5 +521,52 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     textAlign: 'center',
+  },
+  exitModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  exitModalBox: {
+    backgroundColor: '#12004f',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    width: 220,
+    alignItems: 'center',
+  },
+  exitModalTitle: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  exitModalActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  exitModalButton: {
+    flex: 1,
+    borderRadius: 8,
+    paddingVertical: 7,
+    alignItems: 'center',
+    borderWidth: 1,
+  },
+  exitModalButtonNo: {
+    backgroundColor: '#170066',
+    borderColor: '#1aa2ff',
+  },
+  exitModalButtonYes: {
+    backgroundColor: '#7a0000',
+    borderColor: '#ff4d4d',
+  },
+  exitModalButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
