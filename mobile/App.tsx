@@ -7,13 +7,16 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BootLoadingScreen } from './src/components/boot-loading-screen';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
 import { DeviceActivationScreen } from './src/components/device-activation-screen';
 import { MoviesScreen } from './src/components/movies-screen';
 import { PlaylistManagerScreen } from './src/components/playlist-manager-screen';
 import { SeriesScreen } from './src/components/series-screen';
 import { MOCK_MAC } from './src/config/device';
+import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
+import { loadLastPlaylist, saveLastPlaylist } from './src/utils/last-playlist-storage';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
@@ -54,6 +57,10 @@ export default function App() {
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
+  // True only for the initial boot check (cache lookup, or first-run painel
+  // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
+  // Home/activation screen that looks broken rather than loading.
+  const [booting, setBooting] = useState(true);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
   const rightTop = menuItems[2];
@@ -67,6 +74,11 @@ export default function App() {
     setActivePlaylistId(playlist.id);
     setChannels(freshChannels);
     setCurrentScreen('home');
+    // Cached so the next boot can skip straight to Home (see the boot
+    // useEffect below) instead of blocking on the painel + provider round
+    // trip every launch.
+    saveLastPlaylist(playlist);
+    saveChannels(freshChannels);
   };
 
   const fetchAndActivateFromPanel = async () => {
@@ -85,14 +97,38 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
+      const [cachedPlaylist, cachedChannels] = await Promise.all([loadLastPlaylist(), loadChannels()]);
+
+      if (cachedPlaylist && cachedChannels.length > 0) {
+        // Straight to Home with what was on screen last time — no network
+        // wait. The painel is still checked in the background so "Minhas
+        // listas" and future reloads have fresh data, but it never blocks
+        // or interrupts what the user is already browsing/watching.
+        setActivePlaylistId(cachedPlaylist.id);
+        setChannels(cachedChannels);
+        setPlaylists([cachedPlaylist]);
+        setCurrentScreen('home');
+        setBooting(false);
+        fetchDevicePlaylists(MOCK_MAC)
+          .then(setPlaylists)
+          .catch(() => {});
+        return;
+      }
+
       try {
         await fetchAndActivateFromPanel();
       } catch {
         // No painel reachable at boot: stay on the activation/lock screen.
         setCurrentScreen('playlist');
+      } finally {
+        setBooting(false);
       }
     })();
   }, []);
+
+  if (booting) {
+    return <BootLoadingScreen />;
+  }
 
   const handleReloadPlaylist = async () => {
     setReloadingPlaylist(true);
