@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { buildHlsUrl, isExpirado } from '@/lib/hls-url';
 
 // Public endpoint the mobile app polls at boot / "Recarregar Lista": given a
-// device's MAC, return the M3U lists a reseller has linked to it in the
+// device's MAC, return the HLS playlists a reseller has linked to it in the
 // painel. No auth — the MAC itself is the credential here, same as an
 // Xtream/IPTV portal keying access off a device id.
 export async function GET(request: NextRequest) {
@@ -14,7 +15,11 @@ export async function GET(request: NextRequest) {
   const app = await prisma.app.findUnique({
     where: { macAddress: mac.toUpperCase() },
     include: {
-      m3uLists: { where: { isActive: true }, orderBy: { createdAt: 'asc' } },
+      listas: {
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        include: { servidor: true },
+      },
     },
   });
 
@@ -22,11 +27,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json([], { status: 200 });
   }
 
-  const playlists = app.m3uLists.map((list) => ({
-    id: list.id,
-    name: list.name,
-    url: list.url,
-  }));
+  const playlists = app.listas
+    .filter((lista) => !isExpirado(lista.dataExpiracao))
+    .map((lista) => ({
+      id: lista.id,
+      name: lista.nome,
+      url: buildHlsUrl(lista.servidor.url, lista.usuario, lista.senha),
+    }));
 
   return NextResponse.json(playlists, { status: 200 });
 }

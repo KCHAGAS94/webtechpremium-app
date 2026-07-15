@@ -36,7 +36,7 @@ model App {
   metadata  Json?
 
   sessions  Session[]
-  m3uLists  M3UList[]
+  listas    Lista[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -54,15 +54,30 @@ model Session {
   @@index([appId])
 }
 
-model M3UList {
-  id        Int     @id @default(autoincrement())
-  name      String
+model Servidor {
+  id        Int      @id @default(autoincrement())
+  nome      String
   url       String
-  appId     Int
-  app       App     @relation(fields: [appId], references: [id], onDelete: Cascade)
-  isActive  Boolean @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  listas Lista[]
+}
+
+model Lista {
+  id            Int       @id @default(autoincrement())
+  nome          String
+  usuario       String
+  senha         String
+  dataExpiracao DateTime?
+  isActive      Boolean   @default(true)
+  appId         Int
+  app           App       @relation(fields: [appId], references: [id], onDelete: Cascade)
+  servidorId    Int
+  servidor      Servidor  @relation(fields: [servidorId], references: [id])
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
   @@index([appId])
+  @@index([servidorId])
 }

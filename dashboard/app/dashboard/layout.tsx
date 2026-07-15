@@ -1,9 +1,11 @@
 'use client';
 
 import React from 'react';
+import Link from 'next/link';
 
 const menuItems = [
-  { label: 'USUÁRIOS', icon: '👥' },
+  { label: 'USUÁRIOS', icon: '👥', href: '/dashboard/usuarios' },
+  { label: 'SERVIDORES', icon: '🖥️', href: '/dashboard/servidores' },
   { label: 'BANNERS', icon: '📋' },
   { label: 'BACKGROUND', icon: '🖼️' },
   { label: 'LOGO', icon: '🏠' },
@@ -31,15 +33,26 @@ export default function DashboardLayout({
 
         {/* Menu */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-2">
-          {menuItems.slice(0, -1).map((item) => (
-            <button
-              key={item.label}
-              className="w-full text-left px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium flex items-center gap-2"
-            >
-              <span>{item.icon}</span>
-              {item.label}
-            </button>
-          ))}
+          {menuItems.slice(0, -1).map((item) =>
+            item.href ? (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="w-full text-left px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium flex items-center gap-2"
+              >
+                <span>{item.icon}</span>
+                {item.label}
+              </Link>
+            ) : (
+              <button
+                key={item.label}
+                className="w-full text-left px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium flex items-center gap-2"
+              >
+                <span>{item.icon}</span>
+                {item.label}
+              </button>
+            )
+          )}
         </nav>
 
         {/* Logout */}

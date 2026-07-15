@@ -2,19 +2,25 @@
 
 import React, { useEffect, useState } from 'react';
 
-type User = {
+type Servidor = {
   id: number;
-  name: string;
+  nome: string;
+  url: string;
+};
+
+type Lista = {
+  id: number;
   mac: string;
+  servidorId: number;
+  servidorNome: string;
+  nome: string;
   usuario: string;
-  password: string;
+  senha: string;
   expiracaoData: string;
-  m3u: string;
-  dns: string;
   expirado: boolean;
 };
 
-const mockUsers: User[] = [];
+const mockListas: Lista[] = [];
 
 // Formats free-typed input into AA:BB:CC:DD:EE:FF as the user types: strips
 // anything but hex chars, uppercases, and inserts ':' every 2 characters.
@@ -23,16 +29,33 @@ function formatMacAddress(value: string): string {
   return hex.match(/.{1,2}/g)?.join(':') ?? hex;
 }
 
-function EditModal({ user, onClose, onSave }: { user: User | null; onClose: () => void; onSave: (user: User) => void }) {
-  const [formData, setFormData] = useState<User>(
-    user || ({} as User)
-  );
+function EditModal({
+  lista,
+  servidores,
+  onClose,
+  onSave,
+}: {
+  lista: Lista | null;
+  servidores: Servidor[];
+  onClose: () => void;
+  onSave: (lista: Lista) => void;
+}) {
+  const [formData, setFormData] = useState<Lista>(lista || ({} as Lista));
 
-  if (!user) return null;
+  useEffect(() => {
+    if (lista) setFormData(lista);
+  }, [lista]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  if (!lista) return null;
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: name === 'mac' ? formatMacAddress(value) : value });
+    setFormData({
+      ...formData,
+      [name]: name === 'mac' ? formatMacAddress(value) : name === 'servidorId' ? Number(value) : value,
+    });
   };
 
   const handleSave = () => {
@@ -42,113 +65,93 @@ function EditModal({ user, onClose, onSave }: { user: User | null; onClose: () =
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white w-[70%] h-screen flex flex-col rounded-lg shadow-lg">
-        {/* Header */}
+      <div className="bg-white w-[70%] max-w-xl flex flex-col rounded-lg shadow-lg">
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800">Atualizar Usuário</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-3xl font-bold"
-          >
+          <h2 className="text-2xl font-bold text-gray-800">Usuário</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-3xl font-bold">
             ✕
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-2xl space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">
-                👤 Edição de Usuário
-              </label>
-              <div className="border-l-4 border-gray-300 pl-4 py-2 bg-gray-50 rounded">
-                <p className="text-sm text-gray-600">Endereço MAC, Lista M3U e Acesso</p>
-              </div>
-            </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Endereço MAC</label>
+            <input
+              type="text"
+              name="mac"
+              value={formData.mac}
+              onChange={handleChange}
+              maxLength={17}
+              placeholder="00:1A:3M:A3:02:11"
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Endereço MAC</label>
-              <input
-                type="text"
-                name="mac"
-                value={formData.mac}
-                onChange={handleChange}
-                maxLength={17}
-                placeholder="00:1A:3M:A3:02:11"
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Servidor</label>
+            <select
+              name="servidorId"
+              value={formData.servidorId || ''}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+            >
+              <option value="" disabled>
+                Selecione um servidor
+              </option>
+              {servidores.map((servidor) => (
+                <option key={servidor.id} value={servidor.id}>
+                  {servidor.nome}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Lista M3U</label>
-              <input
-                type="text"
-                name="m3u"
-                value={formData.m3u}
-                onChange={handleChange}
-                placeholder="Digite o link M3U"
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Usuário</label>
+            <input
+              type="text"
+              name="usuario"
+              value={formData.usuario}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Nome</label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Senha</label>
+            <input
+              type="text"
+              name="senha"
+              value={formData.senha}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
-              <input
-                type="text"
-                name="usuario"
-                value={formData.usuario}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Lista</label>
+            <input
+              type="text"
+              name="nome"
+              value={formData.nome}
+              onChange={handleChange}
+              placeholder="Ex: Lista principal"
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-              <input
-                type="text"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">DNS</label>
-              <input
-                type="text"
-                name="dns"
-                value={formData.dns}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Validade</label>
-              <input
-                type="date"
-                name="expiracaoData"
-                value={formData.expiracaoData}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Data expira</label>
+            <input
+              type="date"
+              name="expiracaoData"
+              value={formData.expiracaoData}
+              onChange={handleChange}
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+            />
           </div>
         </div>
 
-        {/* Footer */}
         <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
           <button
             onClick={handleSave}
@@ -169,93 +172,107 @@ function EditModal({ user, onClose, onSave }: { user: User | null; onClose: () =
 }
 
 export default function UsuariosPage() {
-  const [users, setUsers] = useState(mockUsers);
+  const [listas, setListas] = useState(mockListas);
+  const [servidores, setServidores] = useState<Servidor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [isAdding, setIsAdding] = useState(false);
+  const [editingLista, setEditingLista] = useState<Lista | null>(null);
+
+  const loadListas = async () => {
+    try {
+      const response = await fetch('/api/painel/listas');
+      const data = await response.json();
+      setListas(data.listas ?? []);
+    } catch (error) {
+      console.error('Falha ao carregar listas do painel', error);
+    }
+  };
 
   useEffect(() => {
+    loadListas();
+
     (async () => {
       try {
-        const response = await fetch('/api/painel/devices');
+        const response = await fetch('/api/painel/servidores');
         const data = await response.json();
-        setUsers(data.devices ?? []);
+        setServidores(data.servidores ?? []);
       } catch (error) {
-        console.error('Falha ao carregar dispositivos do painel', error);
+        console.error('Falha ao carregar servidores', error);
       }
     })();
   }, []);
 
-  const filteredUsers = users.filter(
-    (user) =>
-      (user.name ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.mac ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (user.usuario ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredListas = listas.filter(
+    (lista) =>
+      (lista.mac ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lista.usuario ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lista.nome ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleDelete = async (user: User) => {
-    if (!confirm('Tem certeza que deseja deletar este usuário?')) return;
+  const handleDelete = async (lista: Lista) => {
+    if (!confirm('Tem certeza que deseja deletar esta lista?')) return;
 
-    setUsers(users.filter((u) => u.id !== user.id));
+    setListas(listas.filter((l) => l.id !== lista.id));
     try {
-      await fetch(`/api/painel/devices?mac=${encodeURIComponent(user.mac)}`, {
-        method: 'DELETE',
-      });
+      await fetch(`/api/painel/listas?id=${lista.id}`, { method: 'DELETE' });
     } catch (error) {
-      console.error('Falha ao remover dispositivo do painel', error);
+      console.error('Falha ao remover lista do painel', error);
+    }
+  };
+
+  const handleRemoveExpirados = async () => {
+    const expirados = listas.filter((l) => l.expirado);
+    if (expirados.length === 0) return;
+    if (!confirm(`Remover ${expirados.length} lista(s) expirada(s)?`)) return;
+
+    try {
+      await Promise.all(
+        expirados.map((lista) => fetch(`/api/painel/listas?id=${lista.id}`, { method: 'DELETE' }))
+      );
+      await loadListas();
+    } catch (error) {
+      console.error('Falha ao remover listas expiradas', error);
     }
   };
 
   const handleAddClick = () => {
-    setEditingUser({
-      id: Date.now(),
-      name: '',
+    setEditingLista({
+      id: 0,
       mac: '',
+      servidorId: servidores[0]?.id ?? 0,
+      servidorNome: '',
+      nome: '',
       usuario: '',
-      password: '',
+      senha: '',
       expiracaoData: '',
-      m3u: '',
-      dns: '',
       expirado: false,
-    } as User);
-    setIsAdding(true);
+    });
   };
 
-  const handleSave = async (updatedUser: User) => {
+  const handleSave = async (lista: Lista) => {
     try {
-      const response = await fetch('/api/painel/devices', {
+      await fetch('/api/painel/listas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          mac: updatedUser.mac,
-          name: updatedUser.name,
-          m3u: updatedUser.m3u,
-          usuario: updatedUser.usuario,
-          password: updatedUser.password,
-          dns: updatedUser.dns,
-          expiracaoData: updatedUser.expiracaoData,
-          expirado: updatedUser.expirado,
+          id: lista.id || undefined,
+          mac: lista.mac,
+          servidorId: lista.servidorId,
+          nome: lista.nome,
+          usuario: lista.usuario,
+          senha: lista.senha,
+          expiracaoData: lista.expiracaoData,
         }),
       });
-      const { app } = await response.json();
-
-      const savedUser: User = app ? { ...updatedUser, id: app.id } : updatedUser;
-      if (isAdding) {
-        setUsers([...users, savedUser]);
-      } else {
-        setUsers(users.map((user) => (user.id === updatedUser.id ? savedUser : user)));
-      }
+      await loadListas();
     } catch (error) {
-      console.error('Falha ao salvar dispositivo no painel', error);
+      console.error('Falha ao salvar lista no painel', error);
     }
 
-    setEditingUser(null);
-    setIsAdding(false);
+    setEditingLista(null);
   };
 
   const handleCloseModal = () => {
-    setEditingUser(null);
-    setIsAdding(false);
+    setEditingLista(null);
   };
 
   return (
@@ -277,13 +294,16 @@ export default function UsuariosPage() {
           <span>🔍</span>
           <input
             type="text"
-            placeholder="Pesquisar Mac / Nome / Usuário..."
+            placeholder="Pesquisar Mac / Usuário / Lista..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-3 py-2 outline-none"
           />
         </div>
-        <button className="bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition">
+        <button
+          onClick={handleRemoveExpirados}
+          className="bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition"
+        >
           🗑️ Remover Expirados
         </button>
       </div>
@@ -293,48 +313,43 @@ export default function UsuariosPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-100 border-b border-gray-300">
             <tr>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Nome</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Endereço MAC</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Mac</th>
               <th className="px-6 py-3 text-left font-semibold text-gray-700">Usuário</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Data de Expiração</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Expirado?</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">DNS</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Senha</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Lista</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Data expira</th>
+              <th className="px-6 py-3 text-left font-semibold text-gray-700">Expirado</th>
               <th className="px-6 py-3 text-center font-semibold text-gray-700">Ações</th>
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.map((user) => (
-              <tr key={user.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-3 text-gray-600">{user.name}</td>
-                <td className="px-6 py-3 text-gray-600 font-mono text-xs">{user.mac}</td>
-                <td className="px-6 py-3 text-gray-600">{user.usuario}</td>
-                <td className="px-6 py-3 text-gray-600">{user.expiracaoData}</td>
+            {filteredListas.map((lista) => (
+              <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
+                <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
+                <td className="px-6 py-3 text-gray-600">{lista.usuario}</td>
+                <td className="px-6 py-3 text-gray-600">{lista.senha}</td>
+                <td className="px-6 py-3 text-gray-600">{lista.nome}</td>
+                <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
                 <td className="px-6 py-3">
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
-                    Não
-                  </span>
-                </td>
-                <td className="px-6 py-3">
-                  {user.dns ? (
-                    <a href={user.dns} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:text-blue-700 underline text-xs truncate">
-                      {user.dns.substring(0, 50)}...
-                    </a>
+                  {lista.expirado ? (
+                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                      Sim
+                    </span>
                   ) : (
-                    <span className="text-gray-400 text-xs">—</span>
+                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                      Não
+                    </span>
                   )}
                 </td>
                 <td className="px-6 py-3 flex justify-center gap-2">
                   <button
-                    onClick={() => {
-                      setEditingUser(user);
-                      setIsAdding(false);
-                    }}
+                    onClick={() => setEditingLista(lista)}
                     className="text-blue-500 hover:text-blue-700 font-semibold text-xl"
                   >
                     ✏️
                   </button>
                   <button
-                    onClick={() => handleDelete(user)}
+                    onClick={() => handleDelete(lista)}
                     className="text-red-500 hover:text-red-700 font-semibold text-xl"
                   >
                     🗑️
@@ -348,15 +363,11 @@ export default function UsuariosPage() {
 
       {/* Results Info */}
       <div className="text-sm text-gray-600">
-        Mostrando {filteredUsers.length} de {users.length} usuários
+        Mostrando {filteredListas.length} de {listas.length} usuários
       </div>
 
       {/* Edit/Add Modal */}
-      <EditModal
-        user={editingUser}
-        onClose={handleCloseModal}
-        onSave={handleSave}
-      />
+      <EditModal lista={editingLista} servidores={servidores} onClose={handleCloseModal} onSave={handleSave} />
     </div>
   );
 }
