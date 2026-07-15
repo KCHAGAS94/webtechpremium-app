@@ -56,7 +56,6 @@ type Props = {
   /** Which header nav item to highlight as active. */
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
-  onChangePlaylist: () => void;
 };
 
 const CategoryRow = memo(function CategoryRow({
@@ -102,7 +101,7 @@ const ChannelRow = memo(function ChannelRow({
   );
 });
 
-export function ContentBrowserScreen({ channels, category, activeNav, onNavigate, onChangePlaylist }: Props) {
+export function ContentBrowserScreen({ channels, category, activeNav, onNavigate }: Props) {
   const labels = CONTENT_LABELS[category];
 
   // Single pass over the (potentially huge) channel list: keep only groups
@@ -253,10 +252,6 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
               style={styles.searchInput}
             />
           </View>
-
-          <TouchableOpacity onPress={onChangePlaylist}>
-            <ThemedText style={styles.brand}>trocar lista</ThemedText>
-          </TouchableOpacity>
         </View>
 
         {/* Body */}
@@ -390,11 +385,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     padding: 0,
-  },
-  brand: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#4dd6ff',
   },
   body: {
     flex: 1,

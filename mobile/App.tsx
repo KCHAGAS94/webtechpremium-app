@@ -200,7 +200,6 @@ export default function App() {
         channels={channels}
         activeNav="movies"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
-        onChangePlaylist={() => setCurrentScreen('playlist')}
       />
     );
   }
@@ -211,7 +210,6 @@ export default function App() {
         channels={channels}
         activeNav="series"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
-        onChangePlaylist={() => setCurrentScreen('playlist')}
       />
     );
   }
@@ -224,7 +222,6 @@ export default function App() {
         category={contentCategory}
         activeNav={currentScreen === 'tv' ? 'live' : (currentScreen as NavKey)}
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
-        onChangePlaylist={() => setCurrentScreen('playlist')}
       />
     );
   }

@@ -140,10 +140,9 @@ type Props = {
   channels: M3uChannel[];
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
-  onChangePlaylist: () => void;
 };
 
-export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist }: Props) {
+export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
   const { channelsByGroup, bucketChannels } = useMemo(() => {
     const byGroup = new Map<string, M3uChannel[]>();
     const bucket: M3uChannel[] = [];
@@ -345,10 +344,6 @@ export function MoviesScreen({ channels, activeNav, onNavigate, onChangePlaylist
               style={styles.searchInput}
             />
           </View>
-
-          <TouchableOpacity onPress={onChangePlaylist}>
-            <ThemedText style={styles.brand}>trocar lista</ThemedText>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.body}>
@@ -444,11 +439,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 14,
     padding: 0,
-  },
-  brand: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#4dd6ff',
   },
   body: {
     flex: 1,
