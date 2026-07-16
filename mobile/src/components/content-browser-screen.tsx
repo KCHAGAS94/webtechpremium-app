@@ -155,6 +155,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     instance.play();
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
 
   const handleExpandFullscreen = useCallback(() => {
     setIsFullscreen(true);
@@ -163,6 +164,11 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const handleCloseFullscreen = useCallback(() => {
     setIsFullscreen(false);
   }, []);
+
+  const handleTogglePreviewPlayPause = useCallback(() => {
+    if (player.playing) player.pause();
+    else player.play();
+  }, [player]);
 
   // Debounce the search text so we don't re-filter on every keystroke.
   useEffect(() => {
@@ -314,6 +320,15 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                         Não foi possível carregar{error?.message ? `: ${error.message}` : '.'}
                       </ThemedText>
                     </View>
+                  )}
+                  {status !== 'error' && (
+                    <TouchableOpacity
+                      onPress={handleTogglePreviewPlayPause}
+                      style={styles.previewPlayButton}
+                      hitSlop={8}
+                    >
+                      <ThemedText style={styles.previewPlayIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
+                    </TouchableOpacity>
                   )}
                   <View style={styles.expandHint} pointerEvents="none">
                     <ThemedText style={styles.expandHintIcon}>⤢</ThemedText>
@@ -488,6 +503,21 @@ const styles = StyleSheet.create({
   },
   expandHintIcon: {
     fontSize: 14,
+    color: '#fff',
+  },
+  previewPlayButton: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  previewPlayIcon: {
+    fontSize: 15,
     color: '#fff',
   },
   previewPlaceholder: {
