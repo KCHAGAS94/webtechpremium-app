@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -19,6 +19,12 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
   const [error, setError] = useState('');
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
   const expirationDate = activePlaylist?.expiracaoData;
+
+  useEffect(() => {
+    if (!error) return;
+    const timer = setTimeout(() => setError(''), 3000);
+    return () => clearTimeout(timer);
+  }, [error]);
 
   const handleSelect = async (playlist: PanelPlaylist) => {
     setActivatingId(playlist.id);
@@ -50,8 +56,6 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
           Listas vinculadas a este dispositivo no painel.
         </ThemedText>
 
-        {!!error && <ThemedText style={styles.error}>{error}</ThemedText>}
-
         <View style={styles.body}>
           <FlatList
             style={styles.listColumn}
@@ -68,12 +72,10 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
                   disabled={!!activatingId}
                   activeOpacity={0.75}
                 >
-                  <View style={styles.itemInfo}>
-                    <ThemedText style={styles.itemName}>{item.name}</ThemedText>
-                    {isActive && <ThemedText style={styles.activeBadge}>Ativa</ThemedText>}
-                  </View>
+                  <ThemedText style={styles.itemName}>{item.name}</ThemedText>
+                  {isActive && <ThemedText style={styles.activeBadge}>Ativa</ThemedText>}
 
-                  {isActivating && <ActivityIndicator color="#fff" />}
+                  {isActivating && <ActivityIndicator color="#fff" style={styles.itemSpinner} />}
                 </TouchableOpacity>
               );
             }}
@@ -96,6 +98,12 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
             </ThemedText>
           </View>
         </View>
+
+        {!!error && (
+          <View style={styles.errorBanner}>
+            <ThemedText style={styles.errorBannerText}>{error}</ThemedText>
+          </View>
+        )}
       </SafeAreaView>
     </ThemedView>
   );
@@ -132,10 +140,20 @@ const styles = StyleSheet.create({
     color: '#c7c7e6',
     marginBottom: 16,
   },
-  error: {
-    color: '#ff6b6b',
-    fontSize: 13,
-    marginBottom: 12,
+  errorBanner: {
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
+    backgroundColor: 'rgba(120, 0, 0, 0.85)',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  errorBannerText: {
+    color: '#ffffff',
+    fontSize: 12,
+    textAlign: 'center',
   },
   separator: {
     alignSelf: 'stretch',
@@ -158,41 +176,33 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    width: 100,
+    height: 100,
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     backgroundColor: '#170066',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#1aa2ff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
+    padding: 10,
   },
   itemActive: {
     borderColor: '#3ddc84',
     borderWidth: 2,
   },
-  itemInfo: {
-    gap: 4,
-  },
   itemName: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: '600',
+  },
+  itemSpinner: {
+    marginTop: 8,
   },
   activeBadge: {
     alignSelf: 'flex-start',
-    marginTop: 4,
     color: '#3ddc84',
     fontSize: 11,
     fontWeight: '700',
-    borderWidth: 1,
-    borderColor: '#3ddc84',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
   },
   macPanel: {
     width: 320,
