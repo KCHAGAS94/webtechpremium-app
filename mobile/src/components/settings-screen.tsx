@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { loadSubtitleSettings, saveSubtitleSettings } from '@/utils/subtitle-settings-storage';
 
 // Front-end only for now — each card just reports its id through onSelectItem.
 // The actual behavior behind each one (layout change, hiding categories,
@@ -88,6 +90,32 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
   const [fundoLegendaHabilitado, setFundoLegendaHabilitado] = useState(true);
   const [colorModalVisible, setColorModalVisible] = useState(false);
   const [colorModalTarget, setColorModalTarget] = useState<'texto' | 'fundo'>('texto');
+
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  useEffect(() => {
+    loadSubtitleSettings().then((settings) => {
+      setLegendasHabilitadas(settings.enabled);
+      setTamanhoLegenda(settings.fontSize);
+      setCorLegenda(settings.textColor);
+      setFundoLegendaHabilitado(settings.backgroundEnabled);
+      setFundoLegenda(settings.backgroundColor);
+      setSettingsLoaded(true);
+    });
+  }, []);
+
+  // Only persists once the initial load above has run, so this doesn't
+  // clobber saved settings with the useState defaults on first render.
+  useEffect(() => {
+    if (!settingsLoaded) return;
+    saveSubtitleSettings({
+      enabled: legendasHabilitadas,
+      fontSize: tamanhoLegenda,
+      textColor: corLegenda,
+      backgroundEnabled: fundoLegendaHabilitado,
+      backgroundColor: fundoLegenda,
+    });
+  }, [settingsLoaded, legendasHabilitadas, tamanhoLegenda, corLegenda, fundoLegendaHabilitado, fundoLegenda]);
 
   const closeParentalModal = () => {
     setParentalModalVisible(false);

@@ -6,8 +6,20 @@ import { VideoView, type VideoPlayer } from 'expo-video';
 import * as Brightness from 'expo-brightness';
 
 import { SeekBar } from '@/components/seek-bar';
+import { SubtitleOverlay } from '@/components/subtitle-overlay';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
+import { fetchSubtitleCues } from '@/utils/opensubtitles-api';
+import type { SubtitleCue } from '@/utils/srt-parser';
+import { loadSubtitleSettings, type SubtitleSettings } from '@/utils/subtitle-settings-storage';
+
+const DEFAULT_SUBTITLE_STYLE: SubtitleSettings = {
+  enabled: false,
+  fontSize: 12,
+  textColor: '#ffffff',
+  backgroundEnabled: true,
+  backgroundColor: '#000000',
+};
 
 const AUTO_HIDE_MS = 4000;
 const SKIP_SECONDS = 10;
@@ -47,6 +59,8 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
   const [contentFit, setContentFit] = useState<'contain' | 'cover'>('contain');
   const [subtitlesOn, setSubtitlesOn] = useState(false);
   const [audioTrackIndex, setAudioTrackIndex] = useState(-1);
+  const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
+  const [subtitleStyle, setSubtitleStyle] = useState<SubtitleSettings>(DEFAULT_SUBTITLE_STYLE);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
@@ -58,7 +72,46 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
     bufferedPosition: player.bufferedPosition,
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
+  const { availableSubtitleTracks } = useEvent(player, 'availableSubtitleTracksChange', {
+    availableSubtitleTracks: player.availableSubtitleTracks,
+    oldAvailableSubtitleTracks: undefined,
+  });
   const duration = player.duration;
+
+  // "habilitar legendas" in Configurações is global (AsyncStorage-backed, no
+  // shared state with this screen), so it's only checked once per playback:
+  // if on, the first subtitle track that becomes available is auto-selected.
+  // Left as a ref (not state) so a later manual toggle via handleToggleSubtitles
+  // isn't fought by this effect re-running.
+  const autoSubtitlesAppliedRef = useRef(false);
+  useEffect(() => {
+    if (autoSubtitlesAppliedRef.current || availableSubtitleTracks.length === 0) return;
+    loadSubtitleSettings().then((settings) => {
+      if (!settings.enabled || autoSubtitlesAppliedRef.current) return;
+      autoSubtitlesAppliedRef.current = true;
+      player.subtitleTrack = availableSubtitleTracks[0];
+      setSubtitlesOn(true);
+    });
+  }, [availableSubtitleTracks, player]);
+
+  // Most IPTV movie/series streams carry no embedded subtitle track at all
+  // (the effect above then has nothing to select), so when the setting is on
+  // this pulls a matching .srt from OpenSubtitles instead and renders it
+  // ourselves via <SubtitleOverlay>, synced against `currentTime`.
+  useEffect(() => {
+    let cancelled = false;
+    loadSubtitleSettings().then((settings) => {
+      if (cancelled) return;
+      setSubtitleStyle(settings);
+      if (!settings.enabled) return;
+      fetchSubtitleCues({ title, year }).then((cues) => {
+        if (!cancelled) setSubtitleCues(cues);
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [title, year]);
 
   useEffect(() => {
     player.timeUpdateEventInterval = 1;
@@ -205,6 +258,16 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
               <ThemedText style={styles.errorBackButtonText}>Voltar</ThemedText>
             </TouchableOpacity>
           </View>
+        )}
+
+        {subtitleCues.length > 0 && (
+          <SubtitleOverlay
+            cues={subtitleCues}
+            currentTime={currentTime}
+            fontSize={subtitleStyle.fontSize}
+            textColor={subtitleStyle.textColor}
+            backgroundColor={subtitleStyle.backgroundEnabled ? subtitleStyle.backgroundColor : null}
+          />
         )}
 
         {controlsVisible && (

@@ -8,6 +8,7 @@ import * as Brightness from 'expo-brightness';
 import { SeekBar } from '@/components/seek-bar';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
+import { loadSubtitleSettings } from '@/utils/subtitle-settings-storage';
 
 const AUTO_HIDE_MS = 4000;
 const SKIP_SECONDS = 10;
@@ -49,6 +50,10 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
     bufferedPosition: player.bufferedPosition,
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
+  const { availableSubtitleTracks } = useEvent(player, 'availableSubtitleTracksChange', {
+    availableSubtitleTracks: player.availableSubtitleTracks,
+    oldAvailableSubtitleTracks: undefined,
+  });
   const duration = player.duration;
   const isLive = player.isLive || !Number.isFinite(duration) || duration <= 0;
 
@@ -60,6 +65,19 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
       player.timeUpdateEventInterval = 0;
     };
   }, [player]);
+
+  // "habilitar legendas" in Configurações is global (AsyncStorage-backed) —
+  // there's no manual subtitle toggle on live TV, so this is the only place
+  // the setting takes effect: auto-select the first track once available.
+  const autoSubtitlesAppliedRef = useRef(false);
+  useEffect(() => {
+    if (autoSubtitlesAppliedRef.current || availableSubtitleTracks.length === 0) return;
+    loadSubtitleSettings().then((settings) => {
+      if (!settings.enabled || autoSubtitlesAppliedRef.current) return;
+      autoSubtitlesAppliedRef.current = true;
+      player.subtitleTrack = availableSubtitleTracks[0];
+    });
+  }, [availableSubtitleTracks, player]);
 
   useEffect(() => {
     let cancelled = false;
