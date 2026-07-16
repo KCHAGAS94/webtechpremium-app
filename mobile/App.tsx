@@ -16,6 +16,7 @@ import { DeviceActivationScreen } from './src/components/device-activation-scree
 import { MoviesScreen } from './src/components/movies-screen';
 import { PlaylistManagerScreen } from './src/components/playlist-manager-screen';
 import { SeriesScreen } from './src/components/series-screen';
+import { SettingsScreen } from './src/components/settings-screen';
 import { MOCK_MAC } from './src/config/device';
 import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
@@ -246,6 +247,14 @@ export default function App() {
         channels={channels}
         activeNav="series"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+      />
+    );
+  }
+
+  if (currentScreen === 'settings') {
+    return (
+      <SettingsScreen
+        onBack={() => setCurrentScreen('home')}
       />
     );
   }
