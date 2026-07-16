@@ -7,21 +7,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 // The actual behavior behind each one (layout change, hiding categories,
 // clearing history, etc.) gets wired in one at a time later.
 export type SettingsItemId =
-  | 'add-playlist'
   | 'parental-control'
-  | 'change-playlist'
   | 'change-language'
-  | 'change-layout'
   | 'hide-live-categories'
   | 'hide-vod-categories'
   | 'hide-series-categories'
   | 'clear-movie-history'
-  | 'live-stream-format'
-  | 'external-player'
-  | 'automatic'
-  | 'time-format'
+  | 'clear-live-history'
+  | 'clear-series-history'
   | 'subtitle-settings'
-  | 'select-device-type'
   | 'update-now';
 
 type SettingsItem = {
@@ -32,11 +26,9 @@ type SettingsItem = {
 };
 
 const settingsItems: SettingsItem[] = [
-  { id: 'add-playlist', icon: '📋', label: 'adicionar lista de reprodução' },
   { id: 'parental-control', icon: '🔒', label: 'Controle dos Pais' },
-  { id: 'change-playlist', icon: '📋', label: 'mudar lista de reprodução' },
   { id: 'change-language', icon: '🌐', label: 'mudar idioma' },
-  { id: 'change-layout', icon: '▦', label: 'Alterar layout' },
+  { id: 'subtitle-settings', icon: '💬', label: 'Configurações de legenda' },
   { id: 'hide-live-categories', icon: '🚫', label: 'Ocultar Categorias ao Vivo' },
   { id: 'hide-vod-categories', icon: '🚫', label: 'Ocultar Categorias Vod' },
   { id: 'hide-series-categories', icon: '🚫', label: 'Ocultar Categorias Series' },
@@ -44,15 +36,20 @@ const settingsItems: SettingsItem[] = [
     id: 'clear-movie-history',
     icon: '🗑️',
     label: 'Limpar histórico de filmes',
-    subtitle: 'Não há filmes vistos recentemente.',
   },
-  { id: 'live-stream-format', icon: '📡', label: 'Live Stream Format' },
-  { id: 'external-player', icon: '▶️', label: 'jogador externo' },
-  { id: 'automatic', icon: '✨', label: 'automática' },
-  { id: 'time-format', icon: '🕐', label: 'Formato da hora' },
-  { id: 'subtitle-settings', icon: '💬', label: 'Configurações de legenda' },
-  { id: 'select-device-type', icon: '🖥️', label: 'Select Device Type' },
-  { id: 'update-now', icon: '⬇️', label: 'atualize agora' },
+  {
+    id: 'clear-live-history',
+    icon: '🗑️',
+    label: 'Limpar histórico Tv ao vivo',
+  },
+  {
+    id: 'clear-series-history',
+    icon: '🗑️',
+    label: 'Limpar histórico Series',
+  },
+  { id: 'update-now',
+    icon: '⬇️',
+    label: 'atualize agora' },
 ];
 
 type Props = {
@@ -110,7 +107,8 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    paddingHorizontal: 24,
+    paddingHorizontal: 70,
+    paddingBottom: 15,
   },
   header: {
     flexDirection: 'row',
@@ -142,19 +140,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   card: {
-    width: '23.5%',
-    height: 64,
+    width: '23%',
+    height: 42,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#171ba0',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    gap: 8,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    gap: 6,
   },
   cardIcon: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#ffffff',
-    width: 18,
+    width: 15,
     textAlign: 'center',
   },
   cardTextWrap: {
@@ -162,12 +160,12 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '500',
   },
   cardSubtitle: {
     color: '#9fa3d1',
-    fontSize: 9,
+    fontSize: 8,
     marginTop: 1,
   },
 });
