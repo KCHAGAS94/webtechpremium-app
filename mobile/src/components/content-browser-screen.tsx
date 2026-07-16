@@ -291,12 +291,18 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
             <View style={styles.previewPlayer}>
               {selectedChannel ? (
                 <Pressable style={styles.previewPressable} onPress={handleExpandFullscreen}>
-                  <VideoView
-                    style={styles.video}
-                    player={player}
-                    nativeControls={false}
-                    onFirstFrameRender={() => setIsBuffering(false)}
-                  />
+                  {/* Only one VideoView may attach to `player` at a time: while
+                      FullscreenPlayer's VideoView is mounted, this one must be
+                      unmounted, otherwise expo-video hands the render surface
+                      back to a stale frame instead of the live one on exit. */}
+                  {!isFullscreen && (
+                    <VideoView
+                      style={styles.video}
+                      player={player}
+                      nativeControls={false}
+                      onFirstFrameRender={() => setIsBuffering(false)}
+                    />
+                  )}
                   {isBuffering && status !== 'error' && (
                     <View style={styles.bufferingOverlay}>
                       <ActivityIndicator color="#4dd6ff" size="large" />
