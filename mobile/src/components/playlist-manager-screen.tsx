@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -57,16 +57,13 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
         </ThemedText>
 
         <View style={styles.body}>
-          <FlatList
-            style={styles.listColumn}
-            data={playlists}
-            keyExtractor={(item) => String(item.id)}
-            contentContainerStyle={styles.list}
-            renderItem={({ item }) => {
+          <ScrollView style={styles.listColumn} contentContainerStyle={styles.list}>
+            {playlists.map((item) => {
               const isActive = item.id === activePlaylistId;
               const isActivating = activatingId === item.id;
               return (
                 <TouchableOpacity
+                  key={item.id}
                   style={[styles.item, isActive && styles.itemActive]}
                   onPress={() => handleSelect(item)}
                   disabled={!!activatingId}
@@ -78,8 +75,8 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
                   {isActivating && <ActivityIndicator color="#fff" style={styles.itemSpinner} />}
                 </TouchableOpacity>
               );
-            }}
-          />
+            })}
+          </ScrollView>
 
           <View style={styles.separator} />
 
