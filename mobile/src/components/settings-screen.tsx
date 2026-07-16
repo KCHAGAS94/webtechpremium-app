@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -52,6 +52,23 @@ const settingsItems: SettingsItem[] = [
     label: 'atualize agora' },
 ];
 
+const subtitleColors = [
+  '#ffffff',
+  '#808080',
+  '#000000',
+  '#0000ff',
+  '#29a3f0',
+  '#33cc33',
+  '#128c12',
+  '#ffee33',
+  '#999900',
+  '#ff0000',
+  '#8b0000',
+  '#c94f4f',
+  '#6b4a3a',
+  '#c9a789',
+];
+
 type Props = {
   onBack: () => void;
   onSelectItem?: (id: SettingsItemId) => void;
@@ -63,6 +80,15 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
 
+  const [subtitleModalVisible, setSubtitleModalVisible] = useState(false);
+  const [legendasHabilitadas, setLegendasHabilitadas] = useState(false);
+  const [tamanhoLegenda, setTamanhoLegenda] = useState(12);
+  const [corLegenda, setCorLegenda] = useState('#ffffff');
+  const [fundoLegenda, setFundoLegenda] = useState('#000000');
+  const [fundoLegendaHabilitado, setFundoLegendaHabilitado] = useState(true);
+  const [colorModalVisible, setColorModalVisible] = useState(false);
+  const [colorModalTarget, setColorModalTarget] = useState<'texto' | 'fundo'>('texto');
+
   const closeParentalModal = () => {
     setParentalModalVisible(false);
     setSenha('');
@@ -73,6 +99,10 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
   const handleSelectItem = (id: SettingsItemId) => {
     if (id === 'parental-control') {
       setParentalModalVisible(true);
+      return;
+    }
+    if (id === 'subtitle-settings') {
+      setSubtitleModalVisible(true);
       return;
     }
     onSelectItem?.(id);
@@ -170,6 +200,156 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
               >
                 <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={subtitleModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSubtitleModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.subtitleModalBox}>
+            <View style={styles.subtitleModalHeader}>
+              <Text allowFontScaling={false} style={[styles.modalTitle, styles.subtitleModalHeaderTitle]}>
+                Configurações de legenda
+              </Text>
+              <TouchableOpacity
+                onPress={() => setSubtitleModalVisible(false)}
+                activeOpacity={0.75}
+                style={styles.subtitleModalCloseButton}
+              >
+                <Text allowFontScaling={false} style={styles.subtitleModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.subtitleRow}>
+              <Text allowFontScaling={false} style={styles.subtitleRowIcon}>▤</Text>
+              <Text allowFontScaling={false} style={styles.subtitleRowLabel}>habilitar legendas</Text>
+              <Switch
+                value={legendasHabilitadas}
+                onValueChange={setLegendasHabilitadas}
+                trackColor={{ false: '#3a3a4a', true: '#1aa2ff' }}
+                thumbColor="#ffffff"
+              />
+            </View>
+
+            <View style={styles.subtitleRow}>
+              <Text allowFontScaling={false} style={styles.subtitleRowIcon}>Tt</Text>
+              <Text allowFontScaling={false} style={styles.subtitleRowLabel}>tamanho da legenda</Text>
+              <View style={styles.subtitleStepper}>
+                <TouchableOpacity
+                  style={styles.subtitleStepperButton}
+                  onPress={() => setTamanhoLegenda((size) => Math.max(8, size - 1))}
+                  activeOpacity={0.75}
+                >
+                  <Text allowFontScaling={false} style={styles.subtitleStepperButtonText}>−</Text>
+                </TouchableOpacity>
+                <View style={styles.subtitleStepperValue}>
+                  <Text allowFontScaling={false} style={styles.subtitleStepperValueText}>
+                    {tamanhoLegenda}pt
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.subtitleStepperButton}
+                  onPress={() => setTamanhoLegenda((size) => Math.min(32, size + 1))}
+                  activeOpacity={0.75}
+                >
+                  <Text allowFontScaling={false} style={styles.subtitleStepperButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.subtitleRow}
+              onPress={() => {
+                setColorModalTarget('texto');
+                setColorModalVisible(true);
+              }}
+              activeOpacity={0.75}
+            >
+              <Text allowFontScaling={false} style={styles.subtitleRowIcon}>A</Text>
+              <Text allowFontScaling={false} style={styles.subtitleRowLabel}>cor da legenda</Text>
+              <View style={[styles.subtitleColorSwatch, { backgroundColor: corLegenda }]} />
+            </TouchableOpacity>
+
+            <View style={[styles.subtitleRow, styles.subtitleRowLast]}>
+              <Text allowFontScaling={false} style={styles.subtitleRowIcon}>◒</Text>
+              <Text allowFontScaling={false} style={styles.subtitleRowLabel}>fundo da legenda</Text>
+              <Switch
+                value={fundoLegendaHabilitado}
+                onValueChange={setFundoLegendaHabilitado}
+                trackColor={{ false: '#3a3a4a', true: '#1aa2ff' }}
+                thumbColor="#ffffff"
+              />
+              <TouchableOpacity
+                onPress={() => {
+                  setColorModalTarget('fundo');
+                  setColorModalVisible(true);
+                }}
+                disabled={!fundoLegendaHabilitado}
+                activeOpacity={0.75}
+                style={styles.subtitleSwitchSpacing}
+              >
+                <View
+                  style={[
+                    styles.subtitleColorSwatch,
+                    { backgroundColor: fundoLegenda },
+                    !fundoLegendaHabilitado && styles.subtitleColorSwatchDisabled,
+                  ]}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={colorModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setColorModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.colorModalBox}>
+            <View style={styles.subtitleModalHeader}>
+              <Text allowFontScaling={false} style={[styles.modalTitle, styles.subtitleModalHeaderTitle]}>
+                {colorModalTarget === 'texto' ? 'Cor da legenda' : 'Fundo da legenda'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setColorModalVisible(false)}
+                activeOpacity={0.75}
+                style={styles.subtitleModalCloseButton}
+              >
+                <Text allowFontScaling={false} style={styles.subtitleModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.colorModalBody}>
+              <View style={styles.colorGrid}>
+                {subtitleColors.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[styles.colorSwatchOption, { backgroundColor: color }]}
+                    onPress={() => {
+                      if (colorModalTarget === 'texto') {
+                        setCorLegenda(color);
+                      } else {
+                        setFundoLegenda(color);
+                      }
+                      setColorModalVisible(false);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    {color === (colorModalTarget === 'texto' ? corLegenda : fundoLegenda) && (
+                      <Text allowFontScaling={false} style={styles.colorSwatchCheck}>✓</Text>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           </View>
         </View>
@@ -299,6 +479,128 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#ffffff',
     fontSize: 12,
+    fontWeight: '700',
+  },
+  subtitleModalBox: {
+    backgroundColor: '#12004f',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 380,
+    overflow: 'hidden',
+  },
+  subtitleModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#170066',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  subtitleModalHeaderTitle: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  subtitleModalCloseButton: {
+    marginLeft: 12,
+  },
+  subtitleModalCloseText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  subtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(26, 162, 255, 0.25)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  subtitleRowLast: {
+    paddingBottom: 16,
+  },
+  subtitleRowIcon: {
+    width: 24,
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  subtitleRowLabel: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 13,
+  },
+  subtitleColorSwatch: {
+    width: 26,
+    height: 26,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+  },
+  subtitleColorSwatchDisabled: {
+    opacity: 0.3,
+  },
+  subtitleSwitchSpacing: {
+    marginLeft: 12,
+  },
+  subtitleStepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  subtitleStepperButton: {
+    backgroundColor: '#170066',
+    width: 28,
+    height: 28,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subtitleStepperButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  subtitleStepperValue: {
+    backgroundColor: '#170066',
+    minWidth: 44,
+    height: 28,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subtitleStepperValueText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  colorModalBox: {
+    backgroundColor: '#12004f',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 10,
+    width: 380,
+    overflow: 'hidden',
+  },
+  colorModalBody: {
+    padding: 16,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  colorSwatchOption: {
+    width: 48,
+    height: 48,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  colorSwatchCheck: {
+    color: '#f4c542',
+    fontSize: 18,
     fontWeight: '700',
   },
 });
