@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -58,6 +58,26 @@ type Props = {
 };
 
 export function SettingsScreen({ onBack, onSelectItem }: Props) {
+  const [parentalModalVisible, setParentalModalVisible] = useState(false);
+  const [senha, setSenha] = useState('');
+  const [novaSenha, setNovaSenha] = useState('');
+  const [confirmarSenha, setConfirmarSenha] = useState('');
+
+  const closeParentalModal = () => {
+    setParentalModalVisible(false);
+    setSenha('');
+    setNovaSenha('');
+    setConfirmarSenha('');
+  };
+
+  const handleSelectItem = (id: SettingsItemId) => {
+    if (id === 'parental-control') {
+      setParentalModalVisible(true);
+      return;
+    }
+    onSelectItem?.(id);
+  };
+
   return (
     <LinearGradient
       colors={['#050042', '#0d0569', '#050042']}
@@ -79,7 +99,7 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
             <TouchableOpacity
               key={item.id}
               style={styles.card}
-              onPress={() => onSelectItem?.(item.id)}
+              onPress={() => handleSelectItem(item.id)}
               activeOpacity={0.75}
             >
               <Text allowFontScaling={false} style={styles.cardIcon}>{item.icon}</Text>
@@ -97,6 +117,63 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
           ))}
         </View>
       </SafeAreaView>
+
+      <Modal
+        visible={parentalModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeParentalModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text allowFontScaling={false} style={styles.modalTitle}>Controle dos Pais</Text>
+
+            <Text allowFontScaling={false} style={styles.modalLabel}>Senha</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={senha}
+              onChangeText={setSenha}
+              secureTextEntry
+              placeholderTextColor="#c7c7e6"
+            />
+
+            <Text allowFontScaling={false} style={styles.modalLabel}>Nova Senha</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={novaSenha}
+              onChangeText={setNovaSenha}
+              secureTextEntry
+              placeholderTextColor="#c7c7e6"
+            />
+
+            <Text allowFontScaling={false} style={styles.modalLabel}>Confirme a Senha</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={confirmarSenha}
+              onChangeText={setConfirmarSenha}
+              secureTextEntry
+              placeholderTextColor="#c7c7e6"
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={closeParentalModal}
+                activeOpacity={0.75}
+              >
+                <Text allowFontScaling={false} style={styles.modalButtonText}>SIM</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={closeParentalModal}
+                activeOpacity={0.75}
+              >
+                <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </LinearGradient>
   );
 }
@@ -167,5 +244,61 @@ const styles = StyleSheet.create({
     color: '#9fa3d1',
     fontSize: 8,
     marginTop: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBox: {
+    backgroundColor: '#12004f',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    width: 280,
+  },
+  modalTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  modalLabel: {
+    color: '#ffffff',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  modalInput: {
+    backgroundColor: '#170066',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    color: '#ffffff',
+    marginBottom: 10,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 4,
+  },
+  modalButton: {
+    backgroundColor: '#170066',
+    borderColor: '#1aa2ff',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
+  modalButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
 });
