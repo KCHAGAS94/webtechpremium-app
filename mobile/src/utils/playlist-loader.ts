@@ -1,5 +1,4 @@
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
-import { parseEpisodeInfo } from './series-grouping';
 import { fetchSeriesGenreByName, fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
 
 export type ClassifiedPlaylist = {
@@ -15,6 +14,20 @@ const GROUP_CHUNK_SIZE = 5000;
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+// "Show Name S01E02", "Show Name S1 E2" — just enough to recover the show
+// name for genre matching against Xtream's `get_series` (series-screen.tsx
+// itself no longer groups episodes by show, so this single per-episode pass
+// is the only place this parsing happens now — see the note on
+// fetchSeriesGenreByName below for why that matters).
+const SEASON_EPISODE_PATTERN = /S\s*(\d{1,2})[\s._-]*E\s*(\d{1,3})/i;
+const NUMERIC_PATTERN = /(\d{1,2})x(\d{1,3})/i;
+
+function extractShowName(episodeName: string): string {
+  const match = SEASON_EPISODE_PATTERN.exec(episodeName) ?? NUMERIC_PATTERN.exec(episodeName);
+  const raw = match ? episodeName.slice(0, match.index) : episodeName;
+  return raw.replace(/^[\s._-]+|[\s._-]+$/g, '').trim() || episodeName;
 }
 
 /**
@@ -63,10 +76,9 @@ export async function loadPlaylist(
 
   // The M3U tags every movie/series episode with one flat group ("FILMES",
   // "NOVELAS") — no genre. If this is an Xtream playlist, enrich groupTitle
-  // with the real genre from the JSON API (matched by name — episodes match
-  // on their parsed show name, since the M3U has one line per episode).
-  // Best-effort: a slow/failed request just leaves the flat grouping in
-  // place instead of breaking the load.
+  // with the real genre from the JSON API (matched by name). Best-effort: a
+  // slow/failed request just leaves the flat grouping in place instead of
+  // breaking the load.
   const credentials = parseXtreamCredentials(url);
   if (credentials) {
     try {
@@ -82,8 +94,7 @@ export async function loadPlaylist(
     try {
       const seriesGenreByName = await fetchSeriesGenreByName(credentials);
       for (const episode of series) {
-        const { showName } = parseEpisodeInfo(episode.name);
-        const genre = seriesGenreByName.get(showName);
+        const genre = seriesGenreByName.get(extractShowName(episode.name));
         if (genre) episode.groupTitle = genre;
       }
     } catch {

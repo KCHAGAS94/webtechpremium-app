@@ -76,10 +76,11 @@ export async function fetchVodGenreByName(creds: XtreamCredentials): Promise<Map
 }
 
 /**
- * Same idea as `fetchVodGenreByName`, but for series: looked up by show name
- * (not by episode name — the M3U carries one line per episode, e.g. "Volta
- * por Cima S1 E1", so callers must match on the show name parsed out of that
- * via `parseEpisodeInfo`, same as `get_series`' own `name` field).
+ * Same idea as `fetchVodGenreByName`, but for series: looked up by *show*
+ * name — the M3U has one line per episode ("Volta por Cima S1 E1"), so
+ * callers must extract the show name out of that first (see
+ * `extractShowName` in playlist-loader.ts) to match `get_series`' own `name`
+ * field ("Volta por Cima").
  */
 export async function fetchSeriesGenreByName(creds: XtreamCredentials): Promise<Map<string, string>> {
   const [categories, series] = await Promise.all([
