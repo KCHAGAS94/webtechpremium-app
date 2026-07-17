@@ -36,11 +36,29 @@ export function parseXtreamCredentials(playlistUrl: string): XtreamCredentials |
   }
 }
 
+type SeriesEntry = {
+  name: string;
+  category_id: string;
+};
+
 async function fetchXtream<T>(creds: XtreamCredentials, action: string): Promise<T> {
   const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
+}
+
+function toGenreByName<T extends { name: string; category_id: string }>(
+  categories: VodCategory[],
+  entries: T[]
+): Map<string, string> {
+  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
+  const genreByName = new Map<string, string>();
+  for (const entry of entries) {
+    const genre = categoryNameById.get(entry.category_id);
+    if (genre) genreByName.set(entry.name, genre);
+  }
+  return genreByName;
 }
 
 /**
@@ -54,13 +72,19 @@ export async function fetchVodGenreByName(creds: XtreamCredentials): Promise<Map
     fetchXtream<VodCategory[]>(creds, 'get_vod_categories'),
     fetchXtream<VodStream[]>(creds, 'get_vod_streams'),
   ]);
+  return toGenreByName(categories, streams);
+}
 
-  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
-
-  const genreByName = new Map<string, string>();
-  for (const stream of streams) {
-    const genre = categoryNameById.get(stream.category_id);
-    if (genre) genreByName.set(stream.name, genre);
-  }
-  return genreByName;
+/**
+ * Same idea as `fetchVodGenreByName`, but for series: looked up by show name
+ * (not by episode name — the M3U carries one line per episode, e.g. "Volta
+ * por Cima S1 E1", so callers must match on the show name parsed out of that
+ * via `parseEpisodeInfo`, same as `get_series`' own `name` field).
+ */
+export async function fetchSeriesGenreByName(creds: XtreamCredentials): Promise<Map<string, string>> {
+  const [categories, series] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_series_categories'),
+    fetchXtream<SeriesEntry[]>(creds, 'get_series'),
+  ]);
+  return toGenreByName(categories, series);
 }

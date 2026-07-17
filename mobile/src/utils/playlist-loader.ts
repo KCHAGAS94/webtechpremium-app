@@ -1,5 +1,6 @@
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
-import { fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
+import { parseEpisodeInfo } from './series-grouping';
+import { fetchSeriesGenreByName, fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
@@ -60,17 +61,30 @@ export async function loadPlaylist(
     }
   }
 
-  // The M3U tags every movie with one flat "FILMES" group — no genre. If this
-  // is an Xtream playlist, enrich each movie's groupTitle with its real genre
-  // from the JSON API (matched by exact name). Best-effort: a slow/failed
-  // request just leaves the flat grouping in place instead of breaking the load.
+  // The M3U tags every movie/series episode with one flat group ("FILMES",
+  // "NOVELAS") — no genre. If this is an Xtream playlist, enrich groupTitle
+  // with the real genre from the JSON API (matched by name — episodes match
+  // on their parsed show name, since the M3U has one line per episode).
+  // Best-effort: a slow/failed request just leaves the flat grouping in
+  // place instead of breaking the load.
   const credentials = parseXtreamCredentials(url);
   if (credentials) {
     try {
-      const genreByName = await fetchVodGenreByName(credentials);
+      const vodGenreByName = await fetchVodGenreByName(credentials);
       for (const movie of filmes) {
-        const genre = genreByName.get(movie.name);
+        const genre = vodGenreByName.get(movie.name);
         if (genre) movie.groupTitle = genre;
+      }
+    } catch {
+      // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
+    }
+
+    try {
+      const seriesGenreByName = await fetchSeriesGenreByName(credentials);
+      for (const episode of series) {
+        const { showName } = parseEpisodeInfo(episode.name);
+        const genre = seriesGenreByName.get(showName);
+        if (genre) episode.groupTitle = genre;
       }
     } catch {
       // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
