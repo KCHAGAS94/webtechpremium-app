@@ -1,4 +1,5 @@
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
+import { fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
@@ -56,6 +57,23 @@ export async function loadPlaylist(
     if (sinceYield >= GROUP_CHUNK_SIZE) {
       sinceYield = 0;
       await yieldToEventLoop();
+    }
+  }
+
+  // The M3U tags every movie with one flat "FILMES" group — no genre. If this
+  // is an Xtream playlist, enrich each movie's groupTitle with its real genre
+  // from the JSON API (matched by exact name). Best-effort: a slow/failed
+  // request just leaves the flat grouping in place instead of breaking the load.
+  const credentials = parseXtreamCredentials(url);
+  if (credentials) {
+    try {
+      const genreByName = await fetchVodGenreByName(credentials);
+      for (const movie of filmes) {
+        const genre = genreByName.get(movie.name);
+        if (genre) movie.groupTitle = genre;
+      }
+    } catch {
+      // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
     }
   }
 
