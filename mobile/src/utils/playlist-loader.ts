@@ -1,5 +1,5 @@
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
-import { fetchSeriesGenreByName, fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
+import { fetchLiveGenreByName, fetchSeriesGenreByName, fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
@@ -66,10 +66,11 @@ export async function loadPlaylist(
     }
   }
 
-  // The M3U tags every movie with one flat "FILMES" group — no genre. If this
-  // is an Xtream playlist, enrich each movie's groupTitle with its real genre
-  // from the JSON API (matched by exact name). Best-effort: a slow/failed
-  // request just leaves the flat grouping in place instead of breaking the load.
+  // The M3U tags every movie/channel with a broad flat/technical group
+  // ("FILMES", "CANAIS 4K") — no real category. If this is an Xtream
+  // playlist, enrich groupTitle with the real one from the JSON API (matched
+  // by exact name). Best-effort: a slow/failed request just leaves the flat
+  // grouping in place instead of breaking the load.
   let seriesGenreByShowName: Map<string, string> | null = null;
   const credentials = parseXtreamCredentials(url);
   if (credentials) {
@@ -85,6 +86,16 @@ export async function loadPlaylist(
 
     try {
       seriesGenreByShowName = await fetchSeriesGenreByName(credentials);
+    } catch {
+      // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
+    }
+
+    try {
+      const liveGenreByName = await fetchLiveGenreByName(credentials);
+      for (const channel of tv) {
+        const genre = liveGenreByName.get(channel.name);
+        if (genre) channel.groupTitle = genre;
+      }
     } catch {
       // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
     }

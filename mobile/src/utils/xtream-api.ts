@@ -41,6 +41,11 @@ type SeriesEntry = {
   category_id: string;
 };
 
+type LiveStream = {
+  name: string;
+  category_id: string;
+};
+
 async function fetchXtream<T>(creds: XtreamCredentials, action: string): Promise<T> {
   const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}`;
   const response = await fetch(url);
@@ -88,4 +93,20 @@ export async function fetchSeriesGenreByName(creds: XtreamCredentials): Promise<
     fetchXtream<SeriesEntry[]>(creds, 'get_series'),
   ]);
   return toGenreByName(categories, series);
+}
+
+/**
+ * Same idea as `fetchVodGenreByName`, but for live TV: the M3U tags every
+ * channel with a broad technical bucket ("CANAIS 4K", "CANAIS SD", ...)
+ * instead of a per-network category, but `get_live_categories`/
+ * `get_live_streams` have the real ones ("Canais | Globo Sul", "Canais |
+ * Rede Record", ...), matched by exact channel name (no per-episode parsing
+ * needed here — live channels have no season/episode structure).
+ */
+export async function fetchLiveGenreByName(creds: XtreamCredentials): Promise<Map<string, string>> {
+  const [categories, streams] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_live_categories'),
+    fetchXtream<LiveStream[]>(creds, 'get_live_streams'),
+  ]);
+  return toGenreByName(categories, streams);
 }
