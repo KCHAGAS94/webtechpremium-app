@@ -12,11 +12,15 @@ import { loadSubtitleSettings } from '@/utils/subtitle-settings-storage';
 
 const AUTO_HIDE_MS = 4000;
 const SKIP_SECONDS = 10;
+const LIVE_EDGE_THRESHOLD_SECONDS = 10;
 
 type Props = {
   player: VideoPlayer;
   title: string;
   onClose: () => void;
+  /** How far behind the live edge playback is, in seconds (see content-browser-screen.tsx). */
+  offsetFromLive: number | null;
+  onGoLive: () => void;
 };
 
 function formatTime(totalSeconds: number): string {
@@ -35,7 +39,7 @@ function formatTime(totalSeconds: number): string {
  * auto-hide timing with). Owns play/pause, seek, and volume/brightness
  * sliders so all of them can fade out together after inactivity.
  */
-export function FullscreenPlayer({ player, title, onClose }: Props) {
+export function FullscreenPlayer({ player, title, onClose, offsetFromLive, onGoLive }: Props) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
@@ -57,14 +61,11 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
   const duration = player.duration;
   const isLive = player.isLive || !Number.isFinite(duration) || duration <= 0;
 
-  // timeUpdate is opt-in: the player emits it every `timeUpdateEventInterval`
-  // seconds (0 = disabled, the default).
-  useEffect(() => {
-    player.timeUpdateEventInterval = 1;
-    return () => {
-      player.timeUpdateEventInterval = 0;
-    };
-  }, [player]);
+  // timeUpdate is opt-in (emits every `timeUpdateEventInterval` seconds, 0 =
+  // disabled) but it's enabled by the parent (content-browser-screen), which
+  // owns `player` across fullscreen open/close — enabling/disabling it here
+  // too would turn it off the moment this component unmounts, breaking the
+  // preview's own "voltar ao vivo" detection after the user exits fullscreen.
 
   // "habilitar legendas" in Configurações is global (AsyncStorage-backed) —
   // there's no manual subtitle toggle on live TV, so this is the only place
@@ -159,6 +160,13 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
   const handleScrubStart = useCallback(() => setIsScrubbing(true), []);
   const handleScrubEnd = useCallback(() => setIsScrubbing(false), []);
 
+  const handleGoLive = useCallback(() => {
+    onGoLive();
+    showControls();
+  }, [onGoLive, showControls]);
+
+  const isBehindLive = isLive && !!offsetFromLive && offsetFromLive > LIVE_EDGE_THRESHOLD_SECONDS;
+
   const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
@@ -237,9 +245,16 @@ export function FullscreenPlayer({ player, title, onClose }: Props) {
 
             <View style={styles.bottomBar}>
               {isLive ? (
-                <View style={styles.liveBadge}>
-                  <ThemedText style={styles.liveBadgeText}>AO VIVO</ThemedText>
-                </View>
+                isBehindLive ? (
+                  <TouchableOpacity style={styles.goLiveBadge} onPress={handleGoLive}>
+                    <View style={styles.liveDot} />
+                    <ThemedText style={styles.goLiveBadgeText}>Toque para voltar ao vivo</ThemedText>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.liveBadge}>
+                    <ThemedText style={styles.liveBadgeText}>AO VIVO</ThemedText>
+                  </View>
+                )
               ) : (
                 <>
                   <ThemedText style={styles.time}>{formatTime(currentTime)}</ThemedText>
@@ -373,6 +388,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#e63946',
   },
   liveBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  goLiveBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(230, 57, 70, 0.85)',
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  goLiveBadgeText: {
     fontSize: 12,
     fontWeight: '700',
     color: '#fff',

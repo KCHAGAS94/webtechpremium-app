@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -43,6 +43,7 @@ const CONTENT_LABELS: Record<ContentCategory, { searchPlaceholder: string; empty
 
 const ALL_CATEGORY_ID = 'all';
 const SEARCH_DEBOUNCE_MS = 200;
+const LIVE_EDGE_THRESHOLD_SECONDS = 10;
 
 // Must stay in sync with categoryRow / channelRow paddingVertical + borderBottomWidth below,
 // so FlatList can skip cell measurement (getItemLayout) on very large lists.
@@ -156,6 +157,54 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const { currentOffsetFromLive } = useEvent(player, 'timeUpdate', {
+    currentTime: player.currentTime,
+    currentLiveTimestamp: null,
+    currentOffsetFromLive: null,
+    bufferedPosition: player.bufferedPosition,
+  });
+
+  // Owned here (not in FullscreenPlayer) so it keeps emitting — and the
+  // preview's "voltar ao vivo" badge keeps working — after the user exits
+  // fullscreen, instead of getting reset to 0 when that component unmounts.
+  useEffect(() => {
+    if (category !== 'live') return;
+    player.timeUpdateEventInterval = 1;
+    return () => {
+      player.timeUpdateEventInterval = 0;
+    };
+  }, [player, category]);
+
+  // Most IPTV/Xtream streams don't send the `EXT-X-PROGRAM-DATE-TIME` tag
+  // expo-video needs to report `currentOffsetFromLive`, so it stays `null`
+  // and the "voltar ao vivo" badge never shows even after a long pause.
+  // Fall back to timing the pause ourselves: playback position freezes while
+  // paused but real time keeps moving, so the gap when resuming is (roughly)
+  // how far behind live the stream now is.
+  const pausedAtRef = useRef<number | null>(null);
+  const [manualOffsetSeconds, setManualOffsetSeconds] = useState(0);
+
+  useEffect(() => {
+    if (category !== 'live') return;
+    if (!isPlaying) {
+      pausedAtRef.current = Date.now();
+      return;
+    }
+    if (pausedAtRef.current !== null) {
+      const elapsedSeconds = (Date.now() - pausedAtRef.current) / 1000;
+      pausedAtRef.current = null;
+      if (currentOffsetFromLive == null) {
+        setManualOffsetSeconds((prev) => prev + elapsedSeconds);
+      }
+    }
+  }, [isPlaying, category, currentOffsetFromLive]);
+
+  useEffect(() => {
+    setManualOffsetSeconds(0);
+    pausedAtRef.current = null;
+  }, [selectedChannel?.id]);
+
+  const offsetFromLive = currentOffsetFromLive ?? (manualOffsetSeconds > 0 ? manualOffsetSeconds : null);
 
   const handleExpandFullscreen = useCallback(() => {
     setIsFullscreen(true);
@@ -169,6 +218,14 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     if (player.playing) player.pause();
     else player.play();
   }, [player]);
+
+  const handleGoLive = useCallback(() => {
+    if (offsetFromLive) player.seekBy(offsetFromLive);
+    setManualOffsetSeconds(0);
+    player.play();
+  }, [player, offsetFromLive]);
+
+  const isBehindLive = category === 'live' && !!offsetFromLive && offsetFromLive > LIVE_EDGE_THRESHOLD_SECONDS;
 
   // Debounce the search text so we don't re-filter on every keystroke.
   useEffect(() => {
@@ -330,6 +387,12 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                       <ThemedText style={styles.previewPlayIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
                     </TouchableOpacity>
                   )}
+                  {isBehindLive && status !== 'error' && (
+                    <TouchableOpacity style={styles.goLiveBadgePreview} onPress={handleGoLive}>
+                      <View style={styles.liveDotPreview} />
+                      <ThemedText style={styles.goLiveBadgePreviewText}>Voltar ao vivo</ThemedText>
+                    </TouchableOpacity>
+                  )}
                   <View style={styles.expandHint} pointerEvents="none">
                     <ThemedText style={styles.expandHintIcon}>⤢</ThemedText>
                   </View>
@@ -349,7 +412,13 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
       </SafeAreaView>
 
       {isFullscreen && selectedChannel && (
-        <FullscreenPlayer player={player} title={selectedChannel.name} onClose={handleCloseFullscreen} />
+        <FullscreenPlayer
+          player={player}
+          title={selectedChannel.name}
+          onClose={handleCloseFullscreen}
+          offsetFromLive={offsetFromLive}
+          onGoLive={handleGoLive}
+        />
       )}
     </ThemedView>
   );
@@ -518,6 +587,30 @@ const styles = StyleSheet.create({
   },
   previewPlayIcon: {
     fontSize: 15,
+    color: '#fff',
+  },
+  goLiveBadgePreview: {
+    position: 'absolute',
+    bottom: 8,
+    left: 48,
+    right: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: 'rgba(230, 57, 70, 0.85)',
+  },
+  liveDotPreview: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#fff',
+  },
+  goLiveBadgePreviewText: {
+    fontSize: 11,
+    fontWeight: '700',
     color: '#fff',
   },
   previewPlaceholder: {
