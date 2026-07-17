@@ -21,6 +21,11 @@ type Props = {
   /** How far behind the live edge playback is, in seconds (see content-browser-screen.tsx). */
   offsetFromLive: number | null;
   onGoLive: () => void;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  /** Undefined when the current channel list has 1 or 0 entries — nothing to cycle to. */
+  onNextChannel?: () => void;
+  onPreviousChannel?: () => void;
 };
 
 function formatTime(totalSeconds: number): string {
@@ -39,7 +44,17 @@ function formatTime(totalSeconds: number): string {
  * auto-hide timing with). Owns play/pause, seek, and volume/brightness
  * sliders so all of them can fade out together after inactivity.
  */
-export function FullscreenPlayer({ player, title, onClose, offsetFromLive, onGoLive }: Props) {
+export function FullscreenPlayer({
+  player,
+  title,
+  onClose,
+  offsetFromLive,
+  onGoLive,
+  isFavorite,
+  onToggleFavorite,
+  onNextChannel,
+  onPreviousChannel,
+}: Props) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
@@ -198,14 +213,19 @@ export function FullscreenPlayer({ player, title, onClose, offsetFromLive, onGoL
 
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
-            <View style={styles.topBar}>
-              <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.backButton}>
+            <TouchableOpacity style={styles.topBar} onPress={onClose} activeOpacity={0.75}>
+              <View style={styles.backButton}>
                 <ThemedText style={styles.backIcon}>‹</ThemedText>
-              </TouchableOpacity>
+              </View>
               <ThemedText style={styles.title} numberOfLines={1}>
                 {title}
               </ThemedText>
-            </View>
+              <TouchableOpacity onPress={onToggleFavorite} hitSlop={12} style={styles.favoriteButton}>
+                <ThemedText style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
+                  {isFavorite ? '♥' : '♡'}
+                </ThemedText>
+              </TouchableOpacity>
+            </TouchableOpacity>
 
             <View style={styles.middleRow} pointerEvents="box-none">
               <VerticalSlider
@@ -223,9 +243,31 @@ export function FullscreenPlayer({ player, title, onClose, offsetFromLive, onGoL
                     <ThemedText style={styles.controlIcon}>⏪</ThemedText>
                   </TouchableOpacity>
                 )}
+                {onPreviousChannel && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onPreviousChannel();
+                      showControls();
+                    }}
+                    style={styles.controlButton}
+                  >
+                    <ThemedText style={styles.controlIcon}>⏮</ThemedText>
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity onPress={handleTogglePlayPause} style={styles.playButton}>
                   <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
                 </TouchableOpacity>
+                {onNextChannel && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      onNextChannel();
+                      showControls();
+                    }}
+                    style={styles.controlButton}
+                  >
+                    <ThemedText style={styles.controlIcon}>⏭</ThemedText>
+                  </TouchableOpacity>
+                )}
                 {!isLive && (
                   <TouchableOpacity onPress={() => handleSkip(SKIP_SECONDS)} style={styles.controlButton}>
                     <ThemedText style={styles.controlIcon}>⏩</ThemedText>
@@ -329,6 +371,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: '#fff',
     marginTop: -2,
+  },
+  favoriteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  favoriteIcon: {
+    fontSize: 18,
+    color: '#fff',
+  },
+  favoriteIconActive: {
+    color: '#e63946',
   },
   title: {
     flex: 1,

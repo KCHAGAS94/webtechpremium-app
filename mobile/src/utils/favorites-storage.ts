@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // when the underlying content hasn't changed. Keying by name/showId is what
 // lets a favorite survive a "recarregar" and only actually change if the
 // list itself changes (a title being added/removed).
-export type FavoritesKind = 'movies' | 'series';
+export type FavoritesKind = 'movies' | 'series' | 'live';
 
 const keyFor = (kind: FavoritesKind) => `webtech.favorites.${kind}`;
 

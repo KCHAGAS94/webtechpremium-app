@@ -16,6 +16,7 @@ import { FullscreenPlayer } from '@/components/fullscreen-player';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { ContentCategory } from '@/utils/content-classifier';
+import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 
 export type NavKey = 'home' | 'live' | 'movies' | 'series';
@@ -42,6 +43,7 @@ const CONTENT_LABELS: Record<ContentCategory, { searchPlaceholder: string; empty
 };
 
 const ALL_CATEGORY_ID = 'all';
+const FAVORITES_CATEGORY_ID = 'favorites';
 const SEARCH_DEBOUNCE_MS = 200;
 const LIVE_EDGE_THRESHOLD_SECONDS = 10;
 
@@ -84,10 +86,12 @@ const CategoryRow = memo(function CategoryRow({
 const ChannelRow = memo(function ChannelRow({
   item,
   isSelected,
+  isFavorite,
   onPress,
 }: {
   item: M3uChannel;
   isSelected: boolean;
+  isFavorite: boolean;
   onPress: (channel: M3uChannel) => void;
 }) {
   return (
@@ -98,6 +102,7 @@ const ChannelRow = memo(function ChannelRow({
       <ThemedText style={styles.channelName} numberOfLines={1}>
         {item.name}
       </ThemedText>
+      {isFavorite && <ThemedText style={styles.channelFavoriteIcon}>♥</ThemedText>}
     </TouchableOpacity>
   );
 });
@@ -110,7 +115,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // group them by `group-title` once per playlist load, instead of
   // re-filtering the full list every time the user switches category or
   // types in the search box.
-  const { categories, channelsByGroup, bucketChannels } = useMemo(() => {
+  const { categoryShells, channelsByGroup, bucketChannels } = useMemo(() => {
     const byGroup = new Map<string, M3uChannel[]>();
     const bucket: M3uChannel[] = [];
     for (const channel of channels) {
@@ -123,15 +128,12 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         byGroup.set(channel.groupTitle, [channel]);
       }
     }
-    const cats: Category[] = [
-      { id: ALL_CATEGORY_ID, title: 'Tudo', count: bucket.length },
-      ...Array.from(byGroup.entries()).map(([title, list]) => ({
-        id: title,
-        title,
-        count: list.length,
-      })),
+    const cats: Omit<Category, 'count'>[] = [
+      { id: ALL_CATEGORY_ID, title: 'Tudo' },
+      { id: FAVORITES_CATEGORY_ID, title: 'Favoritos' },
+      ...Array.from(byGroup.entries()).map(([title]) => ({ id: title, title })),
     ];
-    return { categories: cats, channelsByGroup: byGroup, bucketChannels: bucket };
+    return { categoryShells: cats, channelsByGroup: byGroup, bucketChannels: bucket };
   }, [channels, category]);
 
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
@@ -140,6 +142,39 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isBuffering, setIsBuffering] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(new Set());
+
+  // Favorites live on disk (see favorites-storage.ts), keyed by channel name
+  // rather than `selectedChannel.id` — that id is just the item's position
+  // in the last parsed playlist, so it shifts on every reload.
+  useEffect(() => {
+    loadFavorites(category).then(setFavorites);
+  }, [category]);
+
+  // Filled in here (not in the categoryShells memo above) because "Favoritos"
+  // needs a live count and `favorites` isn't loaded from disk yet at that point.
+  const categories = useMemo<Category[]>(
+    () =>
+      categoryShells.map((shell) => {
+        if (shell.id === ALL_CATEGORY_ID) return { ...shell, count: bucketChannels.length };
+        if (shell.id === FAVORITES_CATEGORY_ID) return { ...shell, count: favorites.size };
+        return { ...shell, count: channelsByGroup.get(shell.id)?.length ?? 0 };
+      }),
+    [categoryShells, bucketChannels.length, favorites.size, channelsByGroup]
+  );
+
+  const handleToggleFavorite = useCallback(() => {
+    if (!selectedChannel) return;
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(selectedChannel.name)) next.delete(selectedChannel.name);
+      else next.add(selectedChannel.name);
+      saveFavorites(category, next);
+      return next;
+    });
+  }, [category, selectedChannel]);
+
+  const isSelectedChannelFavorite = !!selectedChannel && favorites.has(selectedChannel.name);
 
   // Xtream/live stream URLs (e.g. get.php?...&output=hls) rarely end in
   // `.m3u8`, so expo-video's `auto` content-type detection (by extension)
@@ -171,7 +206,15 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     if (category !== 'live') return;
     player.timeUpdateEventInterval = 1;
     return () => {
-      player.timeUpdateEventInterval = 0;
+      // useVideoPlayer releases the previous player synchronously (inside
+      // useMemo, during render) whenever selectedChannel changes, which
+      // happens before this cleanup runs — so on a channel switch `player`
+      // here is already a released native object and touching it throws.
+      try {
+        player.timeUpdateEventInterval = 0;
+      } catch {
+        // already released — nothing to clean up.
+      }
     };
   }, [player, category]);
 
@@ -237,8 +280,9 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // playlist reloads or the selected category actually changes.
   const categoryChannels = useMemo(() => {
     if (selectedCategory === ALL_CATEGORY_ID) return bucketChannels;
+    if (selectedCategory === FAVORITES_CATEGORY_ID) return bucketChannels.filter((c) => favorites.has(c.name));
     return channelsByGroup.get(selectedCategory) ?? [];
-  }, [bucketChannels, channelsByGroup, selectedCategory]);
+  }, [bucketChannels, channelsByGroup, selectedCategory, favorites]);
 
   // Search only runs against the already-narrowed category subset, so typing
   // inside "CANAIS: ESPORTES" (35 items) never touches the other ~19k channels.
@@ -253,6 +297,24 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     setIsBuffering(true);
   }, []);
 
+  // "Next/previous channel" in the fullscreen player cycles through whatever
+  // list the user is currently browsing (a group, a search, or — with as few
+  // as 3 channels — "Favoritos"), wrapping around at the ends.
+  const handleStepChannel = useCallback(
+    (direction: 1 | -1) => {
+      if (filteredChannels.length === 0) return;
+      const currentIndex = filteredChannels.findIndex((c) => c.id === selectedChannel?.id);
+      const baseIndex = currentIndex === -1 ? 0 : currentIndex;
+      const nextIndex = (baseIndex + direction + filteredChannels.length) % filteredChannels.length;
+      handleSelectChannel(filteredChannels[nextIndex]);
+    },
+    [filteredChannels, selectedChannel?.id, handleSelectChannel]
+  );
+
+  const handleNextChannel = useCallback(() => handleStepChannel(1), [handleStepChannel]);
+  const handlePreviousChannel = useCallback(() => handleStepChannel(-1), [handleStepChannel]);
+  const canStepChannel = filteredChannels.length > 1;
+
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
       <CategoryRow item={item} isActive={item.id === selectedCategory} onPress={setSelectedCategory} />
@@ -262,9 +324,14 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
 
   const renderChannel = useCallback(
     ({ item }: { item: M3uChannel }) => (
-      <ChannelRow item={item} isSelected={item.id === selectedChannel?.id} onPress={handleSelectChannel} />
+      <ChannelRow
+        item={item}
+        isSelected={item.id === selectedChannel?.id}
+        isFavorite={favorites.has(item.name)}
+        onPress={handleSelectChannel}
+      />
     ),
-    [selectedChannel?.id, handleSelectChannel]
+    [selectedChannel?.id, favorites, handleSelectChannel]
   );
 
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
@@ -340,7 +407,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
               data={filteredChannels}
               keyExtractor={channelKeyExtractor}
               renderItem={renderChannel}
-              extraData={selectedChannel?.id}
+              extraData={[selectedChannel?.id, favorites]}
               getItemLayout={getChannelItemLayout}
               initialNumToRender={16}
               maxToRenderPerBatch={16}
@@ -393,6 +460,13 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                       <ThemedText style={styles.goLiveBadgePreviewText}>Voltar ao vivo</ThemedText>
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteHint} hitSlop={8}>
+                    <ThemedText
+                      style={[styles.favoriteHintIcon, isSelectedChannelFavorite && styles.favoriteHintIconActive]}
+                    >
+                      {isSelectedChannelFavorite ? '♥' : '♡'}
+                    </ThemedText>
+                  </TouchableOpacity>
                   <View style={styles.expandHint} pointerEvents="none">
                     <ThemedText style={styles.expandHintIcon}>⤢</ThemedText>
                   </View>
@@ -418,6 +492,10 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
           onClose={handleCloseFullscreen}
           offsetFromLive={offsetFromLive}
           onGoLive={handleGoLive}
+          isFavorite={isSelectedChannelFavorite}
+          onToggleFavorite={handleToggleFavorite}
+          onNextChannel={canStepChannel ? handleNextChannel : undefined}
+          onPreviousChannel={canStepChannel ? handlePreviousChannel : undefined}
         />
       )}
     </ThemedView>
@@ -530,6 +608,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     flexShrink: 1,
   },
+  channelFavoriteIcon: {
+    fontSize: 13,
+    color: '#e63946',
+  },
   previewColumn: {
     flex: 1,
   },
@@ -573,6 +655,24 @@ const styles = StyleSheet.create({
   expandHintIcon: {
     fontSize: 14,
     color: '#fff',
+  },
+  favoriteHint: {
+    position: 'absolute',
+    top: 8,
+    right: 44,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  favoriteHintIcon: {
+    fontSize: 15,
+    color: '#fff',
+  },
+  favoriteHintIconActive: {
+    color: '#e63946',
   },
   previewPlayButton: {
     position: 'absolute',
