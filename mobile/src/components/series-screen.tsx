@@ -1,22 +1,27 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
 
 import { MoviePlayer } from '@/components/movie-player';
+import { SeriesDetailsScreen } from '@/components/series-details-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
+import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/series-grouping';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 
-// Deliberately flat: one card per M3U entry (each entry is one episode, e.g.
-// "Volta por Cima S1 E1"), grouped only by the playlist's own group-title —
-// same shape as movies-screen.tsx, no show/season folding on top. Simple and
-// fast is the point; a "one poster per show" grouping can come back later as
-// its own separate feature once it's built to not regress load time.
+// Stable identity for an episode's watch-history entry: survives a playlist
+// reload the same way movie titles do (see favorites-storage.ts) since it's
+// derived from the show id + season/episode, not the reload-volatile
+// M3uChannel.id.
+function episodeHistoryKey(showId: string, season: number, episode: number): string {
+  return `${showId}::S${season}E${episode}`;
+}
+
 const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: 'home', label: 'Casa' },
   { key: 'live', label: 'TV ao Vivo' },
@@ -26,7 +31,6 @@ const NAV_ITEMS: { key: NavKey; label: string }[] = [
 
 const ALL_CATEGORY_ID = 'all';
 const FAVORITES_CATEGORY_ID = 'favorites';
-const CONTINUE_WATCHING_CATEGORY_ID = 'continue';
 const SEARCH_DEBOUNCE_MS = 200;
 const NUM_COLUMNS = 5;
 
@@ -36,12 +40,22 @@ type Category = {
   count: number;
 };
 
+// Grouping is the expensive part of opening this screen (a regex per
+// episode across a potentially huge playlist). `channels` is owned by
+// App.tsx and keeps the same array reference across Home <-> Séries
+// navigation — it only changes when a playlist is actually (re)loaded (see
+// App.tsx's activatePlaylist, which always builds a fresh array) — so
+// caching the grouped result by that reference means revisiting this screen
+// with the same list is instant, while a real reload still regroups from
+// scratch exactly as before.
+const seriesGroupCache = new WeakMap<M3uChannel[], SeriesShow[]>();
+
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
 }: {
-  item: M3uChannel;
-  onPress: (episode: M3uChannel) => void;
+  item: SeriesShow;
+  onPress: (show: SeriesShow) => void;
 }) {
   return (
     <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.8}>
@@ -59,24 +73,28 @@ const PosterCard = memo(function PosterCard({
   );
 });
 
-// Same lazy-creation pattern as MovieVodPlayer (movies-screen.tsx): the
-// player is only ever instantiated once an episode is actually picked.
+// Same lazy-creation pattern as MovieVodPlayer (see movies-screen.tsx): the
+// player is only ever instantiated once an episode is actually picked, and
+// playback starts after mount so the VideoView already has a surface
+// attached by the time `.play()` runs.
 function SeriesVodPlayer({
   episode,
+  showName,
   resumeFrom,
   isFavorite,
   onToggleFavorite,
   onClose,
   onProgress,
 }: {
-  episode: M3uChannel;
+  episode: SeriesEpisode;
+  showName: string;
   resumeFrom: number;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
   onProgress: (positionSeconds: number, durationSeconds: number) => void;
 }) {
-  const player = useVideoPlayer(episode.url);
+  const player = useVideoPlayer(episode.channel.url);
   const { currentTime } = useEvent(player, 'timeUpdate', {
     currentTime: 0,
     currentLiveTimestamp: null,
@@ -108,10 +126,12 @@ function SeriesVodPlayer({
     }
   }, [currentTime, player]);
 
+  const title = `${showName} - S${String(episode.season).padStart(2, '0')}E${String(episode.episode).padStart(2, '0')}`;
+
   return (
     <MoviePlayer
       player={player}
-      title={episode.name}
+      title={title}
       isFavorite={isFavorite}
       onToggleFavorite={onToggleFavorite}
       onClose={onClose}
@@ -121,37 +141,25 @@ function SeriesVodPlayer({
 
 type Props = {
   channels: M3uChannel[];
+  /** Real genre per show name from the Xtream API (see playlist-loader.ts). */
+  genreByShowName?: Map<string, string>;
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
 };
 
-export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
-  const { channelsByGroup, bucketChannels } = useMemo(() => {
-    const byGroup = new Map<string, M3uChannel[]>();
-    const bucket: M3uChannel[] = [];
-    for (const channel of channels) {
-      if (channel.category !== 'series') continue;
-      bucket.push(channel);
-      const list = byGroup.get(channel.groupTitle);
-      if (list) {
-        list.push(channel);
-      } else {
-        byGroup.set(channel.groupTitle, [channel]);
-      }
-    }
-    return { channelsByGroup: byGroup, bucketChannels: bucket };
-  }, [channels]);
+export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate }: Props) {
+  const bucketChannels = useMemo(() => channels.filter((c) => c.category === 'series'), [channels]);
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<Map<string, WatchHistoryEntry>>(new Map());
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [playingEpisode, setPlayingEpisode] = useState<M3uChannel | null>(null);
+  const [viewingShow, setViewingShow] = useState<SeriesShow | null>(null);
+  const [playingEpisode, setPlayingEpisode] = useState<SeriesEpisode | null>(null);
+  const [allShows, setAllShows] = useState<SeriesShow[]>([]);
+  const [isGrouping, setIsGrouping] = useState(true);
 
-  // Favorites/history live on disk (see favorites-storage.ts,
-  // watch-history-storage.ts), keyed by episode title — not M3uChannel.id,
-  // which is just positional and gets reshuffled by every playlist reload.
   useEffect(() => {
     loadFavorites('series').then(setFavorites);
     loadWatchHistory().then((entries) => {
@@ -164,42 +172,85 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
     return () => clearTimeout(handle);
   }, [search]);
 
-  const continueWatchingChannels = useMemo(() => {
-    return bucketChannels
-      .filter((c) => history.has(c.name))
-      .sort((a, b) => (history.get(b.name)?.updatedAt ?? 0) - (history.get(a.name)?.updatedAt ?? 0));
-  }, [bucketChannels, history]);
+  // Grouping episodes into show "folders" runs a regex per item, which is
+  // cheap per episode but adds up over a huge playlist — doing it here
+  // (async, chunked in groupSeriesShows) instead of in a synchronous useMemo
+  // is what keeps navigating into this screen from stalling.
+  useEffect(() => {
+    const cached = seriesGroupCache.get(channels);
+    if (cached) {
+      setAllShows(cached);
+      setIsGrouping(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsGrouping(true);
+    groupSeriesShows(
+      bucketChannels,
+      (partialShows) => {
+        if (!cancelled) {
+          setAllShows(partialShows);
+          setIsGrouping(false);
+        }
+      },
+      genreByShowName
+    ).then((shows) => {
+      if (!cancelled) {
+        seriesGroupCache.set(channels, shows);
+        setAllShows(shows);
+        setIsGrouping(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [channels, bucketChannels, genreByShowName]);
+
+  const showsByGroup = useMemo(() => {
+    const byGroup = new Map<string, SeriesShow[]>();
+    for (const show of allShows) {
+      const list = byGroup.get(show.groupTitle);
+      if (list) list.push(show);
+      else byGroup.set(show.groupTitle, [show]);
+    }
+    return byGroup;
+  }, [allShows]);
 
   const categoryList = useMemo<Category[]>(
     () => [
-      { id: CONTINUE_WATCHING_CATEGORY_ID, title: 'Retomar para assistir', count: continueWatchingChannels.length },
-      { id: ALL_CATEGORY_ID, title: 'Tudo', count: bucketChannels.length },
+      { id: ALL_CATEGORY_ID, title: 'Tudo', count: allShows.length },
       { id: FAVORITES_CATEGORY_ID, title: 'Favorito', count: favorites.size },
-      ...Array.from(channelsByGroup.entries()).map(([title, list]) => ({
+      ...Array.from(showsByGroup.entries()).map(([title, list]) => ({
         id: title,
         title,
         count: list.length,
       })),
     ],
-    [bucketChannels.length, channelsByGroup, favorites.size, continueWatchingChannels.length]
+    [allShows.length, showsByGroup, favorites.size]
   );
 
-  const categoryChannels = useMemo(() => {
-    if (selectedCategory === ALL_CATEGORY_ID) return bucketChannels;
-    if (selectedCategory === CONTINUE_WATCHING_CATEGORY_ID) return continueWatchingChannels;
-    if (selectedCategory === FAVORITES_CATEGORY_ID) {
-      return bucketChannels.filter((c) => favorites.has(c.name));
-    }
-    return channelsByGroup.get(selectedCategory) ?? [];
-  }, [bucketChannels, channelsByGroup, selectedCategory, favorites, continueWatchingChannels]);
+  const categoryShows = useMemo(() => {
+    if (selectedCategory === ALL_CATEGORY_ID) return allShows;
+    if (selectedCategory === FAVORITES_CATEGORY_ID) return allShows.filter((s) => favorites.has(s.id));
+    return showsByGroup.get(selectedCategory) ?? [];
+  }, [allShows, showsByGroup, selectedCategory, favorites]);
 
-  const filteredChannels = useMemo(() => {
+  const filteredShows = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    if (!q) return categoryChannels;
-    return categoryChannels.filter((c) => c.name.toLowerCase().includes(q));
-  }, [categoryChannels, debouncedSearch]);
+    if (!q) return categoryShows;
+    return categoryShows.filter((s) => s.name.toLowerCase().includes(q));
+  }, [categoryShows, debouncedSearch]);
 
-  const handlePlay = useCallback((episode: M3uChannel) => {
+  const handleOpenShow = useCallback((show: SeriesShow) => {
+    setViewingShow(show);
+  }, []);
+
+  const handleCloseShow = useCallback(() => {
+    setViewingShow(null);
+  }, []);
+
+  const handlePlayEpisode = useCallback((episode: SeriesEpisode) => {
     setPlayingEpisode(episode);
   }, []);
 
@@ -210,23 +261,23 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
     });
   }, []);
 
-  const handleToggleFavorite = useCallback((episodeName: string) => {
+  const handleToggleFavorite = useCallback((showId: string) => {
     setFavorites((prev) => {
       const next = new Set(prev);
-      if (next.has(episodeName)) next.delete(episodeName);
-      else next.add(episodeName);
+      if (next.has(showId)) next.delete(showId);
+      else next.add(showId);
       saveFavorites('series', next);
       return next;
     });
   }, []);
 
   const handleProgress = useCallback(
-    (episode: M3uChannel, positionSeconds: number, durationSeconds: number) => {
+    (show: SeriesShow, episode: SeriesEpisode, positionSeconds: number, durationSeconds: number) => {
       upsertWatchHistoryProgress({
-        key: episode.name,
+        key: episodeHistoryKey(show.id, episode.season, episode.episode),
         kind: 'episode',
-        title: episode.name,
-        logo: episode.logo,
+        title: `${show.name} - S${episode.season}E${episode.episode}`,
+        logo: episode.channel.logo || show.logo,
         positionSeconds,
         durationSeconds,
       });
@@ -250,23 +301,38 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
   );
 
   const renderCard = useCallback(
-    ({ item }: { item: M3uChannel }) => <PosterCard item={item} onPress={handlePlay} />,
-    [handlePlay]
+    ({ item }: { item: SeriesShow }) => <PosterCard item={item} onPress={handleOpenShow} />,
+    [handleOpenShow]
   );
 
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
-  const channelKeyExtractor = useCallback((item: M3uChannel) => item.id, []);
+  const showKeyExtractor = useCallback((item: SeriesShow) => item.id, []);
 
-  if (playingEpisode) {
+  if (viewingShow) {
     return (
-      <SeriesVodPlayer
-        episode={playingEpisode}
-        resumeFrom={history.get(playingEpisode.name)?.positionSeconds ?? 0}
-        isFavorite={favorites.has(playingEpisode.name)}
-        onToggleFavorite={() => handleToggleFavorite(playingEpisode.name)}
-        onClose={handleClosePlayer}
-        onProgress={(position, duration) => handleProgress(playingEpisode, position, duration)}
-      />
+      <>
+        <SeriesDetailsScreen
+          show={viewingShow}
+          isFavorite={favorites.has(viewingShow.id)}
+          onToggleFavorite={() => handleToggleFavorite(viewingShow.id)}
+          onPlayEpisode={handlePlayEpisode}
+          onBack={handleCloseShow}
+        />
+        {playingEpisode && (
+          <SeriesVodPlayer
+            episode={playingEpisode}
+            showName={viewingShow.name}
+            resumeFrom={
+              history.get(episodeHistoryKey(viewingShow.id, playingEpisode.season, playingEpisode.episode))
+                ?.positionSeconds ?? 0
+            }
+            isFavorite={favorites.has(viewingShow.id)}
+            onToggleFavorite={() => handleToggleFavorite(viewingShow.id)}
+            onClose={handleClosePlayer}
+            onProgress={(position, duration) => handleProgress(viewingShow, playingEpisode, position, duration)}
+          />
+        )}
+      </>
     );
   }
 
@@ -317,22 +383,28 @@ export function SeriesScreen({ channels, activeNav, onNavigate }: Props) {
               <ThemedText style={styles.sortLabel}>Ordenar por Adicionado </ThemedText>
               <ThemedText style={styles.totalLabel}>
                 {categoryList.find((c) => c.id === selectedCategory)?.title ?? 'Tudo'}(
-                {filteredChannels.length})
+                {filteredShows.length})
               </ThemedText>
             </View>
 
-            <FlatList
-              data={filteredChannels}
-              keyExtractor={channelKeyExtractor}
-              renderItem={renderCard}
-              numColumns={NUM_COLUMNS}
-              extraData={favorites}
-              initialNumToRender={20}
-              maxToRenderPerBatch={20}
-              windowSize={7}
-              removeClippedSubviews
-              contentContainerStyle={styles.gridContent}
-            />
+            {isGrouping && allShows.length === 0 ? (
+              <View style={styles.loadingBox}>
+                <ActivityIndicator color="#4dd6ff" size="large" />
+              </View>
+            ) : (
+              <FlatList
+                data={filteredShows}
+                keyExtractor={showKeyExtractor}
+                renderItem={renderCard}
+                numColumns={NUM_COLUMNS}
+                extraData={favorites}
+                initialNumToRender={20}
+                maxToRenderPerBatch={20}
+                windowSize={7}
+                removeClippedSubviews
+                contentContainerStyle={styles.gridContent}
+              />
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -446,6 +518,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
     fontWeight: '600',
+  },
+  loadingBox: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gridContent: {
     paddingHorizontal: 12,

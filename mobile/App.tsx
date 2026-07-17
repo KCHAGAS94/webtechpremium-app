@@ -24,6 +24,7 @@ import { loadLastPlaylist, saveLastPlaylist } from './src/utils/last-playlist-st
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
+import { loadSeriesGenreByShowName, saveSeriesGenreByShowName } from './src/utils/series-genre-storage';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
 // should show (see content-classifier.ts). Same screen component for all
@@ -58,6 +59,7 @@ const sideMenuItems: MenuItem[] = [
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
   const [channels, setChannels] = useState<M3uChannel[]>([]);
+  const [seriesGenreByShowName, setSeriesGenreByShowName] = useState<Map<string, string>>(new Map());
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
@@ -86,7 +88,7 @@ export default function App() {
   }, [reloadBlockedMessage]);
 
   const activatePlaylist = async (playlist: PanelPlaylist) => {
-    const { tv, filmes, series } = await loadPlaylist(playlist.url);
+    const { tv, filmes, series, seriesGenreByShowName: freshSeriesGenre } = await loadPlaylist(playlist.url);
     const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
     setActivePlaylistId(playlist.id);
     setChannels(freshChannels);
@@ -96,6 +98,10 @@ export default function App() {
     // trip every launch.
     saveLastPlaylist(playlist);
     saveChannels(freshChannels);
+    if (freshSeriesGenre) {
+      setSeriesGenreByShowName(freshSeriesGenre);
+      saveSeriesGenreByShowName(freshSeriesGenre);
+    }
   };
 
   const fetchAndActivateFromPanel = async () => {
@@ -114,7 +120,11 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      const [cachedPlaylist, cachedChannels] = await Promise.all([loadLastPlaylist(), loadChannels()]);
+      const [cachedPlaylist, cachedChannels, cachedSeriesGenre] = await Promise.all([
+        loadLastPlaylist(),
+        loadChannels(),
+        loadSeriesGenreByShowName(),
+      ]);
 
       if (cachedPlaylist && cachedChannels.length > 0) {
         // Straight to Home with what was on screen last time — no network
@@ -123,6 +133,7 @@ export default function App() {
         // or interrupts what the user is already browsing/watching.
         setActivePlaylistId(cachedPlaylist.id);
         setChannels(cachedChannels);
+        setSeriesGenreByShowName(cachedSeriesGenre);
         setPlaylists([cachedPlaylist]);
         setCurrentScreen('home');
         setBooting(false);
@@ -245,6 +256,7 @@ export default function App() {
     return (
       <SeriesScreen
         channels={channels}
+        genreByShowName={seriesGenreByShowName}
         activeNav="series"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
       />
