@@ -273,17 +273,17 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
             <View style={styles.topBar}>
-              <View style={styles.topBarLeft}>
-                <TouchableOpacity onPress={onClose} hitSlop={12} style={styles.iconButton}>
+              <TouchableOpacity style={styles.topBarLeft} onPress={onClose} activeOpacity={0.75}>
+                <View style={styles.iconButton}>
                   <ThemedText style={styles.backIcon}>‹</ThemedText>
-                </TouchableOpacity>
+                </View>
                 <View style={styles.titleGroup}>
                   <ThemedText style={styles.title} numberOfLines={1}>
                     {title}
                     {year ? ` (${year})` : ''}
                   </ThemedText>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View style={styles.topBarRight}>
                 <TouchableOpacity onPress={handleInfo} hitSlop={12} style={styles.iconButton}>
