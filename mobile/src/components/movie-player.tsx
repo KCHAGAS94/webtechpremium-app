@@ -5,6 +5,7 @@ import { useEvent } from 'expo';
 import { VideoView, type VideoPlayer } from 'expo-video';
 import * as Brightness from 'expo-brightness';
 
+import { ExitConfirmModal } from '@/components/exit-confirm-modal';
 import { SeekBar } from '@/components/seek-bar';
 import { SubtitleOverlay } from '@/components/subtitle-overlay';
 import { ThemedText } from '@/components/themed-text';
@@ -54,6 +55,7 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
+  const [confirmingExit, setConfirmingExit] = useState(false);
   const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleSettings>(DEFAULT_SUBTITLE_STYLE);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -195,10 +197,13 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
   const handleScrubStart = useCallback(() => setIsScrubbing(true), []);
   const handleScrubEnd = useCallback(() => setIsScrubbing(false), []);
 
+  const handleRequestExit = useCallback(() => setConfirmingExit(true), []);
+  const handleCancelExit = useCallback(() => setConfirmingExit(false), []);
+
   const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
-    <Modal visible animationType="fade" onRequestClose={onClose}>
+    <Modal visible animationType="fade" onRequestClose={handleRequestExit}>
       <StatusBar hidden />
       <View style={styles.container}>
         {status !== 'error' && (
@@ -237,7 +242,7 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
             <View style={styles.topBar}>
-              <TouchableOpacity style={styles.topBarLeft} onPress={onClose} activeOpacity={0.75}>
+              <TouchableOpacity style={styles.topBarLeft} onPress={handleRequestExit} activeOpacity={0.75}>
                 <View style={styles.iconButton}>
                   <ThemedText style={styles.backIcon}>‹</ThemedText>
                 </View>
@@ -303,6 +308,8 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
           </View>
         )}
       </View>
+
+      {confirmingExit && <ExitConfirmModal onConfirm={onClose} onCancel={handleCancelExit} />}
     </Modal>
   );
 }
