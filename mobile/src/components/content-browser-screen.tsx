@@ -20,6 +20,7 @@ import type { ContentCategory } from '@/utils/content-classifier';
 import { loadFavoriteGroups, saveFavoriteGroups } from '@/utils/favorite-groups-storage';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
+import { addLiveWatchHistoryEntry } from '@/utils/live-watch-history-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { normalizeSearchText } from '@/utils/text-normalize';
 
@@ -170,6 +171,15 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [favoriteGroups, setFavoriteGroups] = useState<Set<string>>(new Set());
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [searchCursor, setSearchCursor] = useState(0);
+
+  // Logs "channel X watched at time Y" to Configurações > Limpar histórico Tv
+  // ao vivo — only for the live section, once per channel selection
+  // (including the initial `bucketChannels[0]` default, since the preview
+  // starts playing it immediately).
+  useEffect(() => {
+    if (category !== 'live' || !selectedChannel) return;
+    addLiveWatchHistoryEntry(selectedChannel.name);
+  }, [category, selectedChannel?.id]);
 
   // Favorites live on disk (see favorites-storage.ts), keyed by channel name
   // rather than `selectedChannel.id` — that id is just the item's position

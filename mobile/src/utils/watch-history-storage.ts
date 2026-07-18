@@ -67,3 +67,14 @@ export async function removeWatchHistoryEntry(key: string): Promise<void> {
   const entries = await readAll();
   await writeAll(entries.filter((e) => e.key !== key));
 }
+
+export async function removeWatchHistoryEntries(keys: string[]): Promise<void> {
+  const keySet = new Set(keys);
+  const entries = await readAll();
+  await writeAll(entries.filter((e) => !keySet.has(e.key)));
+}
+
+export async function clearWatchHistoryByKind(kind: WatchHistoryEntry['kind']): Promise<void> {
+  const entries = await readAll();
+  await writeAll(entries.filter((e) => e.kind !== kind));
+}

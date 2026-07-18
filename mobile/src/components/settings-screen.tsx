@@ -4,11 +4,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HideCategoriesModal } from '@/components/hide-categories-modal';
+import { WatchHistoryModal, type WatchHistoryRow } from '@/components/watch-history-modal';
 import type { ContentCategory } from '@/utils/content-classifier';
 import { loadHiddenGroups, saveHiddenGroups } from '@/utils/hidden-groups-storage';
+import {
+  clearLiveWatchHistory,
+  loadLiveWatchHistory,
+  removeLiveWatchHistoryEntries,
+} from '@/utils/live-watch-history-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows } from '@/utils/series-grouping';
 import { loadSubtitleSettings, saveSubtitleSettings } from '@/utils/subtitle-settings-storage';
+import { clearWatchHistoryByKind, loadWatchHistory, removeWatchHistoryEntries } from '@/utils/watch-history-storage';
 
 // Front-end only for now — each card just reports its id through onSelectItem.
 // The actual behavior behind each one (layout change, hiding categories,
@@ -94,6 +101,27 @@ const HIDE_CATEGORIES_ITEM_TO_CONTENT: Partial<Record<SettingsItemId, ContentCat
   'hide-series-categories': 'series',
 };
 
+const HISTORY_ITEM_TO_KIND: Partial<Record<SettingsItemId, 'live' | 'movie' | 'episode'>> = {
+  'clear-live-history': 'live',
+  'clear-movie-history': 'movie',
+  'clear-series-history': 'episode',
+};
+
+const HISTORY_MODAL_TITLES: Record<'live' | 'movie' | 'episode', string> = {
+  live: 'Histórico Tv ao vivo',
+  movie: 'Histórico de filmes',
+  episode: 'Histórico de séries',
+};
+
+function formatHistoryDate(timestampMs: number): string {
+  const date = new Date(timestampMs);
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}/${month} ${hours}:${minutes}`;
+}
+
 export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenreByShowName }: Props) {
   const [parentalModalVisible, setParentalModalVisible] = useState(false);
   const [senha, setSenha] = useState('');
@@ -103,6 +131,9 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
   const [hideCategoriesTarget, setHideCategoriesTarget] = useState<ContentCategory | null>(null);
   const [hideCategoriesOptions, setHideCategoriesOptions] = useState<{ id: string; title: string }[]>([]);
   const [hideCategoriesInitial, setHideCategoriesInitial] = useState<Set<string>>(new Set());
+
+  const [historyModalKind, setHistoryModalKind] = useState<'live' | 'movie' | 'episode' | null>(null);
+  const [historyRows, setHistoryRows] = useState<WatchHistoryRow[]>([]);
 
   // Live/movies get their real category baked into `channel.groupTitle`
   // directly at playlist-load time (see playlist-loader.ts), so the raw
@@ -208,6 +239,27 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
       });
       return;
     }
+    const historyKind = HISTORY_ITEM_TO_KIND[id];
+    if (historyKind) {
+      if (historyKind === 'live') {
+        loadLiveWatchHistory().then((entries) => {
+          setHistoryRows(
+            entries.map((e) => ({ id: e.id, title: e.channelName, subtitle: formatHistoryDate(e.watchedAt) }))
+          );
+          setHistoryModalKind('live');
+        });
+      } else {
+        loadWatchHistory().then((entries) => {
+          setHistoryRows(
+            entries
+              .filter((e) => e.kind === historyKind)
+              .map((e) => ({ id: e.key, title: e.title, subtitle: formatHistoryDate(e.updatedAt) }))
+          );
+          setHistoryModalKind(historyKind);
+        });
+      }
+      return;
+    }
     onSelectItem?.(id);
   };
 
@@ -217,6 +269,23 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
     if (!hideCategoriesTarget) return;
     saveHiddenGroups(hideCategoriesTarget, hidden);
     setHideCategoriesTarget(null);
+  };
+
+  const closeHistoryModal = () => setHistoryModalKind(null);
+
+  const handleClearAllHistory = () => {
+    if (!historyModalKind) return;
+    if (historyModalKind === 'live') clearLiveWatchHistory();
+    else clearWatchHistoryByKind(historyModalKind);
+    setHistoryRows([]);
+  };
+
+  const handleClearSelectedHistory = (ids: string[]) => {
+    if (!historyModalKind) return;
+    if (historyModalKind === 'live') removeLiveWatchHistoryEntries(ids);
+    else removeWatchHistoryEntries(ids);
+    const idSet = new Set(ids);
+    setHistoryRows((prev) => prev.filter((row) => !idSet.has(row.id)));
   };
 
   return (
@@ -472,6 +541,15 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
         initiallyHidden={hideCategoriesInitial}
         onSave={handleSaveHideCategories}
         onCancel={closeHideCategoriesModal}
+      />
+
+      <WatchHistoryModal
+        visible={historyModalKind !== null}
+        title={historyModalKind ? HISTORY_MODAL_TITLES[historyModalKind] : ''}
+        entries={historyRows}
+        onClearAll={handleClearAllHistory}
+        onClearSelected={handleClearSelectedHistory}
+        onClose={closeHistoryModal}
       />
     </LinearGradient>
   );
