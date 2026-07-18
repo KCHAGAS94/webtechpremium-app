@@ -5,6 +5,7 @@ import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
 
 import { MoviePlayer } from '@/components/movie-player';
+import { ResumeWatchModal } from '@/components/resume-watch-modal';
 import { SeriesDetailsScreen } from '@/components/series-details-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -109,8 +110,26 @@ function SeriesVodPlayer({
 
   const resumeFromRef = useRef(resumeFrom);
 
+  // When there's a saved position, playback waits for the user to pick
+  // "continuar" vs "começar do início" instead of auto-resuming.
+  const [resumeChoice, setResumeChoice] = useState<'pending' | 'resume' | 'restart'>(
+    resumeFromRef.current > 0 ? 'pending' : 'restart'
+  );
+
+  // While the resume modal is pending, prebuffer muted from position 0 so
+  // whichever option the user picks doesn't pay a cold-start buffering cost —
+  // "começar do início" is then already buffered, and "continuar de onde
+  // parou" only pays for the seek to the saved position, not the initial load.
   useEffect(() => {
-    if (resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
+    if (resumeChoice !== 'pending') return;
+    player.muted = true;
+    player.play();
+  }, [player, resumeChoice]);
+
+  useEffect(() => {
+    if (resumeChoice === 'pending') return;
+    if (resumeChoice === 'resume' && resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
+    player.muted = false;
     player.play();
     player.timeUpdateEventInterval = 1;
     return () => {
@@ -118,7 +137,7 @@ function SeriesVodPlayer({
         player.timeUpdateEventInterval = 0;
       } catch {}
     };
-  }, [player]);
+  }, [player, resumeChoice]);
 
   // `timeUpdateEventInterval` is 1s so the seek bar/clock stay smooth — this
   // throttles the actual progress save to ~5s so "Retomar para assistir"
@@ -134,13 +153,22 @@ function SeriesVodPlayer({
   const title = `${showName} - S${String(episode.season).padStart(2, '0')}E${String(episode.episode).padStart(2, '0')}`;
 
   return (
-    <MoviePlayer
-      player={player}
-      title={title}
-      isFavorite={isFavorite}
-      onToggleFavorite={onToggleFavorite}
-      onClose={onClose}
-    />
+    <>
+      <MoviePlayer
+        player={player}
+        title={title}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
+        onClose={onClose}
+      />
+      {resumeChoice === 'pending' && (
+        <ResumeWatchModal
+          title={title}
+          onResume={() => setResumeChoice('resume')}
+          onRestart={() => setResumeChoice('restart')}
+        />
+      )}
+    </>
   );
 }
 

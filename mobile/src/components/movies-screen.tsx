@@ -6,6 +6,7 @@ import { useVideoPlayer } from 'expo-video';
 
 import { MovieDetailsScreen } from '@/components/movie-details-screen';
 import { MoviePlayer } from '@/components/movie-player';
+import { ResumeWatchModal } from '@/components/resume-watch-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { NavKey } from '@/components/content-browser-screen';
@@ -101,12 +102,30 @@ function MovieVodPlayer({
   // restarting playback every ~5s).
   const resumeFromRef = useRef(resumeFrom);
 
+  // When there's a saved position, playback waits for the user to pick
+  // "continuar" vs "começar do início" instead of auto-resuming.
+  const [resumeChoice, setResumeChoice] = useState<'pending' | 'resume' | 'restart'>(
+    resumeFromRef.current > 0 ? 'pending' : 'restart'
+  );
+
+  // While the resume modal is pending, prebuffer muted from position 0 so
+  // whichever option the user picks doesn't pay a cold-start buffering cost —
+  // "começar do início" is then already buffered, and "continuar de onde
+  // parou" only pays for the seek to the saved position, not the initial load.
+  useEffect(() => {
+    if (resumeChoice !== 'pending') return;
+    player.muted = true;
+    player.play();
+  }, [player, resumeChoice]);
+
   // Starting playback from useVideoPlayer's setup callback fires before the
   // VideoView below has ever attached a surface to this (brand new) player —
   // unlike Live TV, which reuses an already-playing preview player when it
   // expands to fullscreen. Waiting for mount ensures a surface exists first.
   useEffect(() => {
-    if (resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
+    if (resumeChoice === 'pending') return;
+    if (resumeChoice === 'resume' && resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
+    player.muted = false;
     player.play();
     player.timeUpdateEventInterval = 1;
     return () => {
@@ -114,7 +133,7 @@ function MovieVodPlayer({
         player.timeUpdateEventInterval = 0;
       } catch {}
     };
-  }, [player]);
+  }, [player, resumeChoice]);
 
   // `timeUpdateEventInterval` is 1s so the seek bar/clock stay smooth — this
   // throttles the actual progress save to ~5s so "Retomar para assistir"
@@ -128,14 +147,23 @@ function MovieVodPlayer({
   }, [currentTime, player]);
 
   return (
-    <MoviePlayer
-      player={player}
-      title={title}
-      year={year}
-      isFavorite={isFavorite}
-      onToggleFavorite={onToggleFavorite}
-      onClose={onClose}
-    />
+    <>
+      <MoviePlayer
+        player={player}
+        title={title}
+        year={year}
+        isFavorite={isFavorite}
+        onToggleFavorite={onToggleFavorite}
+        onClose={onClose}
+      />
+      {resumeChoice === 'pending' && (
+        <ResumeWatchModal
+          title={title}
+          onResume={() => setResumeChoice('resume')}
+          onRestart={() => setResumeChoice('restart')}
+        />
+      )}
+    </>
   );
 }
 
