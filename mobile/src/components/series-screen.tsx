@@ -112,7 +112,7 @@ function SeriesVodPlayer({
   useEffect(() => {
     if (resumeFromRef.current > 0) player.currentTime = resumeFromRef.current;
     player.play();
-    player.timeUpdateEventInterval = 5;
+    player.timeUpdateEventInterval = 1;
     return () => {
       try {
         player.timeUpdateEventInterval = 0;
@@ -120,10 +120,15 @@ function SeriesVodPlayer({
     };
   }, [player]);
 
+  // `timeUpdateEventInterval` is 1s so the seek bar/clock stay smooth — this
+  // throttles the actual progress save to ~5s so "Retomar para assistir"
+  // survives an app kill without writing to storage on every tick.
+  const lastSavedAtRef = useRef(0);
   useEffect(() => {
-    if (currentTime > 0 && player.duration > 0) {
-      onProgressRef.current(currentTime, player.duration);
-    }
+    if (currentTime <= 0 || player.duration <= 0) return;
+    if (currentTime - lastSavedAtRef.current < 5) return;
+    lastSavedAtRef.current = currentTime;
+    onProgressRef.current(currentTime, player.duration);
   }, [currentTime, player]);
 
   const title = `${showName} - S${String(episode.season).padStart(2, '0')}E${String(episode.episode).padStart(2, '0')}`;
