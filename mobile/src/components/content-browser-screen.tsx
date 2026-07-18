@@ -23,6 +23,8 @@ import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { addLiveWatchHistoryEntry } from '@/utils/live-watch-history-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { normalizeSearchText } from '@/utils/text-normalize';
+import { useTranslation } from '@/i18n/language-context';
+import type { TranslationKey } from '@/i18n/translations';
 
 export type NavKey = 'home' | 'live' | 'movies' | 'series';
 
@@ -34,19 +36,19 @@ type Category = {
   isGroup: boolean;
 };
 
-const NAV_ITEMS: { key: NavKey; label: string }[] = [
-  { key: 'home', label: 'Casa' },
-  { key: 'live', label: 'TV ao Vivo' },
-  { key: 'movies', label: 'Filmes' },
-  { key: 'series', label: 'Séries' },
+const NAV_ITEMS: { key: NavKey; labelKey: TranslationKey }[] = [
+  { key: 'home', labelKey: 'nav_home' },
+  { key: 'live', labelKey: 'nav_live' },
+  { key: 'movies', labelKey: 'nav_movies' },
+  { key: 'series', labelKey: 'nav_series' },
 ];
 
 // Per-category copy so the same screen reads naturally whether it's browsing
 // live channels, movies, or series.
-const CONTENT_LABELS: Record<ContentCategory, { searchPlaceholder: string; emptyPreview: string }> = {
-  live: { searchPlaceholder: 'Buscar canal', emptyPreview: 'Selecione um canal' },
-  movies: { searchPlaceholder: 'Buscar filme', emptyPreview: 'Selecione um filme' },
-  series: { searchPlaceholder: 'Buscar série', emptyPreview: 'Selecione uma série' },
+const CONTENT_LABELS: Record<ContentCategory, { searchPlaceholder: TranslationKey; emptyPreview: TranslationKey }> = {
+  live: { searchPlaceholder: 'search_channel', emptyPreview: 'preview_select_channel' },
+  movies: { searchPlaceholder: 'search_movie', emptyPreview: 'preview_select_movie' },
+  series: { searchPlaceholder: 'search_show', emptyPreview: 'preview_select_show' },
 };
 
 const ALL_CATEGORY_ID = 'all';
@@ -128,6 +130,7 @@ const ChannelRow = memo(function ChannelRow({
 });
 
 export function ContentBrowserScreen({ channels, category, activeNav, onNavigate }: Props) {
+  const { t } = useTranslation();
   const labels = CONTENT_LABELS[category];
 
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
@@ -430,7 +433,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                 <ThemedText
                   style={[styles.headerNavItem, item.key === activeNav && styles.headerNavItemActive]}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </ThemedText>
               </TouchableOpacity>
             ))}
@@ -448,7 +451,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
             <TextInput
               value={keyboardOpen ? `${search.slice(0, searchCursor)}|${search.slice(searchCursor)}` : search}
               onChangeText={setSearch}
-              placeholder={labels.searchPlaceholder}
+              placeholder={t(labels.searchPlaceholder)}
               placeholderTextColor="#8888aa"
               style={styles.searchInput}
               showSoftInputOnFocus={false}
@@ -563,7 +566,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
 
             <View style={styles.previewInfo}>
               <ThemedText style={styles.previewTitle}>
-                {selectedChannel?.name ?? labels.emptyPreview}
+                {selectedChannel?.name ?? t(labels.emptyPreview)}
               </ThemedText>
             </View>
           </View>

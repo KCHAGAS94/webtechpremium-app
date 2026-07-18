@@ -17,12 +17,14 @@ import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 import { normalizeSearchText } from '@/utils/text-normalize';
+import { useTranslation } from '@/i18n/language-context';
+import type { TranslationKey } from '@/i18n/translations';
 
-const NAV_ITEMS: { key: NavKey; label: string }[] = [
-  { key: 'home', label: 'Casa' },
-  { key: 'live', label: 'TV ao Vivo' },
-  { key: 'movies', label: 'Filmes' },
-  { key: 'series', label: 'Séries' },
+const NAV_ITEMS: { key: NavKey; labelKey: TranslationKey }[] = [
+  { key: 'home', labelKey: 'nav_home' },
+  { key: 'live', labelKey: 'nav_live' },
+  { key: 'movies', labelKey: 'nav_movies' },
+  { key: 'series', labelKey: 'nav_series' },
 ];
 
 const ALL_CATEGORY_ID = 'all';
@@ -177,6 +179,7 @@ type Props = {
 };
 
 export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
+  const { t } = useTranslation();
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
   const { channelsByGroup, bucketChannels } = useMemo(() => {
@@ -368,7 +371,7 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
                 <ThemedText
                   style={[styles.headerNavItem, item.key === activeNav && styles.headerNavItemActive]}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </ThemedText>
               </TouchableOpacity>
             ))}
@@ -386,7 +389,7 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
             <TextInput
               value={keyboardOpen ? `${search.slice(0, searchCursor)}|${search.slice(searchCursor)}` : search}
               onChangeText={setSearch}
-              placeholder="Pesquisar filmes"
+              placeholder={t('search_movies')}
               placeholderTextColor="#8888aa"
               style={styles.searchInput}
               showSoftInputOnFocus={false}

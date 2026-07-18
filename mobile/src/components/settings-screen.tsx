@@ -4,7 +4,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HideCategoriesModal } from '@/components/hide-categories-modal';
+import { LanguageModal } from '@/components/language-modal';
 import { WatchHistoryModal, type WatchHistoryRow } from '@/components/watch-history-modal';
+import { useTranslation } from '@/i18n/language-context';
+import type { TranslationKey } from '@/i18n/translations';
 import type { ContentCategory } from '@/utils/content-classifier';
 import { loadHiddenGroups, saveHiddenGroups } from '@/utils/hidden-groups-storage';
 import {
@@ -35,35 +38,21 @@ export type SettingsItemId =
 type SettingsItem = {
   id: SettingsItemId;
   icon: string;
-  label: string;
+  label: TranslationKey;
   subtitle?: string;
 };
 
 const settingsItems: SettingsItem[] = [
-  { id: 'parental-control', icon: '🔒', label: 'Controle dos Pais' },
-  { id: 'change-language', icon: '🌐', label: 'mudar idioma' },
-  { id: 'subtitle-settings', icon: '💬', label: 'Configurações de legenda' },
-  { id: 'hide-live-categories', icon: '🚫', label: 'Ocultar Categorias ao Vivo' },
-  { id: 'hide-vod-categories', icon: '🚫', label: 'Ocultar Categorias Vod' },
-  { id: 'hide-series-categories', icon: '🚫', label: 'Ocultar Categorias Series' },
-  {
-    id: 'clear-movie-history',
-    icon: '🗑️',
-    label: 'Limpar histórico de filmes',
-  },
-  {
-    id: 'clear-live-history',
-    icon: '🗑️',
-    label: 'Limpar histórico Tv ao vivo',
-  },
-  {
-    id: 'clear-series-history',
-    icon: '🗑️',
-    label: 'Limpar histórico Series',
-  },
-  { id: 'backup-now',
-    icon: '⬇️',
-    label: 'Backup' },
+  { id: 'parental-control', icon: '🔒', label: 'settings_parental_control' },
+  { id: 'change-language', icon: '🌐', label: 'settings_change_language' },
+  { id: 'subtitle-settings', icon: '💬', label: 'settings_subtitles' },
+  { id: 'hide-live-categories', icon: '🚫', label: 'settings_hide_live' },
+  { id: 'hide-vod-categories', icon: '🚫', label: 'settings_hide_vod' },
+  { id: 'hide-series-categories', icon: '🚫', label: 'settings_hide_series' },
+  { id: 'clear-movie-history', icon: '🗑️', label: 'settings_clear_movie_history' },
+  { id: 'clear-live-history', icon: '🗑️', label: 'settings_clear_live_history' },
+  { id: 'clear-series-history', icon: '🗑️', label: 'settings_clear_series_history' },
+  { id: 'backup-now', icon: '⬇️', label: 'settings_backup' },
 ];
 
 const subtitleColors = [
@@ -123,6 +112,8 @@ function formatHistoryDate(timestampMs: number): string {
 }
 
 export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenreByShowName }: Props) {
+  const { t } = useTranslation();
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [parentalModalVisible, setParentalModalVisible] = useState(false);
   const [senha, setSenha] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
@@ -198,6 +189,10 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
   const handleSelectItem = (id: SettingsItemId) => {
     if (id === 'parental-control') {
       setParentalModalVisible(true);
+      return;
+    }
+    if (id === 'change-language') {
+      setLanguageModalVisible(true);
       return;
     }
     if (id === 'subtitle-settings') {
@@ -300,7 +295,7 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
           <TouchableOpacity onPress={onBack} activeOpacity={0.75} style={styles.backButton}>
             <Text allowFontScaling={false} style={styles.backIcon}>‹</Text>
           </TouchableOpacity>
-          <Text allowFontScaling={false} style={styles.title}>Configurações</Text>
+          <Text allowFontScaling={false} style={styles.title}>{t('settings_title')}</Text>
           <View style={styles.backButton} />
         </View>
 
@@ -315,7 +310,7 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
               <Text allowFontScaling={false} style={styles.cardIcon}>{item.icon}</Text>
               <View style={styles.cardTextWrap}>
                 <Text allowFontScaling={false} style={styles.cardLabel} numberOfLines={1}>
-                  {item.label}
+                  {t(item.label)}
                 </Text>
                 {!!item.subtitle && (
                   <Text allowFontScaling={false} style={styles.cardSubtitle} numberOfLines={1}>
@@ -551,6 +546,8 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
         onClearSelected={handleClearSelectedHistory}
         onClose={closeHistoryModal}
       />
+
+      <LanguageModal visible={languageModalVisible} onClose={() => setLanguageModalVisible(false)} />
     </LinearGradient>
   );
 }

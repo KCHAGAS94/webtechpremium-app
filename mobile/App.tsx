@@ -17,6 +17,8 @@ import { MoviesScreen } from './src/components/movies-screen';
 import { PlaylistManagerScreen } from './src/components/playlist-manager-screen';
 import { SeriesScreen } from './src/components/series-screen';
 import { SettingsScreen } from './src/components/settings-screen';
+import { LanguageProvider, useTranslation } from './src/i18n/language-context';
+import type { TranslationKey } from './src/i18n/translations';
 import { MOCK_MAC } from './src/config/device';
 import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
@@ -37,26 +39,35 @@ const CONTENT_SCREENS: Partial<Record<string, ContentCategory>> = {
 
 interface MenuItem {
   id: string;
-  label: string;
+  label: TranslationKey;
   icon: string;
   screen?: string;
 }
 
 const menuItems: MenuItem[] = [
-  { id: '1', label: 'TV ao Vivo', icon: '📺', screen: 'tv' },
-  { id: '2', label: 'Filmes', icon: '▶️', screen: 'movies' },
-  { id: '3', label: 'Séries', icon: '🎬', screen: 'series' },
-  { id: '4', label: 'Conta', icon: '👤', screen: 'account' },
-  { id: '5', label: 'mudar lista de\nreprodução', icon: '🔄', screen: 'playlist' },
-  { id: '6', label: 'Configurações', icon: '⚙️', screen: 'settings' },
+  { id: '1', label: 'nav_live', icon: '📺', screen: 'tv' },
+  { id: '2', label: 'nav_movies', icon: '▶️', screen: 'movies' },
+  { id: '3', label: 'nav_series', icon: '🎬', screen: 'series' },
+  { id: '4', label: 'nav_account', icon: '👤', screen: 'account' },
+  { id: '5', label: 'nav_change_playlist', icon: '🔄', screen: 'playlist' },
+  { id: '6', label: 'nav_settings', icon: '⚙️', screen: 'settings' },
 ];
 
 const sideMenuItems: MenuItem[] = [
-  { id: '7', label: 'recarregar', icon: '🔄', screen: 'reload' },
-  { id: '8', label: 'saída', icon: '🚪', screen: 'exit' },
+  { id: '7', label: 'nav_reload', icon: '🔄', screen: 'reload' },
+  { id: '8', label: 'nav_exit', icon: '🚪', screen: 'exit' },
 ];
 
 export default function App() {
+  return (
+    <LanguageProvider>
+      <AppContent />
+    </LanguageProvider>
+  );
+}
+
+function AppContent() {
+  const { t } = useTranslation();
   const [currentScreen, setCurrentScreen] = useState('home');
   const [channels, setChannels] = useState<M3uChannel[]>([]);
   const [seriesGenreByShowName, setSeriesGenreByShowName] = useState<Map<string, string>>(new Map());
@@ -303,7 +314,7 @@ export default function App() {
                 activeOpacity={0.75}
               >
                 <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
-                <Text allowFontScaling={false} style={styles.tvLabel}>{tvItem.label}</Text>
+                <Text allowFontScaling={false} style={styles.tvLabel}>{t(tvItem.label)}</Text>
               </TouchableOpacity>
 
               <View style={styles.midColumn}>
@@ -314,7 +325,7 @@ export default function App() {
                   activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{centerTop.icon}</Text>
-                  <Text allowFontScaling={false} style={styles.midLabel}>{centerTop.label}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{t(centerTop.label)}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -324,7 +335,7 @@ export default function App() {
                   activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{centerBottom.icon}</Text>
-                  <Text allowFontScaling={false} style={styles.midLabel}>{centerBottom.label}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{t(centerBottom.label)}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -336,7 +347,7 @@ export default function App() {
                   activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{rightTop.icon}</Text>
-                  <Text allowFontScaling={false} style={styles.midLabel}>{rightTop.label}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{t(rightTop.label)}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -346,7 +357,7 @@ export default function App() {
                   activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{rightBottom.icon}</Text>
-                  <Text allowFontScaling={false} style={styles.midLabel}>{rightBottom.label}</Text>
+                  <Text allowFontScaling={false} style={styles.midLabel}>{t(rightBottom.label)}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -358,7 +369,7 @@ export default function App() {
                   activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
-                  <Text allowFontScaling={false} style={styles.sideMenuLabel}>{settingsItem.label}</Text>
+                  <Text allowFontScaling={false} style={styles.sideMenuLabel}>{t(settingsItem.label)}</Text>
                 </TouchableOpacity>
 
                 {sideMenuItems.map((item) => {
@@ -376,7 +387,7 @@ export default function App() {
                         <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
                       )}
                       <Text allowFontScaling={false} style={styles.sideMenuLabel}>
-                        {isReloadItem && reloadingChannels ? 'recarregando...' : item.label}
+                        {isReloadItem && reloadingChannels ? t('nav_reloading') : t(item.label)}
                       </Text>
                     </TouchableOpacity>
                   );
