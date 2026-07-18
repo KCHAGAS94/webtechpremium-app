@@ -5,6 +5,7 @@ import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
 
 import { MoviePlayer } from '@/components/movie-player';
+import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
 import { ResumeWatchModal } from '@/components/resume-watch-modal';
 import { SeriesDetailsScreen } from '@/components/series-details-screen';
 import { ThemedText } from '@/components/themed-text';
@@ -14,6 +15,7 @@ import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/series-grouping';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
+import { normalizeSearchText } from '@/utils/text-normalize';
 
 // Stable identity for an episode's watch-history entry: survives a playlist
 // reload the same way movie titles do (see favorites-storage.ts) since it's
@@ -192,6 +194,8 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
   const [playingEpisode, setPlayingEpisode] = useState<SeriesEpisode | null>(null);
   const [allShows, setAllShows] = useState<SeriesShow[]>([]);
   const [isGrouping, setIsGrouping] = useState(true);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [searchCursor, setSearchCursor] = useState(0);
 
   useEffect(() => {
     loadFavorites('series').then(setFavorites);
@@ -270,9 +274,9 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
   }, [allShows, showsByGroup, selectedCategory, favorites]);
 
   const filteredShows = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
+    const q = normalizeSearchText(debouncedSearch.trim());
     if (!q) return categoryShows;
-    return categoryShows.filter((s) => s.name.toLowerCase().includes(q));
+    return categoryShows.filter((s) => normalizeSearchText(s.name).includes(q));
   }, [categoryShows, debouncedSearch]);
 
   const handleOpenShow = useCallback((show: SeriesShow) => {
@@ -385,17 +389,38 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
             ))}
           </View>
 
-          <View style={styles.searchBox}>
+          <TouchableOpacity
+            style={styles.searchBox}
+            activeOpacity={1}
+            onPress={() => {
+              setSearchCursor(search.length);
+              setKeyboardOpen(true);
+            }}
+          >
             <ThemedText style={styles.searchIcon}>🔍</ThemedText>
             <TextInput
-              value={search}
+              value={keyboardOpen ? `${search.slice(0, searchCursor)}|${search.slice(searchCursor)}` : search}
               onChangeText={setSearch}
               placeholder="Pesquisar séries"
               placeholderTextColor="#8888aa"
               style={styles.searchInput}
+              showSoftInputOnFocus={false}
+              caretHidden
+              editable={false}
+              pointerEvents="none"
             />
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {keyboardOpen && (
+          <OnScreenKeyboard
+            value={search}
+            cursor={searchCursor}
+            onChangeText={setSearch}
+            onCursorChange={setSearchCursor}
+            onClose={() => setKeyboardOpen(false)}
+          />
+        )}
 
         <View style={styles.body}>
           <View style={styles.categoriesColumn}>

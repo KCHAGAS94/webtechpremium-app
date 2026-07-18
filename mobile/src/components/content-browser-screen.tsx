@@ -13,12 +13,14 @@ import { useEvent } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { FullscreenPlayer } from '@/components/fullscreen-player';
+import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { ContentCategory } from '@/utils/content-classifier';
 import { loadFavoriteGroups, saveFavoriteGroups } from '@/utils/favorite-groups-storage';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
+import { normalizeSearchText } from '@/utils/text-normalize';
 
 export type NavKey = 'home' | 'live' | 'movies' | 'series';
 
@@ -160,6 +162,8 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [favoriteGroups, setFavoriteGroups] = useState<Set<string>>(new Set());
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [searchCursor, setSearchCursor] = useState(0);
 
   // Favorites live on disk (see favorites-storage.ts), keyed by channel name
   // rather than `selectedChannel.id` — that id is just the item's position
@@ -324,9 +328,9 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // Search only runs against the already-narrowed category subset, so typing
   // inside "CANAIS: ESPORTES" (35 items) never touches the other ~19k channels.
   const filteredChannels = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
+    const q = normalizeSearchText(debouncedSearch.trim());
     if (!q) return categoryChannels;
-    return categoryChannels.filter((c: M3uChannel) => c.name.toLowerCase().includes(q));
+    return categoryChannels.filter((c: M3uChannel) => normalizeSearchText(c.name).includes(q));
   }, [categoryChannels, debouncedSearch]);
 
   const handleSelectChannel = useCallback((channel: M3uChannel) => {
@@ -415,17 +419,38 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
             ))}
           </View>
 
-          <View style={styles.searchBox}>
+          <TouchableOpacity
+            style={styles.searchBox}
+            activeOpacity={1}
+            onPress={() => {
+              setSearchCursor(search.length);
+              setKeyboardOpen(true);
+            }}
+          >
             <ThemedText style={styles.searchIcon}>🔍</ThemedText>
             <TextInput
-              value={search}
+              value={keyboardOpen ? `${search.slice(0, searchCursor)}|${search.slice(searchCursor)}` : search}
               onChangeText={setSearch}
               placeholder={labels.searchPlaceholder}
               placeholderTextColor="#8888aa"
               style={styles.searchInput}
+              showSoftInputOnFocus={false}
+              caretHidden
+              editable={false}
+              pointerEvents="none"
             />
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {keyboardOpen && (
+          <OnScreenKeyboard
+            value={search}
+            cursor={searchCursor}
+            onChangeText={setSearch}
+            onCursorChange={setSearchCursor}
+            onClose={() => setKeyboardOpen(false)}
+          />
+        )}
 
         {/* Body */}
         <View style={styles.body}>

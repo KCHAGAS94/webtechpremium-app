@@ -18,7 +18,7 @@ export type SettingsItemId =
   | 'clear-live-history'
   | 'clear-series-history'
   | 'subtitle-settings'
-  | 'update-now';
+  | 'backup-now';
 
 type SettingsItem = {
   id: SettingsItemId;
@@ -49,7 +49,7 @@ const settingsItems: SettingsItem[] = [
     icon: '🗑️',
     label: 'Limpar histórico Series',
   },
-  { id: 'update-now',
+  { id: 'backup-now',
     icon: '⬇️',
     label: 'Backup' },
 ];

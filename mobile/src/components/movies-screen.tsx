@@ -6,6 +6,7 @@ import { useVideoPlayer } from 'expo-video';
 
 import { MovieDetailsScreen } from '@/components/movie-details-screen';
 import { MoviePlayer } from '@/components/movie-player';
+import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
 import { ResumeWatchModal } from '@/components/resume-watch-modal';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,6 +15,7 @@ import type { M3uChannel } from '@/utils/m3u-parser';
 import { parseMovieTitle } from '@/utils/movie-info';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
+import { normalizeSearchText } from '@/utils/text-normalize';
 
 const NAV_ITEMS: { key: NavKey; label: string }[] = [
   { key: 'home', label: 'Casa' },
@@ -197,6 +199,8 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [viewingMovie, setViewingMovie] = useState<M3uChannel | null>(null);
   const [playingMovie, setPlayingMovie] = useState<M3uChannel | null>(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [searchCursor, setSearchCursor] = useState(0);
 
   // Favorites/history live on disk (see favorites-storage.ts,
   // watch-history-storage.ts), keyed by movie title — not M3uChannel.id,
@@ -246,9 +250,9 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
   }, [bucketChannels, channelsByGroup, selectedCategory, favorites, continueWatchingChannels]);
 
   const filteredChannels = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
+    const q = normalizeSearchText(debouncedSearch.trim());
     if (!q) return categoryChannels;
-    return categoryChannels.filter((c) => c.name.toLowerCase().includes(q));
+    return categoryChannels.filter((c) => normalizeSearchText(c.name).includes(q));
   }, [categoryChannels, debouncedSearch]);
 
   const handleOpenDetails = useCallback((movie: M3uChannel) => {
@@ -365,17 +369,38 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
             ))}
           </View>
 
-          <View style={styles.searchBox}>
+          <TouchableOpacity
+            style={styles.searchBox}
+            activeOpacity={1}
+            onPress={() => {
+              setSearchCursor(search.length);
+              setKeyboardOpen(true);
+            }}
+          >
             <ThemedText style={styles.searchIcon}>🔍</ThemedText>
             <TextInput
-              value={search}
+              value={keyboardOpen ? `${search.slice(0, searchCursor)}|${search.slice(searchCursor)}` : search}
               onChangeText={setSearch}
               placeholder="Pesquisar filmes"
               placeholderTextColor="#8888aa"
               style={styles.searchInput}
+              showSoftInputOnFocus={false}
+              caretHidden
+              editable={false}
+              pointerEvents="none"
             />
-          </View>
+          </TouchableOpacity>
         </View>
+
+        {keyboardOpen && (
+          <OnScreenKeyboard
+            value={search}
+            cursor={searchCursor}
+            onChangeText={setSearch}
+            onCursorChange={setSearchCursor}
+            onClose={() => setKeyboardOpen(false)}
+          />
+        )}
 
         <View style={styles.body}>
           <View style={styles.categoriesColumn}>
