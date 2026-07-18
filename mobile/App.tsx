@@ -20,13 +20,10 @@ import { SettingsScreen } from './src/components/settings-screen';
 import { LanguageProvider, useTranslation } from './src/i18n/language-context';
 import type { TranslationKey } from './src/i18n/translations';
 import { MOCK_MAC } from './src/config/device';
-import { loadChannels, saveChannels } from './src/utils/channel-storage';
 import type { ContentCategory } from './src/utils/content-classifier';
-import { loadLastPlaylist, saveLastPlaylist } from './src/utils/last-playlist-storage';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
-import { loadSeriesGenreByShowName, saveSeriesGenreByShowName } from './src/utils/series-genre-storage';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
 // should show (see content-classifier.ts). Same screen component for all
@@ -104,14 +101,8 @@ function AppContent() {
     setActivePlaylistId(playlist.id);
     setChannels(freshChannels);
     setCurrentScreen('home');
-    // Cached so the next boot can skip straight to Home (see the boot
-    // useEffect below) instead of blocking on the painel + provider round
-    // trip every launch.
-    saveLastPlaylist(playlist);
-    saveChannels(freshChannels);
     if (freshSeriesGenre) {
       setSeriesGenreByShowName(freshSeriesGenre);
-      saveSeriesGenreByShowName(freshSeriesGenre);
     }
   };
 
@@ -131,29 +122,6 @@ function AppContent() {
 
   useEffect(() => {
     (async () => {
-      const [cachedPlaylist, cachedChannels, cachedSeriesGenre] = await Promise.all([
-        loadLastPlaylist(),
-        loadChannels(),
-        loadSeriesGenreByShowName(),
-      ]);
-
-      if (cachedPlaylist && cachedChannels.length > 0) {
-        // Straight to Home with what was on screen last time — no network
-        // wait. The painel is still checked in the background so "Minhas
-        // listas" and future reloads have fresh data, but it never blocks
-        // or interrupts what the user is already browsing/watching.
-        setActivePlaylistId(cachedPlaylist.id);
-        setChannels(cachedChannels);
-        setSeriesGenreByShowName(cachedSeriesGenre);
-        setPlaylists([cachedPlaylist]);
-        setCurrentScreen('home');
-        setBooting(false);
-        fetchDevicePlaylists(MOCK_MAC)
-          .then(setPlaylists)
-          .catch(() => {});
-        return;
-      }
-
       try {
         await fetchAndActivateFromPanel();
       } catch {
