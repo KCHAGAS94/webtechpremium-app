@@ -15,6 +15,7 @@
     "expo-status-bar": "~3.0.9",
     "expo-video": "~3.0.16",
     "glob": "^13.0.6",
+    "jszip": "^3.10.1",
     "metro-babel-transformer": "^0.82.5",
     "metro-core": "^0.82.5",
     "react": "19.1.0",

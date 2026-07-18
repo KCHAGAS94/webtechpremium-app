@@ -162,6 +162,7 @@ function SeriesVodPlayer({
       <MoviePlayer
         player={player}
         title={title}
+        subtitleSearchTitle={showName}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
         onClose={onClose}

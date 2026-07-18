@@ -10,7 +10,7 @@ import { SeekBar } from '@/components/seek-bar';
 import { SubtitleOverlay } from '@/components/subtitle-overlay';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
-import { fetchSubtitleCues } from '@/utils/opensubtitles-api';
+import { fetchSubtitleCues } from '@/utils/subdl-api';
 import type { SubtitleCue } from '@/utils/srt-parser';
 import { loadSubtitleSettings, type SubtitleSettings } from '@/utils/subtitle-settings-storage';
 
@@ -32,6 +32,10 @@ type Props = {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
+  /** Query used to search OpenSubtitles — defaults to `title`, but for
+   * series episodes `title` is "Show - S01E02" (display-only), which never
+   * matches a real subtitle; pass the plain show name here instead. */
+  subtitleSearchTitle?: string;
 };
 
 function formatTime(totalSeconds: number): string {
@@ -51,13 +55,32 @@ function formatTime(totalSeconds: number): string {
  * stream, and it always shows seek/skip controls instead of branching on
  * `isLive`.
  */
-export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite, onClose }: Props) {
+export function MoviePlayer({
+  player,
+  title,
+  year,
+  isFavorite,
+  onToggleFavorite,
+  onClose,
+  subtitleSearchTitle,
+}: Props) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
   const [confirmingExit, setConfirmingExit] = useState(false);
   const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleSettings>(DEFAULT_SUBTITLE_STYLE);
+  const [subtitlesOn, setSubtitlesOn] = useState(false);
+  const [subtitlesLoading, setSubtitlesLoading] = useState(false);
+  // Explicit feedback for the 💬 button — without it, a "no subtitle found"
+  // result looks identical to the button silently doing nothing.
+  const [subtitleToast, setSubtitleToast] = useState<string | null>(null);
+  const subtitleToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showSubtitleToast = useCallback((message: string) => {
+    setSubtitleToast(message);
+    if (subtitleToastTimerRef.current) clearTimeout(subtitleToastTimerRef.current);
+    subtitleToastTimerRef.current = setTimeout(() => setSubtitleToast(null), 3000);
+  }, []);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
@@ -75,37 +98,80 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
   });
   const duration = player.duration;
 
-  // "habilitar legendas" in Configurações is global (AsyncStorage-backed, no
-  // shared state with this screen), so it's only checked once per playback:
-  // if on, the first subtitle track that becomes available is auto-selected.
-  const autoSubtitlesAppliedRef = useRef(false);
-  useEffect(() => {
-    if (autoSubtitlesAppliedRef.current || availableSubtitleTracks.length === 0) return;
-    loadSubtitleSettings().then((settings) => {
-      if (!settings.enabled || autoSubtitlesAppliedRef.current) return;
-      autoSubtitlesAppliedRef.current = true;
-      player.subtitleTrack = availableSubtitleTracks[0];
-    });
-  }, [availableSubtitleTracks, player]);
-
-  // Most IPTV movie/series streams carry no embedded subtitle track at all
-  // (the effect above then has nothing to select), so when the setting is on
-  // this pulls a matching .srt from OpenSubtitles instead and renders it
-  // ourselves via <SubtitleOverlay>, synced against `currentTime`.
+  // Only loaded for style (font size/color) here — "habilitar legendas"
+  // itself is applied explicitly below, once, via the same code path the
+  // 💬 button uses, so both give the same feedback instead of the initial
+  // auto-enable silently skipping the toast/fetch-retry logic.
   useEffect(() => {
     let cancelled = false;
     loadSubtitleSettings().then((settings) => {
-      if (cancelled) return;
-      setSubtitleStyle(settings);
-      if (!settings.enabled) return;
-      fetchSubtitleCues({ title, year }).then((cues) => {
-        if (!cancelled) setSubtitleCues(cues);
-      });
+      if (!cancelled) setSubtitleStyle(settings);
     });
     return () => {
       cancelled = true;
     };
-  }, [title, year]);
+  }, []);
+
+  // Turns subtitles on: prefers a native track already in the stream, then
+  // falls back to OpenSubtitles. Always reports what happened via a toast —
+  // re-running this on every toggle-on (not gated to "once per playback")
+  // is what lets a failed attempt be retried by just toggling again.
+  const activateSubtitles = useCallback(async () => {
+    if (availableSubtitleTracks.length > 0) {
+      if (!player.subtitleTrack) player.subtitleTrack = availableSubtitleTracks[0];
+      showSubtitleToast('Legenda ativada');
+      return;
+    }
+    if (subtitleCues.length > 0) {
+      showSubtitleToast('Legenda ativada');
+      return;
+    }
+    setSubtitlesLoading(true);
+    const { cues, connectionError } = await fetchSubtitleCues({ title: subtitleSearchTitle ?? title, year });
+    setSubtitlesLoading(false);
+    setSubtitleCues(cues);
+    showSubtitleToast(
+      cues.length > 0
+        ? 'Legenda encontrada'
+        : connectionError
+          ? 'Erro de conexão ao buscar legenda'
+          : 'Legenda não encontrada para este título'
+    );
+  }, [availableSubtitleTracks, player, subtitleCues.length, subtitleSearchTitle, title, year, showSubtitleToast]);
+
+  // "habilitar legendas" in Configurações auto-activates once per playback,
+  // through the same `activateSubtitles` the button uses.
+  const autoActivatedRef = useRef(false);
+  useEffect(() => {
+    if (autoActivatedRef.current) return;
+    loadSubtitleSettings().then((settings) => {
+      if (!settings.enabled || autoActivatedRef.current) return;
+      autoActivatedRef.current = true;
+      setSubtitlesOn(true);
+      activateSubtitles();
+    });
+    // Deliberately runs once (empty deps) — `activateSubtitles` closing over
+    // stale initial values here is fine, since at mount time there's nothing
+    // to be stale over yet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleToggleSubtitles = useCallback(() => {
+    if (subtitlesOn) {
+      setSubtitlesOn(false);
+      if (player.subtitleTrack) player.subtitleTrack = null;
+      showSubtitleToast('Legenda desativada');
+      return;
+    }
+    setSubtitlesOn(true);
+    activateSubtitles();
+  }, [subtitlesOn, player, activateSubtitles, showSubtitleToast]);
+
+  useEffect(() => {
+    return () => {
+      if (subtitleToastTimerRef.current) clearTimeout(subtitleToastTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     player.timeUpdateEventInterval = 1;
@@ -229,7 +295,13 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
           </View>
         )}
 
-        {subtitleCues.length > 0 && (
+        {subtitleToast && (
+          <View style={styles.toast} pointerEvents="none">
+            <ThemedText style={styles.toastText}>{subtitleToast}</ThemedText>
+          </View>
+        )}
+
+        {subtitlesOn && subtitleCues.length > 0 && (
           <SubtitleOverlay
             cues={subtitleCues}
             currentTime={currentTime}
@@ -255,7 +327,14 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
               </TouchableOpacity>
 
               <View style={styles.topBarRight}>
-                <TouchableOpacity onPress={onToggleFavorite} hitSlop={12} style={styles.iconButton}>
+                <TouchableOpacity onPress={handleToggleSubtitles} hitSlop={4} style={styles.iconButton}>
+                  {subtitlesLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <ThemedText style={[styles.toolIcon, subtitlesOn && styles.toolIconActive]}>💬</ThemedText>
+                  )}
+                </TouchableOpacity>
+                <TouchableOpacity onPress={onToggleFavorite} hitSlop={4} style={styles.iconButton}>
                   <ThemedText style={[styles.toolIcon, isFavorite && styles.toolIconActive]}>
                     {isFavorite ? '♥' : '♡'}
                   </ThemedText>
@@ -337,6 +416,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
   },
+  toast: {
+    position: 'absolute',
+    top: 70,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  toastText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
   errorBackButton: {
     borderWidth: 1,
     borderColor: '#4dd6ff',
@@ -366,7 +459,7 @@ const styles = StyleSheet.create({
   topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   titleGroup: {
     flex: 1,
