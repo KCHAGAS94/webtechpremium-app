@@ -1,15 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { HideCategoriesModal } from '@/components/hide-categories-modal';
 import { LanguageModal } from '@/components/language-modal';
+import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
+import { PasswordPromptModal } from '@/components/password-prompt-modal';
 import { WatchHistoryModal, type WatchHistoryRow } from '@/components/watch-history-modal';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
 import type { ContentCategory } from '@/utils/content-classifier';
 import { loadHiddenGroups, saveHiddenGroups } from '@/utils/hidden-groups-storage';
+import { clearParentalPassword, loadParentalPassword, saveParentalPassword } from '@/utils/parental-control-storage';
 import {
   clearLiveWatchHistory,
   loadLiveWatchHistory,
@@ -118,6 +121,45 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
   const [senha, setSenha] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [parentalError, setParentalError] = useState('');
+  const [parentalKeyboardField, setParentalKeyboardField] = useState<
+    'senha' | 'novaSenha' | 'confirmarSenha' | null
+  >(null);
+  const [parentalKeyboardCursor, setParentalKeyboardCursor] = useState(0);
+
+  // Once a password is registered, "Ocultar Categorias" and "Limpar
+  // Históricos" require it. No password set means everyone keeps normal
+  // access, same as before this feature existed.
+  const [parentalPassword, setParentalPassword] = useState<string | null>(null);
+  const [passwordPromptVisible, setPasswordPromptVisible] = useState(false);
+  const pendingProtectedAction = React.useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    loadParentalPassword().then(setParentalPassword);
+  }, []);
+
+  const runProtected = (action: () => void) => {
+    if (!parentalPassword) {
+      action();
+      return;
+    }
+    pendingProtectedAction.current = action;
+    setPasswordPromptVisible(true);
+  };
+
+  const handlePasswordConfirm = (password: string): boolean => {
+    if (password !== parentalPassword) return false;
+    setPasswordPromptVisible(false);
+    const action = pendingProtectedAction.current;
+    pendingProtectedAction.current = null;
+    action?.();
+    return true;
+  };
+
+  const cancelPasswordPrompt = () => {
+    pendingProtectedAction.current = null;
+    setPasswordPromptVisible(false);
+  };
 
   const [hideCategoriesTarget, setHideCategoriesTarget] = useState<ContentCategory | null>(null);
   const [hideCategoriesOptions, setHideCategoriesOptions] = useState<{ id: string; title: string }[]>([]);
@@ -184,6 +226,42 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
     setSenha('');
     setNovaSenha('');
     setConfirmarSenha('');
+    setParentalError('');
+    setParentalKeyboardField(null);
+  };
+
+  const parentalFieldValue = (field: 'senha' | 'novaSenha' | 'confirmarSenha') =>
+    field === 'senha' ? senha : field === 'novaSenha' ? novaSenha : confirmarSenha;
+
+  const setParentalFieldValue = (field: 'senha' | 'novaSenha' | 'confirmarSenha', value: string) => {
+    if (field === 'senha') setSenha(value);
+    else if (field === 'novaSenha') setNovaSenha(value);
+    else setConfirmarSenha(value);
+  };
+
+  const openParentalKeyboard = (field: 'senha' | 'novaSenha' | 'confirmarSenha') => {
+    setParentalKeyboardCursor(parentalFieldValue(field).length);
+    setParentalKeyboardField(field);
+  };
+
+  const handleSaveParentalPassword = () => {
+    if (!novaSenha || novaSenha !== confirmarSenha) {
+      setParentalError('Nova senha e confirmação não conferem');
+      return;
+    }
+    saveParentalPassword(novaSenha);
+    setParentalPassword(novaSenha);
+    closeParentalModal();
+  };
+
+  const handleRemoveParentalPassword = () => {
+    if (senha !== parentalPassword) {
+      setParentalError('Senha incorreta');
+      return;
+    }
+    clearParentalPassword();
+    setParentalPassword(null);
+    closeParentalModal();
   };
 
   const handleSelectItem = (id: SettingsItemId) => {
@@ -225,34 +303,38 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
             })
           : Promise.resolve(Array.from(groupTitlesByCategory.get(hideCategory) ?? []));
 
-      titlesPromise.then((titles) => {
-        setHideCategoriesOptions(titles.map((title) => ({ id: title, title })));
-        loadHiddenGroups(hideCategory).then((hidden) => {
-          setHideCategoriesInitial(hidden);
-          setHideCategoriesTarget(hideCategory);
+      runProtected(() => {
+        titlesPromise.then((titles) => {
+          setHideCategoriesOptions(titles.map((title) => ({ id: title, title })));
+          loadHiddenGroups(hideCategory).then((hidden) => {
+            setHideCategoriesInitial(hidden);
+            setHideCategoriesTarget(hideCategory);
+          });
         });
       });
       return;
     }
     const historyKind = HISTORY_ITEM_TO_KIND[id];
     if (historyKind) {
-      if (historyKind === 'live') {
-        loadLiveWatchHistory().then((entries) => {
-          setHistoryRows(
-            entries.map((e) => ({ id: e.id, title: e.channelName, subtitle: formatHistoryDate(e.watchedAt) }))
-          );
-          setHistoryModalKind('live');
-        });
-      } else {
-        loadWatchHistory().then((entries) => {
-          setHistoryRows(
-            entries
-              .filter((e) => e.kind === historyKind)
-              .map((e) => ({ id: e.key, title: e.title, subtitle: formatHistoryDate(e.updatedAt) }))
-          );
-          setHistoryModalKind(historyKind);
-        });
-      }
+      runProtected(() => {
+        if (historyKind === 'live') {
+          loadLiveWatchHistory().then((entries) => {
+            setHistoryRows(
+              entries.map((e) => ({ id: e.id, title: e.channelName, subtitle: formatHistoryDate(e.watchedAt) }))
+            );
+            setHistoryModalKind('live');
+          });
+        } else {
+          loadWatchHistory().then((entries) => {
+            setHistoryRows(
+              entries
+                .filter((e) => e.kind === historyKind)
+                .map((e) => ({ id: e.key, title: e.title, subtitle: formatHistoryDate(e.updatedAt) }))
+            );
+            setHistoryModalKind(historyKind);
+          });
+        }
+      });
       return;
     }
     onSelectItem?.(id);
@@ -333,52 +415,99 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
           <View style={styles.modalBox}>
             <Text allowFontScaling={false} style={styles.modalTitle}>Controle dos Pais</Text>
 
-            <Text allowFontScaling={false} style={styles.modalLabel}>Senha</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={senha}
-              onChangeText={setSenha}
-              secureTextEntry
-              placeholderTextColor="#c7c7e6"
-            />
+            {parentalPassword ? (
+              <>
+                <Text allowFontScaling={false} style={styles.modalLabel}>Digite a senha para remover</Text>
+                <TouchableOpacity
+                  style={styles.modalInput}
+                  onPress={() => openParentalKeyboard('senha')}
+                  activeOpacity={0.75}
+                >
+                  <Text allowFontScaling={false} style={styles.modalInputText}>
+                    {'•'.repeat(senha.length) || ' '}
+                  </Text>
+                </TouchableOpacity>
 
-            <Text allowFontScaling={false} style={styles.modalLabel}>Nova Senha</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={novaSenha}
-              onChangeText={setNovaSenha}
-              secureTextEntry
-              placeholderTextColor="#c7c7e6"
-            />
+                {!!parentalError && (
+                  <Text allowFontScaling={false} style={styles.modalErrorText}>{parentalError}</Text>
+                )}
 
-            <Text allowFontScaling={false} style={styles.modalLabel}>Confirme a Senha</Text>
-            <TextInput
-              style={styles.modalInput}
-              value={confirmarSenha}
-              onChangeText={setConfirmarSenha}
-              secureTextEntry
-              placeholderTextColor="#c7c7e6"
-            />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={handleRemoveParentalPassword}
+                    activeOpacity={0.75}
+                  >
+                    <Text allowFontScaling={false} style={styles.modalButtonText}>REMOVER</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={closeParentalModal}
+                    activeOpacity={0.75}
+                  >
+                    <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text allowFontScaling={false} style={styles.modalLabel}>Nova Senha</Text>
+                <TouchableOpacity
+                  style={styles.modalInput}
+                  onPress={() => openParentalKeyboard('novaSenha')}
+                  activeOpacity={0.75}
+                >
+                  <Text allowFontScaling={false} style={styles.modalInputText}>
+                    {'•'.repeat(novaSenha.length) || ' '}
+                  </Text>
+                </TouchableOpacity>
 
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={closeParentalModal}
-                activeOpacity={0.75}
-              >
-                <Text allowFontScaling={false} style={styles.modalButtonText}>SIM</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalButton}
-                onPress={closeParentalModal}
-                activeOpacity={0.75}
-              >
-                <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
-              </TouchableOpacity>
-            </View>
+                <Text allowFontScaling={false} style={styles.modalLabel}>Confirme a Senha</Text>
+                <TouchableOpacity
+                  style={styles.modalInput}
+                  onPress={() => openParentalKeyboard('confirmarSenha')}
+                  activeOpacity={0.75}
+                >
+                  <Text allowFontScaling={false} style={styles.modalInputText}>
+                    {'•'.repeat(confirmarSenha.length) || ' '}
+                  </Text>
+                </TouchableOpacity>
+
+                {!!parentalError && (
+                  <Text allowFontScaling={false} style={styles.modalErrorText}>{parentalError}</Text>
+                )}
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={handleSaveParentalPassword}
+                    activeOpacity={0.75}
+                  >
+                    <Text allowFontScaling={false} style={styles.modalButtonText}>SIM</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.modalButton}
+                    onPress={closeParentalModal}
+                    activeOpacity={0.75}
+                  >
+                    <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
+
+      {parentalModalVisible && parentalKeyboardField && (
+        <OnScreenKeyboard
+          value={parentalFieldValue(parentalKeyboardField)}
+          cursor={parentalKeyboardCursor}
+          onChangeText={(text) => setParentalFieldValue(parentalKeyboardField, text)}
+          onCursorChange={setParentalKeyboardCursor}
+          onClose={() => setParentalKeyboardField(null)}
+        />
+      )}
 
       <Modal
         visible={subtitleModalVisible}
@@ -548,6 +677,12 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
       />
 
       <LanguageModal visible={languageModalVisible} onClose={() => setLanguageModalVisible(false)} />
+
+      <PasswordPromptModal
+        visible={passwordPromptVisible}
+        onConfirm={handlePasswordConfirm}
+        onCancel={cancelPasswordPrompt}
+      />
     </LinearGradient>
   );
 }
@@ -652,9 +787,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 4,
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    color: '#ffffff',
+    paddingVertical: 8,
     marginBottom: 10,
+    minHeight: 30,
+    justifyContent: 'center',
+  },
+  modalInputText: {
+    color: '#ffffff',
+    fontSize: 14,
+    letterSpacing: 2,
   },
   modalActions: {
     flexDirection: 'row',
@@ -674,6 +815,12 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 12,
     fontWeight: '700',
+  },
+  modalErrorText: {
+    color: '#ff6b6b',
+    fontSize: 11,
+    marginTop: -4,
+    marginBottom: 8,
   },
   subtitleModalBox: {
     backgroundColor: '#12004f',
