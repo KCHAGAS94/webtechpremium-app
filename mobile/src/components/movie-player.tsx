@@ -31,8 +31,6 @@ type Props = {
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onClose: () => void;
-  /** Defaults to `onClose` — the details screen already shows full metadata. */
-  onInfo?: () => void;
 };
 
 function formatTime(totalSeconds: number): string {
@@ -52,13 +50,10 @@ function formatTime(totalSeconds: number): string {
  * stream, and it always shows seek/skip controls instead of branching on
  * `isLive`.
  */
-export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite, onClose, onInfo }: Props) {
+export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite, onClose }: Props) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
-  const [contentFit, setContentFit] = useState<'contain' | 'cover'>('contain');
-  const [subtitlesOn, setSubtitlesOn] = useState(false);
-  const [audioTrackIndex, setAudioTrackIndex] = useState(-1);
   const [subtitleCues, setSubtitleCues] = useState<SubtitleCue[]>([]);
   const [subtitleStyle, setSubtitleStyle] = useState<SubtitleSettings>(DEFAULT_SUBTITLE_STYLE);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,8 +76,6 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
   // "habilitar legendas" in Configurações is global (AsyncStorage-backed, no
   // shared state with this screen), so it's only checked once per playback:
   // if on, the first subtitle track that becomes available is auto-selected.
-  // Left as a ref (not state) so a later manual toggle via handleToggleSubtitles
-  // isn't fought by this effect re-running.
   const autoSubtitlesAppliedRef = useRef(false);
   useEffect(() => {
     if (autoSubtitlesAppliedRef.current || availableSubtitleTracks.length === 0) return;
@@ -90,7 +83,6 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
       if (!settings.enabled || autoSubtitlesAppliedRef.current) return;
       autoSubtitlesAppliedRef.current = true;
       player.subtitleTrack = availableSubtitleTracks[0];
-      setSubtitlesOn(true);
     });
   }, [availableSubtitleTracks, player]);
 
@@ -203,34 +195,6 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
   const handleScrubStart = useCallback(() => setIsScrubbing(true), []);
   const handleScrubEnd = useCallback(() => setIsScrubbing(false), []);
 
-  const handleToggleSubtitles = useCallback(() => {
-    const tracks = player.availableSubtitleTracks ?? [];
-    if (tracks.length === 0) return;
-    setSubtitlesOn((wasOn) => {
-      player.subtitleTrack = wasOn ? null : tracks[0];
-      return !wasOn;
-    });
-    showControls();
-  }, [player, showControls]);
-
-  const handleCycleAudioTrack = useCallback(() => {
-    const tracks = player.availableAudioTracks ?? [];
-    if (tracks.length === 0) return;
-    setAudioTrackIndex((current) => {
-      const next = current + 1 >= tracks.length ? 0 : current + 1;
-      player.audioTrack = tracks[next];
-      return next;
-    });
-    showControls();
-  }, [player, showControls]);
-
-  const handleToggleResize = useCallback(() => {
-    setContentFit((current) => (current === 'contain' ? 'cover' : 'contain'));
-    showControls();
-  }, [showControls]);
-
-  const handleInfo = onInfo ?? onClose;
-
   const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
@@ -239,7 +203,7 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
       <View style={styles.container}>
         {status !== 'error' && (
           <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo}>
-            <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit={contentFit} />
+            <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
           </Pressable>
         )}
 
@@ -286,25 +250,9 @@ export function MoviePlayer({ player, title, year, isFavorite, onToggleFavorite,
               </TouchableOpacity>
 
               <View style={styles.topBarRight}>
-                <TouchableOpacity onPress={handleInfo} hitSlop={12} style={styles.iconButton}>
-                  <ThemedText style={styles.toolIcon}>ⓘ</ThemedText>
-                </TouchableOpacity>
                 <TouchableOpacity onPress={onToggleFavorite} hitSlop={12} style={styles.iconButton}>
                   <ThemedText style={[styles.toolIcon, isFavorite && styles.toolIconActive]}>
                     {isFavorite ? '♥' : '♡'}
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleToggleSubtitles} hitSlop={12} style={styles.iconButton}>
-                  <ThemedText style={[styles.toolIcon, subtitlesOn && styles.toolIconActive]}>💬</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleCycleAudioTrack} hitSlop={12} style={styles.iconButton}>
-                  <ThemedText style={[styles.toolIcon, audioTrackIndex >= 0 && styles.toolIconActive]}>
-                    🎵
-                  </ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleToggleResize} hitSlop={12} style={styles.iconButton}>
-                  <ThemedText style={[styles.toolIcon, contentFit === 'cover' && styles.toolIconActive]}>
-                    ⛶
                   </ThemedText>
                 </TouchableOpacity>
               </View>
