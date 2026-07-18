@@ -16,6 +16,7 @@ import { FullscreenPlayer } from '@/components/fullscreen-player';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { ContentCategory } from '@/utils/content-classifier';
+import { loadFavoriteGroups, saveFavoriteGroups } from '@/utils/favorite-groups-storage';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 
@@ -25,6 +26,8 @@ type Category = {
   id: string;
   title: string;
   count: number;
+  /** "Tudo"/"Favoritos" aren't real groups — no favorite heart on those rows. */
+  isGroup: boolean;
 };
 
 const NAV_ITEMS: { key: NavKey; label: string }[] = [
@@ -64,20 +67,33 @@ type Props = {
 const CategoryRow = memo(function CategoryRow({
   item,
   isActive,
+  isFavorite,
   onPress,
+  onToggleFavorite,
 }: {
   item: Category;
   isActive: boolean;
+  isFavorite: boolean;
   onPress: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
 }) {
   return (
     <TouchableOpacity style={styles.categoryRow} onPress={() => onPress(item.id)}>
-      <ThemedText
-        style={[styles.categoryTitle, isActive && styles.categoryTitleActive]}
-        numberOfLines={1}
-      >
-        {item.title}
-      </ThemedText>
+      <View style={styles.categoryLeft}>
+        {item.isGroup && (
+          <TouchableOpacity onPress={() => onToggleFavorite(item.id)} hitSlop={8}>
+            <ThemedText style={[styles.categoryFavoriteIcon, isFavorite && styles.categoryFavoriteIconActive]}>
+              {isFavorite ? '♥' : '♡'}
+            </ThemedText>
+          </TouchableOpacity>
+        )}
+        <ThemedText
+          style={[styles.categoryTitle, isActive && styles.categoryTitleActive]}
+          numberOfLines={1}
+        >
+          {item.title}
+        </ThemedText>
+      </View>
       <ThemedText style={styles.categoryCount}>{item.count}</ThemedText>
     </TouchableOpacity>
   );
@@ -129,9 +145,9 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
       }
     }
     const cats: Omit<Category, 'count'>[] = [
-      { id: ALL_CATEGORY_ID, title: 'Tudo' },
-      { id: FAVORITES_CATEGORY_ID, title: 'Favoritos' },
-      ...Array.from(byGroup.entries()).map(([title]) => ({ id: title, title })),
+      { id: ALL_CATEGORY_ID, title: 'Tudo', isGroup: false },
+      { id: FAVORITES_CATEGORY_ID, title: 'Favoritos', isGroup: false },
+      ...Array.from(byGroup.entries()).map(([title]) => ({ id: title, title, isGroup: true })),
     ];
     return { categoryShells: cats, channelsByGroup: byGroup, bucketChannels: bucket };
   }, [channels, category]);
@@ -143,25 +159,33 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [isBuffering, setIsBuffering] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  const [favoriteGroups, setFavoriteGroups] = useState<Set<string>>(new Set());
 
   // Favorites live on disk (see favorites-storage.ts), keyed by channel name
   // rather than `selectedChannel.id` — that id is just the item's position
   // in the last parsed playlist, so it shifts on every reload.
   useEffect(() => {
     loadFavorites(category).then(setFavorites);
+    loadFavoriteGroups(category).then(setFavoriteGroups);
   }, [category]);
 
   // Filled in here (not in the categoryShells memo above) because "Favoritos"
   // needs a live count and `favorites` isn't loaded from disk yet at that point.
-  const categories = useMemo<Category[]>(
-    () =>
-      categoryShells.map((shell) => {
-        if (shell.id === ALL_CATEGORY_ID) return { ...shell, count: bucketChannels.length };
-        if (shell.id === FAVORITES_CATEGORY_ID) return { ...shell, count: favorites.size };
-        return { ...shell, count: channelsByGroup.get(shell.id)?.length ?? 0 };
-      }),
-    [categoryShells, bucketChannels.length, favorites.size, channelsByGroup]
-  );
+  // Favorited groups are pulled to the front (right after "Tudo"/"Favoritos"),
+  // keeping their relative order otherwise — lets someone build a personal
+  // "shortlist" of folders without losing the rest of the catalog's ordering.
+  const categories = useMemo<Category[]>(() => {
+    const withCounts = categoryShells.map((shell) => {
+      if (shell.id === ALL_CATEGORY_ID) return { ...shell, count: bucketChannels.length };
+      if (shell.id === FAVORITES_CATEGORY_ID) return { ...shell, count: favorites.size };
+      return { ...shell, count: channelsByGroup.get(shell.id)?.length ?? 0 };
+    });
+    const pinned = withCounts.filter((c) => !c.isGroup);
+    const groups = withCounts.filter((c) => c.isGroup);
+    const favoriteGroupRows = groups.filter((c) => favoriteGroups.has(c.id));
+    const restGroupRows = groups.filter((c) => !favoriteGroups.has(c.id));
+    return [...pinned, ...favoriteGroupRows, ...restGroupRows];
+  }, [categoryShells, bucketChannels.length, favorites.size, favoriteGroups, channelsByGroup]);
 
   const handleToggleFavorite = useCallback(() => {
     if (!selectedChannel) return;
@@ -173,6 +197,19 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
       return next;
     });
   }, [category, selectedChannel]);
+
+  const handleToggleFavoriteGroup = useCallback(
+    (groupTitle: string) => {
+      setFavoriteGroups((prev) => {
+        const next = new Set(prev);
+        if (next.has(groupTitle)) next.delete(groupTitle);
+        else next.add(groupTitle);
+        saveFavoriteGroups(category, next);
+        return next;
+      });
+    },
+    [category]
+  );
 
   const isSelectedChannelFavorite = !!selectedChannel && favorites.has(selectedChannel.name);
 
@@ -317,9 +354,15 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
-      <CategoryRow item={item} isActive={item.id === selectedCategory} onPress={setSelectedCategory} />
+      <CategoryRow
+        item={item}
+        isActive={item.id === selectedCategory}
+        isFavorite={favoriteGroups.has(item.id)}
+        onPress={setSelectedCategory}
+        onToggleFavorite={handleToggleFavoriteGroup}
+      />
     ),
-    [selectedCategory]
+    [selectedCategory, favoriteGroups, handleToggleFavoriteGroup]
   );
 
   const renderChannel = useCallback(
@@ -392,7 +435,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
               data={categories}
               keyExtractor={categoryKeyExtractor}
               renderItem={renderCategory}
-              extraData={selectedCategory}
+              extraData={[selectedCategory, favoriteGroups]}
               getItemLayout={getCategoryItemLayout}
               initialNumToRender={16}
               maxToRenderPerBatch={16}
@@ -572,11 +615,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a45',
   },
+  categoryLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingRight: 8,
+  },
+  categoryFavoriteIcon: {
+    fontSize: 13,
+    color: '#8888aa',
+  },
+  categoryFavoriteIconActive: {
+    color: '#e63946',
+  },
   categoryTitle: {
     fontSize: 13,
     color: '#c7c7e6',
     flexShrink: 1,
-    paddingRight: 8,
   },
   categoryTitleActive: {
     color: '#4dd6ff',

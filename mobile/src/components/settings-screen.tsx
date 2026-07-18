@@ -51,7 +51,7 @@ const settingsItems: SettingsItem[] = [
   },
   { id: 'update-now',
     icon: '⬇️',
-    label: 'atualize agora' },
+    label: 'Backup' },
 ];
 
 const subtitleColors = [
