@@ -14,6 +14,7 @@ import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { parseMovieTitle } from '@/utils/movie-info';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
+import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 import { normalizeSearchText } from '@/utils/text-normalize';
 
@@ -176,11 +177,14 @@ type Props = {
 };
 
 export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
+
   const { channelsByGroup, bucketChannels } = useMemo(() => {
     const byGroup = new Map<string, M3uChannel[]>();
     const bucket: M3uChannel[] = [];
     for (const channel of channels) {
       if (channel.category !== 'movies') continue;
+      if (hiddenGroups.has(channel.groupTitle)) continue;
       bucket.push(channel);
       const list = byGroup.get(channel.groupTitle);
       if (list) {
@@ -190,7 +194,7 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
       }
     }
     return { channelsByGroup: byGroup, bucketChannels: bucket };
-  }, [channels]);
+  }, [channels, hiddenGroups]);
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<Map<string, WatchHistoryEntry>>(new Map());
@@ -209,6 +213,7 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
   // favorites something or watches further, never as a side effect of
   // `channels` refreshing.
   useEffect(() => {
+    loadHiddenGroups('movies').then(setHiddenGroups);
     loadFavorites('movies').then(setFavorites);
     loadWatchHistory().then((entries) => {
       setHistory(new Map(entries.filter((e) => e.kind === 'movie').map((e) => [e.key, e])));

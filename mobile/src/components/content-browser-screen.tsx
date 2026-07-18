@@ -19,6 +19,7 @@ import { ThemedView } from '@/components/themed-view';
 import type { ContentCategory } from '@/utils/content-classifier';
 import { loadFavoriteGroups, saveFavoriteGroups } from '@/utils/favorite-groups-storage';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
+import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { normalizeSearchText } from '@/utils/text-normalize';
 
@@ -128,16 +129,21 @@ const ChannelRow = memo(function ChannelRow({
 export function ContentBrowserScreen({ channels, category, activeNav, onNavigate }: Props) {
   const labels = CONTENT_LABELS[category];
 
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
+
   // Single pass over the (potentially huge) channel list: keep only groups
   // classified into this screen's `category` (see content-classifier.ts) and
   // group them by `group-title` once per playlist load, instead of
   // re-filtering the full list every time the user switches category or
-  // types in the search box.
+  // types in the search box. Groups hidden in Configurações are dropped
+  // entirely here, so they disappear from "Tudo"/search too, not just the
+  // folder list.
   const { categoryShells, channelsByGroup, bucketChannels } = useMemo(() => {
     const byGroup = new Map<string, M3uChannel[]>();
     const bucket: M3uChannel[] = [];
     for (const channel of channels) {
       if (channel.category !== category) continue;
+      if (hiddenGroups.has(channel.groupTitle)) continue;
       bucket.push(channel);
       const list = byGroup.get(channel.groupTitle);
       if (list) {
@@ -152,7 +158,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
       ...Array.from(byGroup.entries()).map(([title]) => ({ id: title, title, isGroup: true })),
     ];
     return { categoryShells: cats, channelsByGroup: byGroup, bucketChannels: bucket };
-  }, [channels, category]);
+  }, [channels, category, hiddenGroups]);
 
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
   const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(bucketChannels[0]);
@@ -169,6 +175,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // rather than `selectedChannel.id` — that id is just the item's position
   // in the last parsed playlist, so it shifts on every reload.
   useEffect(() => {
+    loadHiddenGroups(category).then(setHiddenGroups);
     loadFavorites(category).then(setFavorites);
     loadFavoriteGroups(category).then(setFavoriteGroups);
   }, [category]);

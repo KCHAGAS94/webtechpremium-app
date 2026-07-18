@@ -267,6 +267,8 @@ export default function App() {
     return (
       <SettingsScreen
         onBack={() => setCurrentScreen('home')}
+        channels={channels}
+        seriesGenreByShowName={seriesGenreByShowName}
       />
     );
   }

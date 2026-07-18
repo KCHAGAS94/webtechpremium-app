@@ -14,6 +14,7 @@ import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/series-grouping';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
+import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 import { normalizeSearchText } from '@/utils/text-normalize';
 
@@ -183,6 +184,8 @@ type Props = {
 };
 
 export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate }: Props) {
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
+
   const bucketChannels = useMemo(() => channels.filter((c) => c.category === 'series'), [channels]);
 
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
@@ -198,6 +201,7 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
   const [searchCursor, setSearchCursor] = useState(0);
 
   useEffect(() => {
+    loadHiddenGroups('series').then(setHiddenGroups);
     loadFavorites('series').then(setFavorites);
     loadWatchHistory().then((entries) => {
       setHistory(new Map(entries.filter((e) => e.kind === 'episode').map((e) => [e.key, e])));
@@ -244,19 +248,30 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
     };
   }, [channels, bucketChannels, genreByShowName]);
 
+  // Hidden groups are matched against `show.groupTitle` (genre-enriched, see
+  // groupSeriesShows), not the raw M3U channel `group-title` — most series
+  // streams carry a generic group like "SÉRIES"/"NOVELAS", and the real
+  // per-provider folders (Netflix, GloboPlay, ...) only exist after that
+  // enrichment. Filtering here, post-grouping, is what makes "Ocultar
+  // Categorias Series" match what Configurações actually lists.
+  const visibleShows = useMemo(
+    () => allShows.filter((s) => !hiddenGroups.has(s.groupTitle)),
+    [allShows, hiddenGroups]
+  );
+
   const showsByGroup = useMemo(() => {
     const byGroup = new Map<string, SeriesShow[]>();
-    for (const show of allShows) {
+    for (const show of visibleShows) {
       const list = byGroup.get(show.groupTitle);
       if (list) list.push(show);
       else byGroup.set(show.groupTitle, [show]);
     }
     return byGroup;
-  }, [allShows]);
+  }, [visibleShows]);
 
   const categoryList = useMemo<Category[]>(
     () => [
-      { id: ALL_CATEGORY_ID, title: 'Tudo', count: allShows.length },
+      { id: ALL_CATEGORY_ID, title: 'Tudo', count: visibleShows.length },
       { id: FAVORITES_CATEGORY_ID, title: 'Favorito', count: favorites.size },
       ...Array.from(showsByGroup.entries()).map(([title, list]) => ({
         id: title,
@@ -264,14 +279,14 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
         count: list.length,
       })),
     ],
-    [allShows.length, showsByGroup, favorites.size]
+    [visibleShows.length, showsByGroup, favorites.size]
   );
 
   const categoryShows = useMemo(() => {
-    if (selectedCategory === ALL_CATEGORY_ID) return allShows;
-    if (selectedCategory === FAVORITES_CATEGORY_ID) return allShows.filter((s) => favorites.has(s.id));
+    if (selectedCategory === ALL_CATEGORY_ID) return visibleShows;
+    if (selectedCategory === FAVORITES_CATEGORY_ID) return visibleShows.filter((s) => favorites.has(s.id));
     return showsByGroup.get(selectedCategory) ?? [];
-  }, [allShows, showsByGroup, selectedCategory, favorites]);
+  }, [visibleShows, showsByGroup, selectedCategory, favorites]);
 
   const filteredShows = useMemo(() => {
     const q = normalizeSearchText(debouncedSearch.trim());

@@ -1,8 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { HideCategoriesModal } from '@/components/hide-categories-modal';
+import type { ContentCategory } from '@/utils/content-classifier';
+import { loadHiddenGroups, saveHiddenGroups } from '@/utils/hidden-groups-storage';
+import type { M3uChannel } from '@/utils/m3u-parser';
+import { groupSeriesShows } from '@/utils/series-grouping';
 import { loadSubtitleSettings, saveSubtitleSettings } from '@/utils/subtitle-settings-storage';
 
 // Front-end only for now — each card just reports its id through onSelectItem.
@@ -74,13 +79,48 @@ const subtitleColors = [
 type Props = {
   onBack: () => void;
   onSelectItem?: (id: SettingsItemId) => void;
+  /** Full playlist — used to list each section's folders in "Ocultar Categorias". */
+  channels?: M3uChannel[];
+  /** Genre lookup by show name (see playlist-loader.ts) — series folders are only
+   * derived from this at grouping time, not baked into `channel.groupTitle`
+   * like movies/live are, so listing series categories needs the same
+   * grouping series-screen.tsx uses instead of the raw M3U group-title. */
+  seriesGenreByShowName?: Map<string, string>;
 };
 
-export function SettingsScreen({ onBack, onSelectItem }: Props) {
+const HIDE_CATEGORIES_ITEM_TO_CONTENT: Partial<Record<SettingsItemId, ContentCategory>> = {
+  'hide-live-categories': 'live',
+  'hide-vod-categories': 'movies',
+  'hide-series-categories': 'series',
+};
+
+export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenreByShowName }: Props) {
   const [parentalModalVisible, setParentalModalVisible] = useState(false);
   const [senha, setSenha] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
+
+  const [hideCategoriesTarget, setHideCategoriesTarget] = useState<ContentCategory | null>(null);
+  const [hideCategoriesOptions, setHideCategoriesOptions] = useState<{ id: string; title: string }[]>([]);
+  const [hideCategoriesInitial, setHideCategoriesInitial] = useState<Set<string>>(new Set());
+
+  // Live/movies get their real category baked into `channel.groupTitle`
+  // directly at playlist-load time (see playlist-loader.ts), so the raw
+  // group-title is accurate for them — only series needs groupSeriesShows.
+  const groupTitlesByCategory = useMemo(() => {
+    const byCategory = new Map<ContentCategory, Set<string>>();
+    for (const channel of channels) {
+      const category = channel.category as ContentCategory;
+      if (category === 'series') continue;
+      let titles = byCategory.get(category);
+      if (!titles) {
+        titles = new Set();
+        byCategory.set(category, titles);
+      }
+      titles.add(channel.groupTitle);
+    }
+    return byCategory;
+  }, [channels]);
 
   const [subtitleModalVisible, setSubtitleModalVisible] = useState(false);
   const [legendasHabilitadas, setLegendasHabilitadas] = useState(false);
@@ -133,7 +173,50 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
       setSubtitleModalVisible(true);
       return;
     }
+    const hideCategory = HIDE_CATEGORIES_ITEM_TO_CONTENT[id];
+    if (hideCategory) {
+      // Load the saved hidden set BEFORE opening the modal — opening it first
+      // and patching `hideCategoriesInitial` in once the promise resolves is
+      // too late, since the modal only re-syncs its checkboxes from that prop
+      // on the moment it transitions to visible.
+      const titlesPromise: Promise<string[]> =
+        hideCategory === 'series'
+          ? groupSeriesShows(
+              channels.filter((c) => c.category === 'series'),
+              undefined,
+              seriesGenreByShowName
+            ).then((shows) => {
+              // Same first-appearance order series-screen.tsx's own
+              // showsByGroup ends up with — not alphabetical.
+              const seen = new Set<string>();
+              const titles: string[] = [];
+              for (const show of shows) {
+                if (seen.has(show.groupTitle)) continue;
+                seen.add(show.groupTitle);
+                titles.push(show.groupTitle);
+              }
+              return titles;
+            })
+          : Promise.resolve(Array.from(groupTitlesByCategory.get(hideCategory) ?? []));
+
+      titlesPromise.then((titles) => {
+        setHideCategoriesOptions(titles.map((title) => ({ id: title, title })));
+        loadHiddenGroups(hideCategory).then((hidden) => {
+          setHideCategoriesInitial(hidden);
+          setHideCategoriesTarget(hideCategory);
+        });
+      });
+      return;
+    }
     onSelectItem?.(id);
+  };
+
+  const closeHideCategoriesModal = () => setHideCategoriesTarget(null);
+
+  const handleSaveHideCategories = (hidden: Set<string>) => {
+    if (!hideCategoriesTarget) return;
+    saveHiddenGroups(hideCategoriesTarget, hidden);
+    setHideCategoriesTarget(null);
   };
 
   return (
@@ -382,6 +465,14 @@ export function SettingsScreen({ onBack, onSelectItem }: Props) {
           </View>
         </View>
       </Modal>
+
+      <HideCategoriesModal
+        visible={hideCategoriesTarget !== null}
+        categories={hideCategoriesOptions}
+        initiallyHidden={hideCategoriesInitial}
+        onSave={handleSaveHideCategories}
+        onCancel={closeHideCategoriesModal}
+      />
     </LinearGradient>
   );
 }
