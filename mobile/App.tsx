@@ -19,7 +19,7 @@ import { SeriesScreen } from './src/components/series-screen';
 import { SettingsScreen } from './src/components/settings-screen';
 import { LanguageProvider, useTranslation } from './src/i18n/language-context';
 import type { TranslationKey } from './src/i18n/translations';
-import { MOCK_MAC } from './src/config/device';
+import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
@@ -76,6 +76,7 @@ function AppContent() {
   const [reloadBlockedMessage, setReloadBlockedMessage] = useState('');
   const [exitModalVisible, setExitModalVisible] = useState(false);
   const [accountModalVisible, setAccountModalVisible] = useState(false);
+  const [deviceMac, setDeviceMac] = useState('');
   // True only for the initial boot check (cache lookup, or first-run painel
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
@@ -106,8 +107,8 @@ function AppContent() {
     }
   };
 
-  const fetchAndActivateFromPanel = async () => {
-    const panelPlaylists = await fetchDevicePlaylists(MOCK_MAC);
+  const fetchAndActivateFromPanel = async (mac: string) => {
+    const panelPlaylists = await fetchDevicePlaylists(mac);
     setPlaylists(panelPlaylists);
 
     if (panelPlaylists.length === 0) {
@@ -123,7 +124,9 @@ function AppContent() {
   useEffect(() => {
     (async () => {
       try {
-        await fetchAndActivateFromPanel();
+        const mac = await getDeviceMac();
+        setDeviceMac(mac);
+        await fetchAndActivateFromPanel(mac);
       } catch {
         // No painel reachable at boot: stay on the activation/lock screen.
         setCurrentScreen('playlist');
@@ -140,7 +143,7 @@ function AppContent() {
   const handleReloadPlaylist = async () => {
     setReloadingPlaylist(true);
     try {
-      await fetchAndActivateFromPanel();
+      await fetchAndActivateFromPanel(deviceMac);
     } catch {
       // Reload is best-effort; user stays on the activation screen to retry.
     } finally {
@@ -203,7 +206,7 @@ function AppContent() {
     if (playlists.length === 0) {
       return (
         <DeviceActivationScreen
-          macAddress={MOCK_MAC}
+          macAddress={deviceMac}
           onReload={handleReloadPlaylist}
           reloading={reloadingPlaylist}
         />
@@ -214,7 +217,7 @@ function AppContent() {
       <PlaylistManagerScreen
         playlists={playlists}
         activePlaylistId={activePlaylistId}
-        macAddress={MOCK_MAC}
+        macAddress={deviceMac}
         onSelect={activatePlaylist}
         onClose={() => setCurrentScreen('home')}
       />
@@ -417,7 +420,7 @@ function AppContent() {
 
             <View style={styles.accountRow}>
               <Text allowFontScaling={false} style={styles.accountRowLabel}>Endereço Mac</Text>
-              <Text allowFontScaling={false} style={styles.accountRowValue}>{MOCK_MAC}</Text>
+              <Text allowFontScaling={false} style={styles.accountRowValue}>{deviceMac}</Text>
             </View>
             <View style={styles.accountRow}>
               <Text allowFontScaling={false} style={styles.accountRowLabel}>Estado da conta</Text>
