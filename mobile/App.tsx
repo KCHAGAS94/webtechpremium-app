@@ -24,6 +24,7 @@ import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
+import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
 // should show (see content-classifier.ts). Same screen component for all
@@ -96,7 +97,7 @@ function AppContent() {
     return () => clearTimeout(timer);
   }, [reloadBlockedMessage]);
 
-  const activatePlaylist = async (playlist: PanelPlaylist) => {
+  const activatePlaylist = async (playlist: PanelPlaylist, mac: string = deviceMac, panelPlaylists: PanelPlaylist[] = playlists) => {
     const { tv, filmes, series, seriesGenreByShowName: freshSeriesGenre } = await loadPlaylist(playlist.url);
     const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
     setActivePlaylistId(playlist.id);
@@ -104,6 +105,16 @@ function AppContent() {
     setCurrentScreen('home');
     if (freshSeriesGenre) {
       setSeriesGenreByShowName(freshSeriesGenre);
+    }
+    if (mac) {
+      setCachedPlaylistState(mac, {
+        panelPlaylists,
+        activePlaylistId: playlist.id,
+        tv,
+        filmes,
+        series,
+        seriesGenreByShowName: freshSeriesGenre ? Array.from(freshSeriesGenre.entries()) : [],
+      });
     }
   };
 
@@ -118,14 +129,37 @@ function AppContent() {
       return;
     }
 
-    await activatePlaylist(panelPlaylists[0]);
+    await activatePlaylist(panelPlaylists[0], mac, panelPlaylists);
   };
 
   useEffect(() => {
     (async () => {
+      const mac = await getDeviceMac();
+      setDeviceMac(mac);
+
+      // Fast path: show last session's channels instantly instead of making
+      // the user stare at the boot screen through a full panel+M3U+genre
+      // fetch on every single launch. The network refresh below still runs
+      // right after, silently replacing this with fresh data (or leaving it
+      // as-is if the refresh fails) — this is just cached data shown early,
+      // never the source of truth.
+      const cached = await getCachedPlaylistState(mac);
+      if (cached) {
+        setPlaylists(cached.panelPlaylists);
+        setActivePlaylistId(cached.activePlaylistId);
+        setChannels([...cached.tv, ...cached.filmes, ...cached.series]);
+        setSeriesGenreByShowName(new Map(cached.seriesGenreByShowName));
+        if (cached.panelPlaylists.length === 0) {
+          setCurrentScreen('playlist');
+        }
+        setBooting(false);
+        fetchAndActivateFromPanel(mac).catch(() => {
+          // Background refresh failed — keep showing the cached data.
+        });
+        return;
+      }
+
       try {
-        const mac = await getDeviceMac();
-        setDeviceMac(mac);
         await fetchAndActivateFromPanel(mac);
       } catch {
         // No painel reachable at boot: stay on the activation/lock screen.

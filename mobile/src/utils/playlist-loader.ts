@@ -74,30 +74,33 @@ export async function loadPlaylist(
   let seriesGenreByShowName: Map<string, string> | null = null;
   const credentials = parseXtreamCredentials(url);
   if (credentials) {
-    try {
-      const vodGenreByName = await fetchVodGenreByName(credentials);
+    // These three calls are independent (different endpoints, different
+    // buckets) so they run concurrently instead of one after another —
+    // roughly a 3x cut of this section's wall-clock time. Each is still
+    // best-effort: a failure only leaves that bucket's flat grouping in
+    // place instead of breaking the whole load.
+    const [vodResult, seriesResult, liveResult] = await Promise.allSettled([
+      fetchVodGenreByName(credentials),
+      fetchSeriesGenreByName(credentials),
+      fetchLiveGenreByName(credentials),
+    ]);
+
+    if (vodResult.status === 'fulfilled') {
       for (const movie of filmes) {
-        const genre = vodGenreByName.get(movie.name);
+        const genre = vodResult.value.get(movie.name);
         if (genre) movie.groupTitle = genre;
       }
-    } catch {
-      // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
     }
 
-    try {
-      seriesGenreByShowName = await fetchSeriesGenreByName(credentials);
-    } catch {
-      // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
+    if (seriesResult.status === 'fulfilled') {
+      seriesGenreByShowName = seriesResult.value;
     }
 
-    try {
-      const liveGenreByName = await fetchLiveGenreByName(credentials);
+    if (liveResult.status === 'fulfilled') {
       for (const channel of tv) {
-        const genre = liveGenreByName.get(channel.name);
+        const genre = liveResult.value.get(channel.name);
         if (genre) channel.groupTitle = genre;
       }
-    } catch {
-      // Xtream API unavailable/non-Xtream provider — keep the flat grouping.
     }
   }
 
