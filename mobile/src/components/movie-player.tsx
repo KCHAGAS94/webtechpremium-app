@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEvent } from 'expo';
 import { VideoView, type VideoPlayer } from 'expo-video';
 import * as Brightness from 'expo-brightness';
+import * as NavigationBar from 'expo-navigation-bar';
+import { useKeepAwake } from 'expo-keep-awake';
 
 import { ExitConfirmModal } from '@/components/exit-confirm-modal';
 import { SeekBar } from '@/components/seek-bar';
@@ -76,6 +78,17 @@ export function MoviePlayer({
   // result looks identical to the button silently doing nothing.
   const [subtitleToast, setSubtitleToast] = useState<string | null>(null);
   const subtitleToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useKeepAwake();
+
+  useEffect(() => {
+    NavigationBar.setVisibilityAsync('hidden');
+    NavigationBar.setBehaviorAsync('overlay-swipe');
+    return () => {
+      NavigationBar.setVisibilityAsync('visible');
+    };
+  }, []);
+
   const showSubtitleToast = useCallback((message: string) => {
     setSubtitleToast(message);
     if (subtitleToastTimerRef.current) clearTimeout(subtitleToastTimerRef.current);

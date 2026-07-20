@@ -4,6 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEvent } from 'expo';
 import { VideoView, type VideoPlayer } from 'expo-video';
 import * as Brightness from 'expo-brightness';
+import * as NavigationBar from 'expo-navigation-bar';
+import { useKeepAwake } from 'expo-keep-awake';
 
 import { SeekBar } from '@/components/seek-bar';
 import { ThemedText } from '@/components/themed-text';
@@ -59,6 +61,16 @@ export function FullscreenPlayer({
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useKeepAwake();
+
+  useEffect(() => {
+    NavigationBar.setVisibilityAsync('hidden');
+    NavigationBar.setBehaviorAsync('overlay-swipe');
+    return () => {
+      NavigationBar.setVisibilityAsync('visible');
+    };
+  }, []);
 
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const { volume } = useEvent(player, 'volumeChange', { volume: player.volume });
