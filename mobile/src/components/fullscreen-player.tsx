@@ -197,7 +197,13 @@ export function FullscreenPlayer({
   const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
-    <Modal visible animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible
+      animationType="fade"
+      onRequestClose={onClose}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <StatusBar hidden />
       <View style={styles.container}>
         {status !== 'error' && (

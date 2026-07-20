@@ -282,7 +282,13 @@ export function MoviePlayer({
   const progress = duration > 0 ? currentTime / duration : 0;
 
   return (
-    <Modal visible animationType="fade" onRequestClose={handleRequestExit}>
+    <Modal
+      visible
+      animationType="fade"
+      onRequestClose={handleRequestExit}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <StatusBar hidden />
       <View style={styles.container}>
         {status !== 'error' && (
