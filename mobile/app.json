@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "WebTech Premium",
-    "slug": "webtech-premium",
+    "slug": "webtechpremium-app",
     "version": "1.0.0",
     "orientation": "landscape",
     "icon": "./assets/images/icon.png",
@@ -17,7 +17,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundColor": "#0a0a1a"
-      }
+      },
+      "permissions": [
+        "android.permission.WRITE_SETTINGS"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.webtechpremium.app"
@@ -27,8 +30,22 @@
     },
     "plugins": [
       "expo-video",
-      "expo-brightness"
+      "expo-brightness",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ],
-    "scheme": "webtechpremium"
+    "scheme": "webtechpremium",
+    "extra": {
+      "eas": {
+        "projectId": "b8d35b29-b969-4491-babd-42887d2d6950"
+      }
+    },
+    "owner": "kchagasdevs-team"
   }
 }
