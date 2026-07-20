@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -22,6 +22,11 @@ export function BootLoadingScreen() {
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
+          <Image
+            source={require('@/assets/images/logo_quadrada_sem_fundo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <ActivityIndicator color="#4dd6ff" size="large" />
           <ThemedText style={styles.text}>Carregando sua lista...</ThemedText>
         </View>
@@ -42,6 +47,10 @@ const styles = StyleSheet.create({
   content: {
     alignItems: 'center',
     gap: 14,
+  },
+  logo: {
+    width: 140,
+    height: 140,
   },
   text: {
     fontSize: 14,

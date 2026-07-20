@@ -4,7 +4,7 @@
     "slug": "webtechpremium-app",
     "version": "1.0.0",
     "orientation": "landscape",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/logo_quadrada.png",
     "userInterfaceStyle": "dark",
     "sdkVersion": "54.0.0",
     "platforms": [
@@ -15,7 +15,7 @@
     "android": {
       "package": "com.webtechpremium.app",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "foregroundImage": "./assets/images/logo_quadrada_sem_fundo.png",
         "backgroundColor": "#0a0a1a"
       },
       "permissions": [
@@ -31,6 +31,15 @@
     "plugins": [
       "expo-video",
       "expo-brightness",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo_quadrada_sem_fundo.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#04041a"
+        }
+      ],
       [
         "expo-build-properties",
         {
