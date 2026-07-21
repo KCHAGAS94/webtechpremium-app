@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
@@ -56,6 +56,31 @@ type Category = {
 // scratch exactly as before.
 const seriesGroupCache = new WeakMap<M3uChannel[], SeriesShow[]>();
 
+const CategoryRow = memo(function CategoryRow({
+  item,
+  isActive,
+  onPress,
+}: {
+  item: Category;
+  isActive: boolean;
+  onPress: (id: string) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.categoryRow, focused && styles.categoryRowFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={() => onPress(item.id)}
+    >
+      <ThemedText style={[styles.categoryTitle, isActive && styles.categoryTitleActive]} numberOfLines={1}>
+        {item.title}
+      </ThemedText>
+      <ThemedText style={styles.categoryCount}>{item.count}</ThemedText>
+    </Pressable>
+  );
+});
+
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
@@ -63,8 +88,14 @@ const PosterCard = memo(function PosterCard({
   item: SeriesShow;
   onPress: (show: SeriesShow) => void;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.8}>
+    <Pressable
+      style={[styles.card, focused && styles.cardFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={() => onPress(item)}
+    >
       {item.logo ? (
         <Image source={{ uri: item.logo }} style={styles.poster} resizeMode="cover" />
       ) : (
@@ -75,7 +106,7 @@ const PosterCard = memo(function PosterCard({
       <ThemedText style={styles.cardTitle} numberOfLines={2}>
         {item.name}
       </ThemedText>
-    </TouchableOpacity>
+    </Pressable>
   );
 });
 
@@ -343,15 +374,7 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
-      <TouchableOpacity style={styles.categoryRow} onPress={() => setSelectedCategory(item.id)}>
-        <ThemedText
-          style={[styles.categoryTitle, item.id === selectedCategory && styles.categoryTitleActive]}
-          numberOfLines={1}
-        >
-          {item.title}
-        </ThemedText>
-        <ThemedText style={styles.categoryCount}>{item.count}</ThemedText>
-      </TouchableOpacity>
+      <CategoryRow item={item} isActive={item.id === selectedCategory} onPress={setSelectedCategory} />
     ),
     [selectedCategory]
   );
@@ -558,6 +581,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a45',
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
+  },
+  categoryRowFocused: {
+    borderLeftColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   categoryTitle: {
     fontSize: 13,
@@ -609,6 +638,13 @@ const styles = StyleSheet.create({
     flex: 1 / NUM_COLUMNS,
     padding: 8,
     gap: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    borderRadius: 10,
+  },
+  cardFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   poster: {
     width: '100%',

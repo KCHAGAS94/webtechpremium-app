@@ -83,8 +83,14 @@ const CategoryRow = memo(function CategoryRow({
   onPress: (id: string) => void;
   onToggleFavorite: (id: string) => void;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
-    <TouchableOpacity style={styles.categoryRow} onPress={() => onPress(item.id)}>
+    <Pressable
+      style={[styles.categoryRow, focused && styles.categoryRowFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={() => onPress(item.id)}
+    >
       <View style={styles.categoryLeft}>
         {item.isGroup && (
           <TouchableOpacity onPress={() => onToggleFavorite(item.id)} hitSlop={8}>
@@ -101,7 +107,29 @@ const CategoryRow = memo(function CategoryRow({
         </ThemedText>
       </View>
       <ThemedText style={styles.categoryCount}>{item.count}</ThemedText>
-    </TouchableOpacity>
+    </Pressable>
+  );
+});
+
+const HeaderNavItem = memo(function HeaderNavItem({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.headerNavItemBox, focused && styles.headerNavItemFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      <ThemedText style={[styles.headerNavItem, active && styles.headerNavItemActive]}>{label}</ThemedText>
+    </Pressable>
   );
 });
 
@@ -116,16 +144,23 @@ const ChannelRow = memo(function ChannelRow({
   isFavorite: boolean;
   onPress: (channel: M3uChannel) => void;
 }) {
+  const [focused, setFocused] = useState(false);
   return (
-    <TouchableOpacity
-      style={[styles.channelRow, isSelected && styles.channelRowSelected]}
+    <Pressable
+      style={[
+        styles.channelRow,
+        isSelected && styles.channelRowSelected,
+        focused && styles.channelRowFocused,
+      ]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       onPress={() => onPress(item)}
     >
       <ThemedText style={styles.channelName} numberOfLines={1}>
         {item.name}
       </ThemedText>
       {isFavorite && <ThemedText style={styles.channelFavoriteIcon}>♥</ThemedText>}
-    </TouchableOpacity>
+    </Pressable>
   );
 });
 
@@ -174,6 +209,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const [favoriteGroups, setFavoriteGroups] = useState<Set<string>>(new Set());
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [searchCursor, setSearchCursor] = useState(0);
+  const [searchFocused, setSearchFocused] = useState(false);
 
   // Logs "channel X watched at time Y" to Configurações > Limpar histórico Tv
   // ao vivo — only for the live section, once per channel selection
@@ -429,19 +465,19 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         <View style={styles.header}>
           <View style={styles.headerNav}>
             {NAV_ITEMS.map((item) => (
-              <TouchableOpacity key={item.key} onPress={() => onNavigate(item.key)}>
-                <ThemedText
-                  style={[styles.headerNavItem, item.key === activeNav && styles.headerNavItemActive]}
-                >
-                  {t(item.labelKey)}
-                </ThemedText>
-              </TouchableOpacity>
+              <HeaderNavItem
+                key={item.key}
+                active={item.key === activeNav}
+                label={t(item.labelKey)}
+                onPress={() => onNavigate(item.key)}
+              />
             ))}
           </View>
 
-          <TouchableOpacity
-            style={styles.searchBox}
-            activeOpacity={1}
+          <Pressable
+            style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
             onPress={() => {
               setSearchCursor(search.length);
               setKeyboardOpen(true);
@@ -459,7 +495,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
               editable={false}
               pointerEvents="none"
             />
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {keyboardOpen && (
@@ -612,6 +648,14 @@ const styles = StyleSheet.create({
     gap: 20,
     alignItems: 'center',
   },
+  headerNavItemBox: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  headerNavItemFocused: {
+    backgroundColor: '#132a4d',
+  },
   headerNavItem: {
     fontSize: 15,
     color: '#c7c7e6',
@@ -631,6 +675,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     gap: 8,
+  },
+  searchBoxFocused: {
+    backgroundColor: '#132a4d',
   },
   searchIcon: {
     fontSize: 14,
@@ -659,6 +706,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a45',
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
+  },
+  categoryRowFocused: {
+    borderLeftColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   categoryLeft: {
     flex: 1,
@@ -700,9 +753,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#1a1a45',
+    borderLeftWidth: 3,
+    borderLeftColor: 'transparent',
   },
   channelRowSelected: {
     backgroundColor: '#1a3a6b',
+  },
+  channelRowFocused: {
+    borderLeftColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   channelName: {
     fontSize: 13,
