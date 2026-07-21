@@ -20,7 +20,8 @@
       },
       "permissions": [
         "android.permission.WRITE_SETTINGS"
-      ]
+      ],
+      "versionCode": 2
     },
     "ios": {
       "bundleIdentifier": "com.webtechpremium.app"

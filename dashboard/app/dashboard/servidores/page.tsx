@@ -19,6 +19,10 @@ function EditModal({
 }) {
   const [formData, setFormData] = useState<Servidor>(servidor || ({} as Servidor));
 
+  useEffect(() => {
+    setFormData(servidor || ({} as Servidor));
+  }, [servidor]);
+
   if (!servidor) return null;
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
