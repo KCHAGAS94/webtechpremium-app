@@ -25,6 +25,7 @@ import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
+import type { SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
 import { popBackAction, useBackStackEntry } from './src/utils/back-stack';
 
@@ -97,7 +98,7 @@ function AppContent() {
   const { t } = useTranslation();
   const [currentScreen, setCurrentScreen] = useState('home');
   const [channels, setChannels] = useState<M3uChannel[]>([]);
-  const [seriesGenreByShowName, setSeriesGenreByShowName] = useState<Map<string, string>>(new Map());
+  const [seriesMetaByShowName, setSeriesMetaByShowName] = useState<Map<string, SeriesMeta>>(new Map());
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
@@ -150,13 +151,13 @@ function AppContent() {
   }, [currentScreen]);
 
   const activatePlaylist = async (playlist: PanelPlaylist, mac: string = deviceMac, panelPlaylists: PanelPlaylist[] = playlists) => {
-    const { tv, filmes, series, seriesGenreByShowName: freshSeriesGenre } = await loadPlaylist(playlist.url);
+    const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await loadPlaylist(playlist.url);
     const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
     setActivePlaylistId(playlist.id);
     setChannels(freshChannels);
     setCurrentScreen('home');
-    if (freshSeriesGenre) {
-      setSeriesGenreByShowName(freshSeriesGenre);
+    if (freshSeriesMeta) {
+      setSeriesMetaByShowName(freshSeriesMeta);
     }
     if (mac) {
       setCachedPlaylistState(mac, {
@@ -165,7 +166,7 @@ function AppContent() {
         tv,
         filmes,
         series,
-        seriesGenreByShowName: freshSeriesGenre ? Array.from(freshSeriesGenre.entries()) : [],
+        seriesMetaByShowName: freshSeriesMeta ? Array.from(freshSeriesMeta.entries()) : [],
       });
     }
   };
@@ -200,7 +201,7 @@ function AppContent() {
         setPlaylists(cached.panelPlaylists);
         setActivePlaylistId(cached.activePlaylistId);
         setChannels([...cached.tv, ...cached.filmes, ...cached.series]);
-        setSeriesGenreByShowName(new Map(cached.seriesGenreByShowName));
+        setSeriesMetaByShowName(new Map(cached.seriesMetaByShowName));
         if (cached.panelPlaylists.length === 0) {
           setCurrentScreen('playlist');
         }
@@ -325,7 +326,8 @@ function AppContent() {
     return (
       <SeriesScreen
         channels={channels}
-        genreByShowName={seriesGenreByShowName}
+        metaByShowName={seriesMetaByShowName}
+        playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
         activeNav="series"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
       />
@@ -337,7 +339,7 @@ function AppContent() {
       <SettingsScreen
         onBack={() => setCurrentScreen('home')}
         channels={channels}
-        seriesGenreByShowName={seriesGenreByShowName}
+        seriesMetaByShowName={seriesMetaByShowName}
       />
     );
   }

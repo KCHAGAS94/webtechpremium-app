@@ -13,6 +13,7 @@ import { ThemedView } from '@/components/themed-view';
 import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/series-grouping';
+import type { SeriesMeta } from '@/utils/xtream-api';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
@@ -233,13 +234,14 @@ function SeriesVodPlayer({
 
 type Props = {
   channels: M3uChannel[];
-  /** Real genre per show name from the Xtream API (see playlist-loader.ts). */
-  genreByShowName?: Map<string, string>;
+  /** Real genre + series_id per show name from the Xtream API (see playlist-loader.ts). */
+  metaByShowName?: Map<string, SeriesMeta>;
+  playlistUrl: string;
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
 };
 
-export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate }: Props) {
+export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav, onNavigate }: Props) {
   const { t } = useTranslation();
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
@@ -292,7 +294,7 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
           setIsGrouping(false);
         }
       },
-      genreByShowName
+      metaByShowName
     ).then((shows) => {
       if (!cancelled) {
         seriesGroupCache.set(channels, shows);
@@ -303,7 +305,7 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
     return () => {
       cancelled = true;
     };
-  }, [channels, bucketChannels, genreByShowName]);
+  }, [channels, bucketChannels, metaByShowName]);
 
   // Hidden groups are matched against `show.groupTitle` (genre-enriched, see
   // groupSeriesShows), not the raw M3U channel `group-title` — most series
@@ -414,6 +416,7 @@ export function SeriesScreen({ channels, genreByShowName, activeNav, onNavigate 
       <>
         <SeriesDetailsScreen
           show={viewingShow}
+          playlistUrl={playlistUrl}
           isFavorite={favorites.has(viewingShow.id)}
           onToggleFavorite={() => handleToggleFavorite(viewingShow.id)}
           onPlayEpisode={handlePlayEpisode}

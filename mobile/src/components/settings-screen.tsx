@@ -21,6 +21,7 @@ import {
 } from '@/utils/live-watch-history-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows } from '@/utils/series-grouping';
+import type { SeriesMeta } from '@/utils/xtream-api';
 import { loadSubtitleSettings, saveSubtitleSettings } from '@/utils/subtitle-settings-storage';
 import { clearWatchHistoryByKind, loadWatchHistory, removeWatchHistoryEntries } from '@/utils/watch-history-storage';
 
@@ -85,7 +86,7 @@ type Props = {
    * derived from this at grouping time, not baked into `channel.groupTitle`
    * like movies/live are, so listing series categories needs the same
    * grouping series-screen.tsx uses instead of the raw M3U group-title. */
-  seriesGenreByShowName?: Map<string, string>;
+  seriesMetaByShowName?: Map<string, SeriesMeta>;
 };
 
 const HIDE_CATEGORIES_ITEM_TO_CONTENT: Partial<Record<SettingsItemId, ContentCategory>> = {
@@ -115,7 +116,7 @@ function formatHistoryDate(timestampMs: number): string {
   return `${day}/${month} ${hours}:${minutes}`;
 }
 
-export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenreByShowName }: Props) {
+export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMetaByShowName }: Props) {
   const { t } = useTranslation();
   const [languageModalVisible, setLanguageModalVisible] = useState(false);
   const [parentalModalVisible, setParentalModalVisible] = useState(false);
@@ -289,7 +290,7 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
           ? groupSeriesShows(
               channels.filter((c) => c.category === 'series'),
               undefined,
-              seriesGenreByShowName
+              seriesMetaByShowName
             ).then((shows) => {
               // Same first-appearance order series-screen.tsx's own
               // showsByGroup ends up with — not alphabetical.

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { M3uChannel } from './m3u-parser';
 import type { PanelPlaylist } from './panel-api';
+import type { SeriesMeta } from './xtream-api';
 
 const STORAGE_KEY_PREFIX = 'webtechpremium:playlist-cache:';
 
@@ -15,7 +16,7 @@ export type CachedPlaylistState = {
   tv: M3uChannel[];
   filmes: M3uChannel[];
   series: M3uChannel[];
-  seriesGenreByShowName: [string, string][];
+  seriesMetaByShowName: [string, SeriesMeta][];
 };
 
 export async function getCachedPlaylistState(mac: string): Promise<CachedPlaylistState | null> {

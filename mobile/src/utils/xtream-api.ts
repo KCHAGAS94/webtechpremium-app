@@ -56,6 +56,20 @@ export function parseXtreamCredentials(playlistUrl: string): XtreamCredentials |
 type SeriesEntry = {
   name: string;
   category_id: string;
+  series_id: number;
+};
+
+export type SeriesMeta = {
+  genre: string | null;
+  seriesId: string;
+};
+
+export type SeriesInfo = {
+  plot: string | null;
+  cast: string | null;
+  director: string | null;
+  releaseDate: string | null;
+  rating: string | null;
 };
 
 type LiveStream = {
@@ -159,6 +173,51 @@ export async function fetchSeriesGenreByName(creds: XtreamCredentials): Promise<
     fetchXtream<SeriesEntry[]>(creds, 'get_series'),
   ]);
   return toGenreByName(categories, series);
+}
+
+/**
+ * Same idea as `fetchVodMetaByName`, but for series: also keeps each show's
+ * numeric `series_id` (needed to call `getSeriesInfo` for plot/cast), looked
+ * up by show name the same way `fetchSeriesGenreByName` is.
+ */
+export async function fetchSeriesMetaByName(creds: XtreamCredentials): Promise<Map<string, SeriesMeta>> {
+  const [categories, series] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_series_categories'),
+    fetchXtream<SeriesEntry[]>(creds, 'get_series'),
+  ]);
+  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
+  const metaByName = new Map<string, SeriesMeta>();
+  for (const entry of series) {
+    metaByName.set(entry.name, {
+      genre: categoryNameById.get(entry.category_id) ?? null,
+      seriesId: String(entry.series_id),
+    });
+  }
+  return metaByName;
+}
+
+/**
+ * Per-show detail call — the only way to get plot/cast for a series, which
+ * `get_series` (the bulk list endpoint) doesn't expose. Callers should treat
+ * failures as non-fatal (details screen just shows nothing extra).
+ */
+export async function getSeriesInfo(creds: XtreamCredentials, seriesId: string): Promise<SeriesInfo | null> {
+  const response = await fetchXtream<{ info?: Record<string, unknown> }>(
+    creds,
+    'get_series_info',
+    `&series_id=${encodeURIComponent(seriesId)}`
+  );
+  const info = response?.info;
+  if (!info) return null;
+  const asString = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() ? value.trim() : null;
+  return {
+    plot: asString(info.plot ?? info.description),
+    cast: asString(info.cast ?? info.actors),
+    director: asString(info.director),
+    releaseDate: asString(info.releasedate ?? info.release_date),
+    rating: asString(info.rating),
+  };
 }
 
 /**

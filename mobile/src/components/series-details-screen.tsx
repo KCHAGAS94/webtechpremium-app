@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { SeriesEpisode, SeriesShow } from '@/utils/series-grouping';
+import { getSeriesInfo, parseXtreamCredentials, type SeriesInfo } from '@/utils/xtream-api';
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -12,15 +13,33 @@ function pad2(value: number): string {
 
 type Props = {
   show: SeriesShow;
+  playlistUrl: string;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onPlayEpisode: (episode: SeriesEpisode) => void;
   onBack: () => void;
 };
 
-export function SeriesDetailsScreen({ show, isFavorite, onToggleFavorite, onPlayEpisode, onBack }: Props) {
+export function SeriesDetailsScreen({ show, playlistUrl, isFavorite, onToggleFavorite, onPlayEpisode, onBack }: Props) {
   const [selectedSeason, setSelectedSeason] = useState(show.seasons[0] ?? 1);
   const episodes = show.episodesBySeason.get(selectedSeason) ?? [];
+  const [info, setInfo] = useState<SeriesInfo | null>(null);
+
+  useEffect(() => {
+    setInfo(null);
+    if (!show.seriesId) return;
+    const credentials = parseXtreamCredentials(playlistUrl);
+    if (!credentials) return;
+    let cancelled = false;
+    getSeriesInfo(credentials, show.seriesId)
+      .then((result) => {
+        if (!cancelled) setInfo(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [show.seriesId, playlistUrl]);
 
   return (
     <ThemedView style={styles.container}>
@@ -52,6 +71,8 @@ export function SeriesDetailsScreen({ show, isFavorite, onToggleFavorite, onPlay
               <View style={styles.metaRow}>
                 <ThemedText style={styles.metaText}>{show.groupTitle}</ThemedText>
               </View>
+
+              {info?.plot && <ThemedText style={styles.plot}>{info.plot}</ThemedText>}
 
               <TouchableOpacity
                 style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
@@ -182,6 +203,12 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 14,
     color: '#c7c7e6',
+  },
+  plot: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#c7c7e6',
+    marginTop: 4,
   },
   favoriteButton: {
     width: 44,

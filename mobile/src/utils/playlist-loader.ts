@@ -1,16 +1,16 @@
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
-import { fetchLiveGenreByName, fetchSeriesGenreByName, fetchVodMetaByName, parseXtreamCredentials } from './xtream-api';
+import { fetchLiveGenreByName, fetchSeriesMetaByName, fetchVodMetaByName, parseXtreamCredentials, type SeriesMeta } from './xtream-api';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
   filmes: M3uChannel[];
   series: M3uChannel[];
-  // Genre lookup by *show name*, applied once per show (not per episode) by
-  // series-grouping.ts's groupSeriesShows — that's where each episode's show
-  // name is already being parsed out anyway. Doing the lookup by episode
-  // name here instead would re-run that same regex-based parse a second
-  // time over the whole, possibly 100k+ episode, series list.
-  seriesGenreByShowName: Map<string, string> | null;
+  // Genre + series_id lookup by *show name*, applied once per show (not per
+  // episode) by series-grouping.ts's groupSeriesShows — that's where each
+  // episode's show name is already being parsed out anyway. Doing the lookup
+  // by episode name here instead would re-run that same regex-based parse a
+  // second time over the whole, possibly 100k+ episode, series list.
+  seriesMetaByShowName: Map<string, SeriesMeta> | null;
 };
 
 // Bucketing an already-parsed list is O(n) over plain objects (cheap even at
@@ -71,7 +71,7 @@ export async function loadPlaylist(
   // playlist, enrich groupTitle with the real one from the JSON API (matched
   // by exact name). Best-effort: a slow/failed request just leaves the flat
   // grouping in place instead of breaking the load.
-  let seriesGenreByShowName: Map<string, string> | null = null;
+  let seriesMetaByShowName: Map<string, SeriesMeta> | null = null;
   const credentials = parseXtreamCredentials(url);
   if (credentials) {
     // These three calls are independent (different endpoints, different
@@ -81,7 +81,7 @@ export async function loadPlaylist(
     // place instead of breaking the whole load.
     const [vodResult, seriesResult, liveResult] = await Promise.allSettled([
       fetchVodMetaByName(credentials),
-      fetchSeriesGenreByName(credentials),
+      fetchSeriesMetaByName(credentials),
       fetchLiveGenreByName(credentials),
     ]);
 
@@ -96,7 +96,7 @@ export async function loadPlaylist(
     }
 
     if (seriesResult.status === 'fulfilled') {
-      seriesGenreByShowName = seriesResult.value;
+      seriesMetaByShowName = seriesResult.value;
     }
 
     if (liveResult.status === 'fulfilled') {
@@ -107,5 +107,5 @@ export async function loadPlaylist(
     }
   }
 
-  return { tv, filmes, series, seriesGenreByShowName };
+  return { tv, filmes, series, seriesMetaByShowName };
 }

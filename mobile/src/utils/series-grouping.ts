@@ -1,4 +1,5 @@
 import type { M3uChannel } from './m3u-parser';
+import type { SeriesMeta } from './xtream-api';
 
 export type ParsedEpisode = {
   showName: string;
@@ -21,6 +22,11 @@ export type SeriesShow = {
   groupTitle: string;
   seasons: number[];
   episodesBySeason: Map<number, SeriesEpisode[]>;
+  // Xtream numeric series id, filled in best-effort by playlist-loader.ts
+  // (matched by exact show name against get_series) — required to call the
+  // per-show get_series_info endpoint for plot/cast. Absent for non-Xtream
+  // M3Us or if the name match failed.
+  seriesId?: string;
 };
 
 // "Show Name S01E02", "Show Name S1 E2", "Show.Name.S01.E02.Title" — the
@@ -113,7 +119,7 @@ export function parseEpisodeInfo(rawName: string): ParsedEpisode {
 export async function groupSeriesShows(
   channels: M3uChannel[],
   onProgress?: (shows: SeriesShow[]) => void,
-  genreByShowName?: Map<string, string> | null
+  metaByShowName?: Map<string, SeriesMeta> | null
 ): Promise<SeriesShow[]> {
   const shows = new Map<string, SeriesShow>();
 
@@ -124,13 +130,15 @@ export async function groupSeriesShows(
 
     let show = shows.get(key);
     if (!show) {
+      const meta = metaByShowName?.get(showName);
       show = {
         id: key,
         name: showName,
         logo: channel.logo,
-        groupTitle: genreByShowName?.get(showName) ?? channel.groupTitle,
+        groupTitle: meta?.genre ?? channel.groupTitle,
         seasons: [],
         episodesBySeason: new Map(),
+        seriesId: meta?.seriesId,
       };
       shows.set(key, show);
     } else if (!show.logo && channel.logo) {
