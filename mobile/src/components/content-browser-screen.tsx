@@ -138,11 +138,13 @@ const ChannelRow = memo(function ChannelRow({
   isSelected,
   isFavorite,
   onPress,
+  onLongPress,
 }: {
   item: M3uChannel;
   isSelected: boolean;
   isFavorite: boolean;
   onPress: (channel: M3uChannel) => void;
+  onLongPress?: (channel: M3uChannel) => void;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -155,6 +157,7 @@ const ChannelRow = memo(function ChannelRow({
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item)}
+      onLongPress={onLongPress ? () => onLongPress(item) : undefined}
     >
       <ThemedText style={styles.channelName} numberOfLines={1}>
         {item.name}
@@ -265,6 +268,21 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         if (next.has(groupTitle)) next.delete(groupTitle);
         else next.add(groupTitle);
         saveFavoriteGroups(category, next);
+        return next;
+      });
+    },
+    [category]
+  );
+
+  // Long-pressing OK on a row (TV ao vivo only) favorites that channel
+  // directly from the list, without needing to select/play it first.
+  const handleToggleFavoriteChannel = useCallback(
+    (channel: M3uChannel) => {
+      setFavorites((prev) => {
+        const next = new Set(prev);
+        if (next.has(channel.name)) next.delete(channel.name);
+        else next.add(channel.name);
+        saveFavorites(category, next);
         return next;
       });
     },
@@ -443,9 +461,10 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         isSelected={item.id === selectedChannel?.id}
         isFavorite={favorites.has(item.name)}
         onPress={handleSelectChannel}
+        onLongPress={category === 'live' ? handleToggleFavoriteChannel : undefined}
       />
     ),
-    [selectedChannel?.id, favorites, handleSelectChannel]
+    [selectedChannel?.id, favorites, handleSelectChannel, category, handleToggleFavoriteChannel]
   );
 
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
