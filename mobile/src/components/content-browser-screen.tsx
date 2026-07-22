@@ -389,10 +389,21 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     return categoryChannels.filter((c: M3uChannel) => normalizeSearchText(c.name).includes(q));
   }, [categoryChannels, debouncedSearch]);
 
-  const handleSelectChannel = useCallback((channel: M3uChannel) => {
-    setSelectedChannel(channel);
-    setIsBuffering(true);
-  }, []);
+  // Pressing OK on a channel that's already selected/playing in the preview
+  // (i.e. the user pressed OK twice on the same row) expands straight to
+  // fullscreen, instead of requiring the remote's focus to move over to the
+  // preview pane first.
+  const handleSelectChannel = useCallback(
+    (channel: M3uChannel) => {
+      if (selectedChannel?.id === channel.id) {
+        handleExpandFullscreen();
+        return;
+      }
+      setSelectedChannel(channel);
+      setIsBuffering(true);
+    },
+    [selectedChannel?.id, handleExpandFullscreen]
+  );
 
   // "Next/previous channel" in the fullscreen player cycles through whatever
   // list the user is currently browsing (a group, a search, or — with as few
