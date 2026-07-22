@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -5,28 +6,47 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { parseMovieTitle } from '@/utils/movie-info';
-
-// The M3U playlist has no cast data, so this is a static placeholder row
-// matching the reference design until a real metadata source is wired up.
-const MOCK_CAST = [
-  'Manuela González',
-  'Mabel Moreno',
-  'Emmanuel Restrepo',
-  'Claudio Cataño',
-  'Emmanuel Espar...',
-  'Julián Cerati',
-];
+import { getVodInfo, parseXtreamCredentials, type VodInfo } from '@/utils/xtream-api';
 
 type Props = {
   movie: M3uChannel;
+  playlistUrl: string;
   isFavorite: boolean;
   onToggleFavorite: () => void;
   onPlay: () => void;
   onBack: () => void;
 };
 
-export function MovieDetailsScreen({ movie, isFavorite, onToggleFavorite, onPlay, onBack }: Props) {
+function formatAddedAt(addedAt?: string): string | null {
+  if (!addedAt) return null;
+  // Xtream's `added` field is a unix seconds timestamp (as a string).
+  const seconds = Number(addedAt);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return new Date(seconds * 1000).toLocaleDateString('pt-BR');
+}
+
+export function MovieDetailsScreen({ movie, playlistUrl, isFavorite, onToggleFavorite, onPlay, onBack }: Props) {
   const { title, year } = parseMovieTitle(movie.name);
+  const [info, setInfo] = useState<VodInfo | null>(null);
+
+  useEffect(() => {
+    setInfo(null);
+    if (!movie.vodId) return;
+    const credentials = parseXtreamCredentials(playlistUrl);
+    if (!credentials) return;
+    let cancelled = false;
+    getVodInfo(credentials, movie.vodId)
+      .then((result) => {
+        if (!cancelled) setInfo(result);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [movie.vodId, playlistUrl]);
+
+  const addedLabel = formatAddedAt(movie.addedAt);
+  const castNames = info?.cast?.split(',').map((name) => name.trim()).filter(Boolean) ?? [];
 
   return (
     <ThemedView style={styles.container}>
@@ -61,9 +81,11 @@ export function MovieDetailsScreen({ movie, isFavorite, onToggleFavorite, onPlay
               </View>
 
               <View style={styles.detailLines}>
-                <ThemedText style={styles.detailLine}>Duração: —</ThemedText>
-                <ThemedText style={styles.detailLine}>Data adicionada: —</ThemedText>
+                <ThemedText style={styles.detailLine}>Duração: {info?.duration ?? '—'}</ThemedText>
+                <ThemedText style={styles.detailLine}>Data adicionada: {addedLabel ?? '—'}</ThemedText>
               </View>
+
+              {info?.plot && <ThemedText style={styles.plot}>{info.plot}</ThemedText>}
 
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.playButton} onPress={onPlay}>
@@ -83,10 +105,11 @@ export function MovieDetailsScreen({ movie, isFavorite, onToggleFavorite, onPlay
             </View>
           </View>
 
+          {castNames.length > 0 && (
           <View style={styles.castSection}>
             <ThemedText style={styles.castHeading}>Elenco:</ThemedText>
             <View style={styles.castRow}>
-              {MOCK_CAST.map((name) => (
+              {castNames.map((name) => (
                 <View key={name} style={styles.castItem}>
                   <View style={styles.castAvatar} />
                   <ThemedText style={styles.castName} numberOfLines={1}>
@@ -96,6 +119,7 @@ export function MovieDetailsScreen({ movie, isFavorite, onToggleFavorite, onPlay
               ))}
             </View>
           </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
@@ -182,6 +206,12 @@ const styles = StyleSheet.create({
   detailLine: {
     fontSize: 13,
     color: '#8888aa',
+  },
+  plot: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#c7c7e6',
+    marginTop: 8,
   },
   actions: {
     flexDirection: 'row',

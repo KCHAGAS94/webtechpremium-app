@@ -227,11 +227,12 @@ function MovieVodPlayer({
 
 type Props = {
   channels: M3uChannel[];
+  playlistUrl: string;
   activeNav: NavKey;
   onNavigate: (key: NavKey) => void;
 };
 
-export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
+export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: Props) {
   const { t } = useTranslation();
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
@@ -387,6 +388,7 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
       <>
         <MovieDetailsScreen
           movie={viewingMovie}
+          playlistUrl={playlistUrl}
           isFavorite={favorites.has(viewingMovie.name)}
           onToggleFavorite={() => handleToggleFavorite(viewingMovie.name)}
           onPlay={handlePlay}

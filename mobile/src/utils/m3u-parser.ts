@@ -7,6 +7,14 @@ export type M3uChannel = {
   groupTitle: string;
   url: string;
   category: ContentCategory;
+  // Xtream numeric stream id, filled in best-effort by playlist-loader.ts
+  // (matched by exact name against get_vod_streams) — required to call the
+  // per-item get_vod_info endpoint for duration/plot/cast. Absent for
+  // non-Xtream M3Us or if the name match failed.
+  vodId?: string;
+  // Unix seconds string from get_vod_streams' `added` field, same best-effort
+  // enrichment as vodId.
+  addedAt?: string;
 };
 
 export type ParseM3uProgress = {

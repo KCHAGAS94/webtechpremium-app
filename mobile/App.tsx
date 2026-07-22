@@ -314,6 +314,7 @@ function AppContent() {
     return (
       <MoviesScreen
         channels={channels}
+        playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
         activeNav="movies"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
       />

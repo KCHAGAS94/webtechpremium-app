@@ -1,5 +1,5 @@
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
-import { fetchLiveGenreByName, fetchSeriesGenreByName, fetchVodGenreByName, parseXtreamCredentials } from './xtream-api';
+import { fetchLiveGenreByName, fetchSeriesGenreByName, fetchVodMetaByName, parseXtreamCredentials } from './xtream-api';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
@@ -80,15 +80,18 @@ export async function loadPlaylist(
     // best-effort: a failure only leaves that bucket's flat grouping in
     // place instead of breaking the whole load.
     const [vodResult, seriesResult, liveResult] = await Promise.allSettled([
-      fetchVodGenreByName(credentials),
+      fetchVodMetaByName(credentials),
       fetchSeriesGenreByName(credentials),
       fetchLiveGenreByName(credentials),
     ]);
 
     if (vodResult.status === 'fulfilled') {
       for (const movie of filmes) {
-        const genre = vodResult.value.get(movie.name);
-        if (genre) movie.groupTitle = genre;
+        const meta = vodResult.value.get(movie.name);
+        if (!meta) continue;
+        if (meta.genre) movie.groupTitle = meta.genre;
+        movie.vodId = meta.vodId;
+        if (meta.addedAt) movie.addedAt = meta.addedAt;
       }
     }
 

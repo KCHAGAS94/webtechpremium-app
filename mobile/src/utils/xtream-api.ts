@@ -21,6 +21,23 @@ type VodCategory = {
 type VodStream = {
   name: string;
   category_id: string;
+  stream_id: number;
+  added?: string;
+};
+
+export type VodMeta = {
+  genre: string | null;
+  vodId: string;
+  addedAt: string | null;
+};
+
+export type VodInfo = {
+  plot: string | null;
+  duration: string | null;
+  cast: string | null;
+  director: string | null;
+  releaseDate: string | null;
+  rating: string | null;
 };
 
 /** Extracts Xtream credentials from a `get.php`-style playlist URL, if it is one. */
@@ -46,8 +63,8 @@ type LiveStream = {
   category_id: string;
 };
 
-async function fetchXtream<T>(creds: XtreamCredentials, action: string): Promise<T> {
-  const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}`;
+async function fetchXtream<T>(creds: XtreamCredentials, action: string, extraParams = ''): Promise<T> {
+  const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}${extraParams}`;
   const response = await fetch(url);
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
@@ -78,6 +95,55 @@ export async function fetchVodGenreByName(creds: XtreamCredentials): Promise<Map
     fetchXtream<VodStream[]>(creds, 'get_vod_streams'),
   ]);
   return toGenreByName(categories, streams);
+}
+
+/**
+ * Same two requests as `fetchVodGenreByName`, but also keeps each movie's
+ * numeric `stream_id` (needed to call `getVodInfo` for duration/plot/cast)
+ * and its `added` timestamp (list-level "date added", no per-item call
+ * needed for that one) — everything get_vod_streams exposes per movie, all
+ * still matched by exact name against the M3U-parsed catalog.
+ */
+export async function fetchVodMetaByName(creds: XtreamCredentials): Promise<Map<string, VodMeta>> {
+  const [categories, streams] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_vod_categories'),
+    fetchXtream<VodStream[]>(creds, 'get_vod_streams'),
+  ]);
+  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
+  const metaByName = new Map<string, VodMeta>();
+  for (const stream of streams) {
+    metaByName.set(stream.name, {
+      genre: categoryNameById.get(stream.category_id) ?? null,
+      vodId: String(stream.stream_id),
+      addedAt: stream.added ?? null,
+    });
+  }
+  return metaByName;
+}
+
+/**
+ * Per-movie detail call — the only way to get duration/plot/cast, which
+ * `get_vod_streams` (the bulk list endpoint) doesn't expose. Callers should
+ * treat failures as non-fatal (details screen just keeps showing "—").
+ */
+export async function getVodInfo(creds: XtreamCredentials, vodId: string): Promise<VodInfo | null> {
+  const response = await fetchXtream<{ info?: Record<string, unknown> }>(
+    creds,
+    'get_vod_info',
+    `&vod_id=${encodeURIComponent(vodId)}`
+  );
+  const info = response?.info;
+  if (!info) return null;
+  const asString = (value: unknown): string | null =>
+    typeof value === 'string' && value.trim() ? value.trim() : null;
+  return {
+    plot: asString(info.plot ?? info.description),
+    duration: asString(info.duration),
+    cast: asString(info.cast ?? info.actors),
+    director: asString(info.director),
+    releaseDate: asString(info.releasedate ?? info.release_date),
+    rating: asString(info.rating),
+  };
 }
 
 /**
