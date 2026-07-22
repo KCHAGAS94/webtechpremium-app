@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   BackHandler,
   Modal,
+  Pressable,
   View,
   Text,
   TouchableOpacity,
@@ -55,6 +56,33 @@ const sideMenuItems: MenuItem[] = [
   { id: '7', label: 'nav_reload', icon: '🔄', screen: 'reload' },
   { id: '8', label: 'nav_exit', icon: '🚪', screen: 'exit' },
 ];
+
+// Highlights whichever card currently has TV-remote (D-pad) focus, so the
+// Casa/home screen shows where the selection is, matching the focus rings
+// added to the browser screens' headers/lists.
+function FocusableCard({
+  style,
+  focusedStyle,
+  onPress,
+  children,
+}: {
+  style: object;
+  focusedStyle: object;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[style, focused && focusedStyle]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 export default function App() {
   return (
@@ -312,79 +340,79 @@ function AppContent() {
         <View style={styles.mainContent}>
           <View style={styles.contentArea}>
             <View style={styles.layoutRow}>
-              <TouchableOpacity
+              <FocusableCard
                 key={tvItem.id}
                 style={styles.tvCard}
+                focusedStyle={styles.tvCardFocused}
                 onPress={() => handleMenuPress(tvItem.screen)}
-                activeOpacity={0.75}
               >
                 <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
                 <Text allowFontScaling={false} style={styles.tvLabel}>{t(tvItem.label)}</Text>
-              </TouchableOpacity>
+              </FocusableCard>
 
               <View style={styles.midColumn}>
-                <TouchableOpacity
+                <FocusableCard
                   key={centerTop.id}
                   style={styles.midCard}
+                  focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(centerTop.screen)}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{centerTop.icon}</Text>
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(centerTop.label)}</Text>
-                </TouchableOpacity>
+                </FocusableCard>
 
-                <TouchableOpacity
+                <FocusableCard
                   key={centerBottom.id}
                   style={styles.midCard}
+                  focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(centerBottom.screen)}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{centerBottom.icon}</Text>
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(centerBottom.label)}</Text>
-                </TouchableOpacity>
+                </FocusableCard>
               </View>
 
               <View style={styles.midColumn}>
-                <TouchableOpacity
+                <FocusableCard
                   key={rightTop.id}
                   style={styles.midCard}
+                  focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(rightTop.screen)}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{rightTop.icon}</Text>
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(rightTop.label)}</Text>
-                </TouchableOpacity>
+                </FocusableCard>
 
-                <TouchableOpacity
+                <FocusableCard
                   key={rightBottom.id}
                   style={styles.midCard}
+                  focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(rightBottom.screen)}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.midIcon}>{rightBottom.icon}</Text>
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(rightBottom.label)}</Text>
-                </TouchableOpacity>
+                </FocusableCard>
               </View>
 
               <View style={styles.sideMenu}>
-                <TouchableOpacity
+                <FocusableCard
                   key={settingsItem.id}
                   style={styles.sideMenuItem}
+                  focusedStyle={styles.sideMenuItemFocused}
                   onPress={() => handleMenuPress(settingsItem.screen)}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
                   <Text allowFontScaling={false} style={styles.sideMenuLabel}>{t(settingsItem.label)}</Text>
-                </TouchableOpacity>
+                </FocusableCard>
 
                 {sideMenuItems.map((item) => {
                   const isReloadItem = item.screen === 'reload';
                   return (
-                    <TouchableOpacity
+                    <FocusableCard
                       key={item.id}
                       style={styles.sideMenuItem}
+                      focusedStyle={styles.sideMenuItemFocused}
                       onPress={() => handleMenuPress(item.screen)}
-                      activeOpacity={0.75}
                     >
                       {isReloadItem && reloadingChannels ? (
                         <ActivityIndicator color="#4dd6ff" style={styles.sideMenuSpinner} />
@@ -394,7 +422,7 @@ function AppContent() {
                       <Text allowFontScaling={false} style={styles.sideMenuLabel}>
                         {isReloadItem && reloadingChannels ? t('nav_reloading') : t(item.label)}
                       </Text>
-                    </TouchableOpacity>
+                    </FocusableCard>
                   );
                 })}
               </View>
@@ -522,6 +550,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
+  tvCardFocused: {
+    borderColor: '#4dd6ff',
+    borderWidth: 3,
+    backgroundColor: '#1f0d8a',
+  },
   tvIcon: {
     fontSize: 64,
     marginBottom: 8,
@@ -549,6 +582,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
+  midCardFocused: {
+    borderColor: '#4dd6ff',
+    borderWidth: 3,
+    backgroundColor: '#1f0d8a',
+  },
   midIcon: {
     fontSize: 40,
     marginBottom: 6,
@@ -575,6 +613,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     gap: 12,
+  },
+  sideMenuItemFocused: {
+    borderColor: '#4dd6ff',
+    borderWidth: 3,
+    backgroundColor: '#1f0d8a',
   },
   sideMenuIcon: {
     fontSize: 28,

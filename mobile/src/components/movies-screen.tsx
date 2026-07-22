@@ -39,6 +39,28 @@ type Category = {
   count: number;
 };
 
+const HeaderNavItem = memo(function HeaderNavItem({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.headerNavItemBox, focused && styles.headerNavItemFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      <ThemedText style={[styles.headerNavItem, active && styles.headerNavItemActive]}>{label}</ThemedText>
+    </Pressable>
+  );
+});
+
 const CategoryRow = memo(function CategoryRow({
   item,
   isActive,
@@ -390,13 +412,12 @@ export function MoviesScreen({ channels, activeNav, onNavigate }: Props) {
         <View style={styles.header}>
           <View style={styles.headerNav}>
             {NAV_ITEMS.map((item) => (
-              <TouchableOpacity key={item.key} onPress={() => onNavigate(item.key)}>
-                <ThemedText
-                  style={[styles.headerNavItem, item.key === activeNav && styles.headerNavItemActive]}
-                >
-                  {t(item.labelKey)}
-                </ThemedText>
-              </TouchableOpacity>
+              <HeaderNavItem
+                key={item.key}
+                active={item.key === activeNav}
+                label={t(item.labelKey)}
+                onPress={() => onNavigate(item.key)}
+              />
             ))}
           </View>
 
@@ -496,6 +517,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 20,
     alignItems: 'center',
+  },
+  headerNavItemBox: {
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  headerNavItemFocused: {
+    backgroundColor: '#132a4d',
   },
   headerNavItem: {
     fontSize: 15,
