@@ -26,6 +26,7 @@ import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
+import { popBackAction, useBackStackEntry } from './src/utils/back-stack';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
 // should show (see content-classifier.ts). Same screen component for all
@@ -124,6 +125,29 @@ function AppContent() {
     const timer = setTimeout(() => setReloadBlockedMessage(''), 2000);
     return () => clearTimeout(timer);
   }, [reloadBlockedMessage]);
+
+  // Every screen/modal that's currently open registers itself on the shared
+  // back-stack (see back-stack.ts) while it's visible, so the single remote
+  // "voltar" handler below always unwinds the exact same path the user
+  // navigated in, one step at a time, instead of jumping straight to Casa.
+  useBackStackEntry(
+    currentScreen === 'tv' || currentScreen === 'movies' || currentScreen === 'series' || currentScreen === 'playlist' || currentScreen === 'settings',
+    () => setCurrentScreen('home')
+  );
+  useBackStackEntry(accountModalVisible, () => setAccountModalVisible(false));
+  useBackStackEntry(exitModalVisible, () => setExitModalVisible(false));
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (popBackAction()) return true;
+      if (currentScreen === 'home') {
+        setExitModalVisible(true);
+        return true;
+      }
+      return false;
+    });
+    return () => subscription.remove();
+  }, [currentScreen]);
 
   const activatePlaylist = async (playlist: PanelPlaylist, mac: string = deviceMac, panelPlaylists: PanelPlaylist[] = playlists) => {
     const { tv, filmes, series, seriesGenreByShowName: freshSeriesGenre } = await loadPlaylist(playlist.url);

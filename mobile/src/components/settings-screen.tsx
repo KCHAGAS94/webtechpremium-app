@@ -8,6 +8,7 @@ import { LanguageModal } from '@/components/language-modal';
 import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
 import { PasswordPromptModal } from '@/components/password-prompt-modal';
 import { WatchHistoryModal, type WatchHistoryRow } from '@/components/watch-history-modal';
+import { useBackStackEntry } from '@/utils/back-stack';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
 import type { ContentCategory } from '@/utils/content-classifier';
@@ -349,6 +350,19 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesGenr
   };
 
   const closeHistoryModal = () => setHistoryModalKind(null);
+
+  // Each modal (and the keyboard nested inside the parental-control modal)
+  // registers itself on the shared back-stack while visible, so remote
+  // "voltar" closes exactly the topmost one first — retracing the same path
+  // that was used to open it — instead of jumping straight back to Casa.
+  useBackStackEntry(languageModalVisible, () => setLanguageModalVisible(false));
+  useBackStackEntry(parentalModalVisible, closeParentalModal);
+  useBackStackEntry(!!parentalKeyboardField, () => setParentalKeyboardField(null));
+  useBackStackEntry(passwordPromptVisible, cancelPasswordPrompt);
+  useBackStackEntry(hideCategoriesTarget !== null, closeHideCategoriesModal);
+  useBackStackEntry(historyModalKind !== null, closeHistoryModal);
+  useBackStackEntry(subtitleModalVisible, () => setSubtitleModalVisible(false));
+  useBackStackEntry(colorModalVisible, () => setColorModalVisible(false));
 
   const handleClearAllHistory = () => {
     if (!historyModalKind) return;
