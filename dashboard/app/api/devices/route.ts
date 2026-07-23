@@ -19,6 +19,31 @@ async function getOrCreateSystemUser() {
   });
 }
 
+// Creates one blank Lista per Servidor that doesn't already have one for this
+// App. Handles both a brand-new App and one that exists but is missing
+// Listas (e.g. left over from a Servidor added after the App was created, or
+// a partially-registered device from before this auto-registration existed).
+async function ensureListas(appId: number) {
+  const [servidores, existingListas] = await Promise.all([
+    prisma.servidor.findMany({ orderBy: { id: 'asc' } }),
+    prisma.lista.findMany({ where: { appId }, select: { servidorId: true } }),
+  ]);
+
+  const existingServidorIds = new Set(existingListas.map((l) => l.servidorId));
+  const missing = servidores.filter((s) => !existingServidorIds.has(s.id));
+  if (missing.length === 0) return;
+
+  await prisma.lista.createMany({
+    data: missing.map((servidor) => ({
+      appId,
+      servidorId: servidor.id,
+      nome: servidor.nome,
+      usuario: '',
+      senha: '',
+    })),
+  });
+}
+
 async function registerDevice(macAddress: string) {
   const servidores = await prisma.servidor.findMany({ orderBy: { id: 'asc' } });
   if (servidores.length === 0) return null;
@@ -28,15 +53,7 @@ async function registerDevice(macAddress: string) {
     data: { macAddress, name: macAddress, version: '1.0.0', userId: systemUser.id },
   });
 
-  await prisma.lista.createMany({
-    data: servidores.map((servidor) => ({
-      appId: app.id,
-      servidorId: servidor.id,
-      nome: servidor.nome,
-      usuario: '',
-      senha: '',
-    })),
-  });
+  await ensureListas(app.id);
 
   return prisma.app.findUnique({
     where: { id: app.id },
@@ -74,6 +91,18 @@ export async function GET(request: NextRequest) {
 
   if (!app) {
     app = await registerDevice(macAddress);
+  } else if (app.listas.length === 0) {
+    await ensureListas(app.id);
+    app = await prisma.app.findUnique({
+      where: { id: app.id },
+      include: {
+        listas: {
+          where: { isActive: true },
+          orderBy: { createdAt: 'asc' },
+          include: { servidor: true },
+        },
+      },
+    });
   }
 
   if (!app) {
