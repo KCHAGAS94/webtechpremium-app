@@ -66,17 +66,6 @@ export default function DashboardLayout({
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col">
-        {/* Header */}
-        <header className="bg-white shadow px-6 py-4 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl font-semibold text-gray-800">ULTRA PAINEL</h1>
-            <p className="text-sm text-gray-500">Web Tech Premium</p>
-          </div>
-          <button className="bg-red-500 text-white px-4 py-2 rounded font-semibold hover:bg-red-600 transition">
-            Logout
-          </button>
-        </header>
-
         {/* Content */}
         <div className="flex-1 overflow-auto p-6">
           {children}
