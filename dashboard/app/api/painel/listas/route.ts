@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
         senha: lista.senha,
         expiracaoData: lista.dataExpiracao ? lista.dataExpiracao.toISOString().slice(0, 10) : '',
         expirado: isExpirado(lista.dataExpiracao),
+        instaladoEm: lista.app.createdAt.toISOString(),
       })),
     },
     { status: 200 }

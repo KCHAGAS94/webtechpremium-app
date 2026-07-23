@@ -18,9 +18,21 @@ type Lista = {
   senha: string;
   expiracaoData: string;
   expirado: boolean;
+  instaladoEm: string;
 };
 
 const mockListas: Lista[] = [];
+
+function formatInstaladoEm(iso: string): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 // Formats free-typed input into AA:BB:CC:DD:EE:FF as the user types: strips
 // anything but hex chars, uppercases, and inserts ':' every 2 characters.
@@ -245,6 +257,7 @@ export default function UsuariosPage() {
       senha: '',
       expiracaoData: '',
       expirado: false,
+      instaladoEm: '',
     });
   };
 
@@ -319,6 +332,7 @@ export default function UsuariosPage() {
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Senha</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Lista</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Servidor</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Instalado em</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
                 <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
@@ -332,6 +346,7 @@ export default function UsuariosPage() {
                   <td className="px-6 py-3 text-gray-600">{lista.senha}</td>
                   <td className="px-6 py-3 text-gray-600">{lista.nome}</td>
                   <td className="px-6 py-3 text-gray-600">{lista.servidorNome}</td>
+                  <td className="px-6 py-3 text-gray-600 whitespace-nowrap">{formatInstaladoEm(lista.instaladoEm)}</td>
                   <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
                   <td className="px-6 py-3">
                     {lista.expirado ? (
