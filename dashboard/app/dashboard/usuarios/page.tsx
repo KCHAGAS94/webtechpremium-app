@@ -296,13 +296,21 @@ export default function UsuariosPage() {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
-        <button
-          onClick={handleAddClick}
-          className="bg-green-500 text-white px-6 py-2 rounded font-semibold hover:bg-green-600 transition flex items-center gap-2"
-        >
-          ✓ Adicionar
-        </button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex gap-3">
+          <button
+            onClick={handleAddClick}
+            className="flex-1 sm:flex-none bg-green-500 text-white px-6 py-2 rounded font-semibold hover:bg-green-600 transition flex items-center justify-center gap-2"
+          >
+            ✓ Adicionar
+          </button>
+          <button
+            onClick={handleRemoveExpirados}
+            className="sm:hidden flex-1 bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition"
+          >
+            🗑️ Expirados
+          </button>
+        </div>
         <div className="flex-1 flex items-center bg-white rounded border border-gray-300 px-3">
           <span>🔍</span>
           <input
@@ -310,20 +318,82 @@ export default function UsuariosPage() {
             placeholder="Pesquisar Mac / Usuário / Lista..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 px-3 py-2 outline-none"
+            className="flex-1 px-3 py-2 outline-none min-w-0"
           />
         </div>
         <button
           onClick={handleRemoveExpirados}
-          className="bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition"
+          className="hidden sm:block bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition whitespace-nowrap"
         >
           🗑️ Remover Expirados
         </button>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="max-h-[70vh] overflow-y-auto">
+      {/* Cards (mobile) */}
+      <div className="sm:hidden space-y-3">
+        {filteredListas.map((lista) => (
+          <div key={lista.id} className="bg-white rounded-lg shadow p-4 space-y-2">
+            <div className="flex justify-between items-start">
+              <span className="font-mono text-xs text-gray-600">{lista.mac}</span>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setEditingLista(lista)}
+                  className="text-blue-500 hover:text-blue-700 text-lg"
+                >
+                  ✏️
+                </button>
+                <button
+                  onClick={() => handleDelete(lista)}
+                  className="text-red-500 hover:text-red-700 text-lg"
+                >
+                  🗑️
+                </button>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
+              <div>
+                <div className="text-xs text-gray-400">Usuário</div>
+                <div className="text-gray-700">{lista.usuario || '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Senha</div>
+                <div className="text-gray-700">{lista.senha || '—'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Lista</div>
+                <div className="text-gray-700">{lista.nome}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Servidor</div>
+                <div className="text-gray-700">{lista.servidorNome}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Instalado em</div>
+                <div className="text-gray-700">{formatInstaladoEm(lista.instaladoEm)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Data expira</div>
+                <div className="text-gray-700">{lista.expiracaoData || '—'}</div>
+              </div>
+            </div>
+            <div>
+              {lista.expirado ? (
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                  Expirado
+                </span>
+              ) : (
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                  Ativo
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Table (desktop) */}
+      <div className="hidden sm:block bg-white rounded-lg shadow overflow-hidden">
+        <div className="max-h-[70vh] overflow-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
               <tr>
