@@ -310,55 +310,59 @@ export default function UsuariosPage() {
 
       {/* Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100 border-b border-gray-300">
-            <tr>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Mac</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Usuário</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Senha</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Lista</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Data expira</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-700">Expirado</th>
-              <th className="px-6 py-3 text-center font-semibold text-gray-700">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredListas.map((lista) => (
-              <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
-                <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
-                <td className="px-6 py-3 text-gray-600">{lista.usuario}</td>
-                <td className="px-6 py-3 text-gray-600">{lista.senha}</td>
-                <td className="px-6 py-3 text-gray-600">{lista.nome}</td>
-                <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
-                <td className="px-6 py-3">
-                  {lista.expirado ? (
-                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
-                      Sim
-                    </span>
-                  ) : (
-                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
-                      Não
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-3 flex justify-center gap-2">
-                  <button
-                    onClick={() => setEditingLista(lista)}
-                    className="text-blue-500 hover:text-blue-700 font-semibold text-xl"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    onClick={() => handleDelete(lista)}
-                    className="text-red-500 hover:text-red-700 font-semibold text-xl"
-                  >
-                    🗑️
-                  </button>
-                </td>
+        <div className="max-h-[70vh] overflow-y-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Mac</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Usuário</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Senha</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Lista</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Servidor</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
+                <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredListas.map((lista) => (
+                <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.usuario}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.senha}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.nome}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.servidorNome}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
+                  <td className="px-6 py-3">
+                    {lista.expirado ? (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                        Sim
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                        Não
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-3 flex justify-center gap-2">
+                    <button
+                      onClick={() => setEditingLista(lista)}
+                      className="text-blue-500 hover:text-blue-700 font-semibold text-xl"
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      onClick={() => handleDelete(lista)}
+                      className="text-red-500 hover:text-red-700 font-semibold text-xl"
+                    >
+                      🗑️
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Results Info */}
