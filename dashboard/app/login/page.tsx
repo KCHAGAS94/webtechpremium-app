@@ -12,13 +12,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [statusError, setStatusError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     axios
       .get('/api/auth/status')
       .then((res) => setIsFirstAccess(!res.data.hasUsers))
-      .catch(() => setIsFirstAccess(false))
+      .catch(() => setStatusError(true))
       .finally(() => setCheckingStatus(false));
   }, []);
 
@@ -46,6 +47,19 @@ export default function LoginPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
         <p className="text-blue-100">Carregando...</p>
+      </div>
+    );
+  }
+
+  if (statusError) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8 text-center">
+          <h1 className="text-2xl font-bold text-blue-900 mb-2">WebTech Premium</h1>
+          <p className="text-sm text-red-600">
+            Não foi possível conectar ao banco de dados. Verifique se o Postgres está acessível e tente novamente.
+          </p>
+        </div>
       </div>
     );
   }
