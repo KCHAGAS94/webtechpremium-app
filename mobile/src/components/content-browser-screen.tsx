@@ -70,6 +70,41 @@ type Props = {
   onNavigate: (key: NavKey) => void;
 };
 
+// Standalone focusable control for a heart icon nested inside a bigger
+// Pressable row. RN's D-pad/keyboard focus engine can target nested
+// focusable views independently of their parent, but only if they render
+// their own focus state — a plain TouchableOpacity gives no visual cue when
+// the remote/keyboard moves focus onto it, so from the outside it looks
+// unreachable even though pressing OK on it does work.
+const FavoriteHeartButton = memo(function FavoriteHeartButton({
+  isFavorite,
+  onPress,
+  style,
+  iconStyle,
+  activeIconStyle,
+  hitSlop,
+}: {
+  isFavorite: boolean;
+  onPress: () => void;
+  style?: any;
+  iconStyle: any;
+  activeIconStyle: any;
+  hitSlop?: number;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[style, focused && styles.favoriteHeartFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      hitSlop={hitSlop}
+    >
+      <ThemedText style={[iconStyle, isFavorite && activeIconStyle]}>{isFavorite ? '♥' : '♡'}</ThemedText>
+    </Pressable>
+  );
+});
+
 const CategoryRow = memo(function CategoryRow({
   item,
   isActive,
@@ -93,11 +128,13 @@ const CategoryRow = memo(function CategoryRow({
     >
       <View style={styles.categoryLeft}>
         {item.isGroup && (
-          <TouchableOpacity onPress={() => onToggleFavorite(item.id)} hitSlop={8}>
-            <ThemedText style={[styles.categoryFavoriteIcon, isFavorite && styles.categoryFavoriteIconActive]}>
-              {isFavorite ? '♥' : '♡'}
-            </ThemedText>
-          </TouchableOpacity>
+          <FavoriteHeartButton
+            isFavorite={isFavorite}
+            onPress={() => onToggleFavorite(item.id)}
+            iconStyle={styles.categoryFavoriteIcon}
+            activeIconStyle={styles.categoryFavoriteIconActive}
+            hitSlop={8}
+          />
         )}
         <ThemedText
           style={[styles.categoryTitle, isActive && styles.categoryTitleActive]}
@@ -139,12 +176,16 @@ const ChannelRow = memo(function ChannelRow({
   isFavorite,
   onPress,
   onLongPress,
+  onToggleFavorite,
 }: {
   item: M3uChannel;
   isSelected: boolean;
   isFavorite: boolean;
   onPress: (channel: M3uChannel) => void;
   onLongPress?: (channel: M3uChannel) => void;
+  /** Lets OK/click favorite the row directly (D-pad friendly) without
+   * changing what OK does on the row itself — long-press still works too. */
+  onToggleFavorite?: (channel: M3uChannel) => void;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -162,7 +203,18 @@ const ChannelRow = memo(function ChannelRow({
       <ThemedText style={styles.channelName} numberOfLines={1}>
         {item.name}
       </ThemedText>
-      {isFavorite && <ThemedText style={styles.channelFavoriteIcon}>♥</ThemedText>}
+      {onToggleFavorite ? (
+        <FavoriteHeartButton
+          isFavorite={isFavorite}
+          onPress={() => onToggleFavorite(item)}
+          style={styles.channelFavoriteButton}
+          iconStyle={styles.channelFavoriteIcon}
+          activeIconStyle={styles.channelFavoriteIconActive}
+          hitSlop={8}
+        />
+      ) : (
+        isFavorite && <ThemedText style={styles.channelFavoriteIcon}>♥</ThemedText>
+      )}
     </Pressable>
   );
 });
@@ -462,6 +514,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         isFavorite={favorites.has(item.name)}
         onPress={handleSelectChannel}
         onLongPress={category === 'live' ? handleToggleFavoriteChannel : undefined}
+        onToggleFavorite={category === 'live' ? handleToggleFavoriteChannel : undefined}
       />
     ),
     [selectedChannel?.id, favorites, handleSelectChannel, category, handleToggleFavoriteChannel]
@@ -750,6 +803,12 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingRight: 8,
   },
+  favoriteHeartFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    borderRadius: 4,
+    backgroundColor: '#132a4d',
+  },
   categoryFavoriteIcon: {
     fontSize: 13,
     color: '#8888aa',
@@ -798,8 +857,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     flexShrink: 1,
   },
+  channelFavoriteButton: {
+    padding: 4,
+  },
   channelFavoriteIcon: {
     fontSize: 13,
+    color: '#8888aa',
+  },
+  channelFavoriteIconActive: {
     color: '#e63946',
   },
   previewColumn: {
