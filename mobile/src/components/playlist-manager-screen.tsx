@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +13,34 @@ type Props = {
   onSelect: (playlist: PanelPlaylist) => Promise<void> | void;
   onClose: () => void;
 };
+
+function ServerCard({
+  isActive,
+  disabled,
+  autoFocus,
+  onPress,
+  children,
+}: {
+  isActive: boolean;
+  disabled: boolean;
+  autoFocus?: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const [focused, setFocused] = useState(!!autoFocus);
+  return (
+    <Pressable
+      style={[styles.item, isActive && styles.itemActive, focused && styles.itemFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      disabled={disabled}
+      hasTVPreferredFocus={autoFocus}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress, onSelect, onClose }: Props) {
   const [activatingId, setActivatingId] = useState<number | null>(null);
@@ -58,22 +86,26 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
 
         <View style={styles.body}>
           <ScrollView style={styles.listColumn} contentContainerStyle={styles.list}>
-            {playlists.map((item) => {
+            {playlists.map((item, index) => {
               const isActive = item.id === activePlaylistId;
               const isActivating = activatingId === item.id;
               return (
-                <TouchableOpacity
+                <ServerCard
                   key={item.id}
-                  style={[styles.item, isActive && styles.itemActive]}
-                  onPress={() => handleSelect(item)}
+                  isActive={isActive}
                   disabled={!!activatingId}
-                  activeOpacity={0.75}
+                  // First server in the list always grabs D-pad focus on
+                  // entry, same as the Home screen's "TV ao vivo" card —
+                  // otherwise nothing shows as selected until the user
+                  // presses a direction key.
+                  autoFocus={index === 0}
+                  onPress={() => handleSelect(item)}
                 >
                   <ThemedText style={styles.itemName}>{item.name}</ThemedText>
                   {isActive && <ThemedText style={styles.activeBadge}>Ativa</ThemedText>}
 
                   {isActivating && <ActivityIndicator color="#fff" style={styles.itemSpinner} />}
-                </TouchableOpacity>
+                </ServerCard>
               );
             })}
           </ScrollView>
@@ -186,6 +218,11 @@ const styles = StyleSheet.create({
   itemActive: {
     borderColor: '#3ddc84',
     borderWidth: 2,
+  },
+  itemFocused: {
+    borderColor: '#4dd6ff',
+    borderWidth: 2,
+    backgroundColor: '#1f24c2',
   },
   itemName: {
     color: '#fff',
