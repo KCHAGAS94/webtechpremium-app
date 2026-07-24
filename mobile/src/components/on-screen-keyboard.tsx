@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Modal, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 
@@ -40,6 +40,18 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
   const rows = mode === 'letters' ? LETTER_ROWS : SYMBOL_ROWS;
   const keyStyle = largeKeys ? [styles.key, styles.keyLarge] : styles.key;
 
+  // A physical/USB/Bluetooth keyboard sends key events to whatever native
+  // view currently has focus — the on-screen keys above are just touch
+  // targets and never receive them. This 1x1 TextInput stays focused for as
+  // long as the modal is open purely to catch that hardware input; its
+  // software keyboard is disabled so it doesn't fight with the on-screen
+  // grid, and both end up driving the same `value`/`cursor` state.
+  const hiddenInputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => hiddenInputRef.current?.focus(), 50);
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleKey = (char: string) => {
     onChangeText(value.slice(0, cursor) + char + value.slice(cursor));
     onCursorChange(cursor + 1);
@@ -70,6 +82,15 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
             without this, tapping empty padding inside the panel (not on a
             key) would also close the keyboard. */}
         <Pressable style={styles.panel} onPress={() => {}}>
+          <TextInput
+            ref={hiddenInputRef}
+            value={value}
+            selection={{ start: cursor, end: cursor }}
+            onChangeText={onChangeText}
+            onSelectionChange={(e) => onCursorChange(e.nativeEvent.selection.start)}
+            showSoftInputOnFocus={false}
+            style={styles.hiddenInput}
+          />
           {rows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
               {row.map((char) => (
@@ -117,6 +138,12 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
 }
 
 const styles = StyleSheet.create({
+  hiddenInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
