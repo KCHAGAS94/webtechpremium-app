@@ -33,6 +33,8 @@ async function ensureListas(appId: number) {
   const missing = servidores.filter((s) => !existingServidorIds.has(s.id));
   if (missing.length === 0) return;
 
+  const dataExpiracao = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
   await prisma.lista.createMany({
     data: missing.map((servidor) => ({
       appId,
@@ -40,6 +42,7 @@ async function ensureListas(appId: number) {
       nome: servidor.nome,
       usuario: '',
       senha: '',
+      dataExpiracao,
     })),
   });
 }
