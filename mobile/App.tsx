@@ -67,19 +67,29 @@ function FocusableCard({
   focusedStyle,
   onPress,
   children,
+  autoFocus,
 }: {
   style: object;
   focusedStyle: object;
   onPress: () => void;
   children: React.ReactNode;
+  // Grabs D-pad focus as soon as this card mounts, so arriving at Home
+  // (first launch, or backing out of a section) always shows a highlighted
+  // starting point instead of no focus anywhere until the user presses a
+  // direction key. `hasTVPreferredFocus` is RN's built-in TV-focus hook
+  // (Android TV / tvOS); the `focused` default just keeps the highlight
+  // style in sync with it on the very first render, before any onFocus
+  // event has fired.
+  autoFocus?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!autoFocus);
   return (
     <Pressable
       style={[style, focused && focusedStyle]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={onPress}
+      hasTVPreferredFocus={autoFocus}
     >
       {children}
     </Pressable>
@@ -372,6 +382,7 @@ function AppContent() {
                 style={styles.tvCard}
                 focusedStyle={styles.tvCardFocused}
                 onPress={() => handleMenuPress(tvItem.screen)}
+                autoFocus
               >
                 <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
                 <Text allowFontScaling={false} style={styles.tvLabel}>{t(tvItem.label)}</Text>
