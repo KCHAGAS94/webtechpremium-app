@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -114,6 +114,37 @@ function formatHistoryDate(timestampMs: number): string {
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${day}/${month} ${hours}:${minutes}`;
+}
+
+// Highlights whichever card currently has TV-remote (D-pad) focus. Without
+// this, navigating the grid with a remote gives no visual clue which card
+// is selected — see App.tsx's FocusableCard for the same pattern on Home.
+function SettingsCard({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.card, focused && styles.cardFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+function FocusableBackButton({ onPress }: { onPress: () => void }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.backButton, focused && styles.backButtonFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      <Text allowFontScaling={false} style={styles.backIcon}>‹</Text>
+    </Pressable>
+  );
 }
 
 export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMetaByShowName }: Props) {
@@ -389,21 +420,14 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
     >
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={onBack} activeOpacity={0.75} style={styles.backButton}>
-            <Text allowFontScaling={false} style={styles.backIcon}>‹</Text>
-          </TouchableOpacity>
+          <FocusableBackButton onPress={onBack} />
           <Text allowFontScaling={false} style={styles.title}>{t('settings_title')}</Text>
           <View style={styles.backButton} />
         </View>
 
         <View style={styles.grid}>
           {settingsItems.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.card}
-              onPress={() => handleSelectItem(item.id)}
-              activeOpacity={0.75}
-            >
+            <SettingsCard key={item.id} onPress={() => handleSelectItem(item.id)}>
               <Text allowFontScaling={false} style={styles.cardIcon}>{item.icon}</Text>
               <View style={styles.cardTextWrap}>
                 <Text allowFontScaling={false} style={styles.cardLabel} numberOfLines={1}>
@@ -415,7 +439,7 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
                   </Text>
                 )}
               </View>
-            </TouchableOpacity>
+            </SettingsCard>
           ))}
         </View>
       </SafeAreaView>
@@ -721,6 +745,13 @@ const styles = StyleSheet.create({
   backButton: {
     width: 28,
     alignItems: 'flex-start',
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  backButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
   },
   backIcon: {
     color: '#ffffff',
@@ -747,8 +778,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#171ba0',
     borderRadius: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
     paddingHorizontal: 8,
     gap: 6,
+  },
+  cardFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
   },
   cardIcon: {
     fontSize: 12,
