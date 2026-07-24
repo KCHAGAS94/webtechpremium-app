@@ -8,6 +8,7 @@ import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 
 import { ExitConfirmModal } from '@/components/exit-confirm-modal';
+import { PlayerControlButton } from '@/components/player-control-button';
 import { SeekBar } from '@/components/seek-bar';
 import { SubtitleOverlay } from '@/components/subtitle-overlay';
 import { ThemedText } from '@/components/themed-text';
@@ -292,7 +293,10 @@ export function MoviePlayer({
       <StatusBar hidden />
       <View style={styles.container}>
         {status !== 'error' && (
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo}>
+          // focusable={false}: see fullscreen-player.tsx — a fullscreen
+          // focusable view here would grab the TV remote's default D-pad
+          // focus and block navigation to the actual control buttons.
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo} focusable={false}>
             <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
           </Pressable>
         )}
@@ -333,7 +337,11 @@ export function MoviePlayer({
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
             <View style={styles.topBar}>
-              <TouchableOpacity style={styles.topBarLeft} onPress={handleRequestExit} activeOpacity={0.75}>
+              <PlayerControlButton
+                style={styles.topBarLeft}
+                focusedStyle={styles.iconButtonFocused}
+                onPress={handleRequestExit}
+              >
                 <View style={styles.iconButton}>
                   <ThemedText style={styles.backIcon}>‹</ThemedText>
                 </View>
@@ -343,21 +351,31 @@ export function MoviePlayer({
                     {year ? ` (${year})` : ''}
                   </ThemedText>
                 </View>
-              </TouchableOpacity>
+              </PlayerControlButton>
 
               <View style={styles.topBarRight}>
-                <TouchableOpacity onPress={handleToggleSubtitles} hitSlop={4} style={styles.iconButton}>
+                <PlayerControlButton
+                  onPress={handleToggleSubtitles}
+                  hitSlop={4}
+                  style={styles.iconButton}
+                  focusedStyle={styles.iconButtonFocused}
+                >
                   {subtitlesLoading ? (
                     <ActivityIndicator color="#fff" size="small" />
                   ) : (
                     <ThemedText style={[styles.toolIcon, subtitlesOn && styles.toolIconActive]}>💬</ThemedText>
                   )}
-                </TouchableOpacity>
-                <TouchableOpacity onPress={onToggleFavorite} hitSlop={4} style={styles.iconButton}>
+                </PlayerControlButton>
+                <PlayerControlButton
+                  onPress={onToggleFavorite}
+                  hitSlop={4}
+                  style={styles.iconButton}
+                  focusedStyle={styles.iconButtonFocused}
+                >
                   <ThemedText style={[styles.toolIcon, isFavorite && styles.toolIconActive]}>
                     {isFavorite ? '♥' : '♡'}
                   </ThemedText>
-                </TouchableOpacity>
+                </PlayerControlButton>
               </View>
             </View>
 
@@ -372,15 +390,28 @@ export function MoviePlayer({
               />
 
               <View style={styles.centerControls}>
-                <TouchableOpacity onPress={() => handleSkip(-SKIP_SECONDS)} style={styles.controlButton}>
+                <PlayerControlButton
+                  onPress={() => handleSkip(-SKIP_SECONDS)}
+                  style={styles.controlButton}
+                  focusedStyle={styles.controlButtonFocused}
+                >
                   <ThemedText style={styles.controlIcon}>⏪</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={handleTogglePlayPause} style={styles.playButton}>
+                </PlayerControlButton>
+                <PlayerControlButton
+                  onPress={handleTogglePlayPause}
+                  style={styles.playButton}
+                  focusedStyle={styles.playButtonFocused}
+                  autoFocus
+                >
                   <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleSkip(SKIP_SECONDS)} style={styles.controlButton}>
+                </PlayerControlButton>
+                <PlayerControlButton
+                  onPress={() => handleSkip(SKIP_SECONDS)}
+                  style={styles.controlButton}
+                  focusedStyle={styles.controlButtonFocused}
+                >
                   <ThemedText style={styles.controlIcon}>⏩</ThemedText>
-                </TouchableOpacity>
+                </PlayerControlButton>
               </View>
 
               <VerticalSlider
@@ -491,6 +522,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
+  iconButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    borderRadius: 18,
+  },
   backIcon: {
     fontSize: 24,
     color: '#fff',
@@ -522,8 +558,14 @@ const styles = StyleSheet.create({
   controlButton: {
     width: 44,
     height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  controlButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   controlIcon: {
     fontSize: 26,
@@ -536,6 +578,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  playButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   playIcon: {
     fontSize: 28,

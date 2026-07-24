@@ -7,6 +7,7 @@ import * as Brightness from 'expo-brightness';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 
+import { PlayerControlButton } from '@/components/player-control-button';
 import { SeekBar } from '@/components/seek-bar';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
@@ -207,7 +208,11 @@ export function FullscreenPlayer({
       <StatusBar hidden />
       <View style={styles.container}>
         {status !== 'error' && (
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo}>
+          // focusable={false}: this covers the entire screen, so if it were
+          // focusable it would grab the TV remote's default D-pad focus on
+          // entry and swallow directional navigation before it ever reaches
+          // the actual control buttons below.
+          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo} focusable={false}>
             <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
           </Pressable>
         )}
@@ -231,19 +236,24 @@ export function FullscreenPlayer({
 
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
-            <TouchableOpacity style={styles.topBar} onPress={onClose} activeOpacity={0.75}>
-              <View style={styles.backButton}>
+            <View style={styles.topBar}>
+              <PlayerControlButton onPress={onClose} style={styles.backButton} focusedStyle={styles.backButtonFocused}>
                 <ThemedText style={styles.backIcon}>‹</ThemedText>
-              </View>
+              </PlayerControlButton>
               <ThemedText style={styles.title} numberOfLines={1}>
                 {title}
               </ThemedText>
-              <TouchableOpacity onPress={onToggleFavorite} hitSlop={12} style={styles.favoriteButton}>
+              <PlayerControlButton
+                onPress={onToggleFavorite}
+                hitSlop={12}
+                style={styles.favoriteButton}
+                focusedStyle={styles.favoriteButtonFocused}
+              >
                 <ThemedText style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
                   {isFavorite ? '♥' : '♡'}
                 </ThemedText>
-              </TouchableOpacity>
-            </TouchableOpacity>
+              </PlayerControlButton>
+            </View>
 
             <View style={styles.middleRow} pointerEvents="box-none">
               <VerticalSlider
@@ -257,39 +267,54 @@ export function FullscreenPlayer({
 
               <View style={styles.centerControls}>
                 {!isLive && (
-                  <TouchableOpacity onPress={() => handleSkip(-SKIP_SECONDS)} style={styles.controlButton}>
+                  <PlayerControlButton
+                    onPress={() => handleSkip(-SKIP_SECONDS)}
+                    style={styles.controlButton}
+                    focusedStyle={styles.controlButtonFocused}
+                  >
                     <ThemedText style={styles.controlIcon}>⏪</ThemedText>
-                  </TouchableOpacity>
+                  </PlayerControlButton>
                 )}
                 {onPreviousChannel && (
-                  <TouchableOpacity
+                  <PlayerControlButton
                     onPress={() => {
                       onPreviousChannel();
                       showControls();
                     }}
                     style={styles.controlButton}
+                    focusedStyle={styles.controlButtonFocused}
                   >
                     <ThemedText style={styles.controlIcon}>⏮</ThemedText>
-                  </TouchableOpacity>
+                  </PlayerControlButton>
                 )}
-                <TouchableOpacity onPress={handleTogglePlayPause} style={styles.playButton}>
+                <PlayerControlButton
+                  onPress={handleTogglePlayPause}
+                  style={styles.playButton}
+                  focusedStyle={styles.playButtonFocused}
+                  autoFocus
+                >
                   <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
-                </TouchableOpacity>
+                </PlayerControlButton>
                 {onNextChannel && (
-                  <TouchableOpacity
+                  <PlayerControlButton
                     onPress={() => {
                       onNextChannel();
                       showControls();
                     }}
                     style={styles.controlButton}
+                    focusedStyle={styles.controlButtonFocused}
                   >
                     <ThemedText style={styles.controlIcon}>⏭</ThemedText>
-                  </TouchableOpacity>
+                  </PlayerControlButton>
                 )}
                 {!isLive && (
-                  <TouchableOpacity onPress={() => handleSkip(SKIP_SECONDS)} style={styles.controlButton}>
+                  <PlayerControlButton
+                    onPress={() => handleSkip(SKIP_SECONDS)}
+                    style={styles.controlButton}
+                    focusedStyle={styles.controlButtonFocused}
+                  >
                     <ThemedText style={styles.controlIcon}>⏩</ThemedText>
-                  </TouchableOpacity>
+                  </PlayerControlButton>
                 )}
               </View>
 
@@ -306,10 +331,14 @@ export function FullscreenPlayer({
             <View style={styles.bottomBar}>
               {isLive ? (
                 isBehindLive ? (
-                  <TouchableOpacity style={styles.goLiveBadge} onPress={handleGoLive}>
+                  <PlayerControlButton
+                    style={styles.goLiveBadge}
+                    focusedStyle={styles.goLiveBadgeFocused}
+                    onPress={handleGoLive}
+                  >
                     <View style={styles.liveDot} />
                     <ThemedText style={styles.goLiveBadgeText}>Toque para voltar ao vivo</ThemedText>
-                  </TouchableOpacity>
+                  </PlayerControlButton>
                 ) : (
                   <View style={styles.liveBadge}>
                     <ThemedText style={styles.liveBadgeText}>AO VIVO</ThemedText>
@@ -385,6 +414,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
+  backButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+  },
   backIcon: {
     fontSize: 24,
     color: '#fff',
@@ -397,6 +430,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  favoriteButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
   },
   favoriteIcon: {
     fontSize: 18,
@@ -425,8 +462,14 @@ const styles = StyleSheet.create({
   controlButton: {
     width: 44,
     height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  controlButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(255,255,255,0.15)',
   },
   controlIcon: {
     fontSize: 26,
@@ -439,6 +482,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  playButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(255,255,255,0.3)',
   },
   playIcon: {
     fontSize: 28,
@@ -475,6 +523,10 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 6,
     backgroundColor: 'rgba(230, 57, 70, 0.85)',
+  },
+  goLiveBadgeFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
   },
   liveDot: {
     width: 8,
