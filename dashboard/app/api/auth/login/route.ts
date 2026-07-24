@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       '24h'
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: 'Login realizado com sucesso',
         user: {
@@ -55,6 +55,16 @@ export async function POST(request: NextRequest) {
       },
       { status: 200 }
     );
+
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24, // 24h, matching the token's own expiry
+    });
+
+    return response;
   } catch (error) {
     console.error(error);
     return NextResponse.json(

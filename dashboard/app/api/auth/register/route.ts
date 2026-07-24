@@ -15,7 +15,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificar se usuário já existe
+    // Cadastro só é permitido enquanto não existir nenhum usuário: o primeiro
+    // acesso cria o admin, todo acesso seguinte deve usar login.
+    const userCount = await prisma.user.count();
+    if (userCount > 0) {
+      return NextResponse.json(
+        { error: 'Cadastro indisponível: já existe um usuário criado' },
+        { status: 403 }
+      );
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { email },
     });
@@ -45,7 +54,7 @@ export async function POST(request: NextRequest) {
       '7d'
     );
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: 'Usuário criado com sucesso',
         user: {
@@ -57,6 +66,16 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 }
     );
+
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 7, // 7d, matching the token's own expiry
+    });
+
+    return response;
   } catch (error) {
     console.error(error);
     return NextResponse.json(

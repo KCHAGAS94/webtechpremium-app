@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import axios from 'axios';
 
 const menuItems = [
   { label: 'USUÁRIOS', icon: '👥', href: '/dashboard/usuarios' },
@@ -23,6 +25,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await axios.post('/api/auth/logout');
+    router.push('/login');
+    router.refresh();
+  };
 
   return (
     <div className="flex h-screen bg-gray-100 overflow-hidden">
@@ -79,7 +88,10 @@ export default function DashboardLayout({
 
         {/* Logout */}
         <div className="p-3 border-t border-purple-700">
-          <button className="w-full text-left px-4 py-2 rounded hover:bg-red-600 transition text-sm font-medium flex items-center gap-2">
+          <button
+            onClick={handleLogout}
+            className="w-full text-left px-4 py-2 rounded hover:bg-red-600 transition text-sm font-medium flex items-center gap-2"
+          >
             <span>🚪</span>
             SAIR
           </button>
