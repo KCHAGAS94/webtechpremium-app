@@ -48,6 +48,12 @@
             "usesCleartextTraffic": true
           }
         }
+      ],
+      [
+        "react-native-google-cast",
+        {
+          "receiverAppId": "CC1AD845"
+        }
       ]
     ],
     "scheme": "webtechpremium",

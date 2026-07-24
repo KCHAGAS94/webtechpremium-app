@@ -216,6 +216,7 @@ function SeriesVodPlayer({
       <MoviePlayer
         player={player}
         title={title}
+        streamUrl={episode.channel.url}
         subtitleSearchTitle={showName}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}

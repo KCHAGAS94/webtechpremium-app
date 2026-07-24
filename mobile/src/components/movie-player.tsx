@@ -7,12 +7,14 @@ import * as Brightness from 'expo-brightness';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 
+import { CastButton } from '@/components/cast-button';
 import { ExitConfirmModal } from '@/components/exit-confirm-modal';
 import { PlayerControlButton } from '@/components/player-control-button';
 import { SeekBar } from '@/components/seek-bar';
 import { SubtitleOverlay } from '@/components/subtitle-overlay';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
+import { useCastStream } from '@/utils/cast-stream';
 import { fetchSubtitleCues } from '@/utils/subdl-api';
 import type { SubtitleCue } from '@/utils/srt-parser';
 import { loadSubtitleSettings, type SubtitleSettings } from '@/utils/subtitle-settings-storage';
@@ -31,6 +33,9 @@ const SKIP_SECONDS = 10;
 type Props = {
   player: VideoPlayer;
   title: string;
+  /** Raw stream URL — handed to the Chromecast receiver as-is when the user
+   * casts (see cast-stream.ts); expo-video never sees this directly. */
+  streamUrl: string;
   year?: string | null;
   isFavorite: boolean;
   onToggleFavorite: () => void;
@@ -61,6 +66,7 @@ function formatTime(totalSeconds: number): string {
 export function MoviePlayer({
   player,
   title,
+  streamUrl,
   year,
   isFavorite,
   onToggleFavorite,
@@ -111,6 +117,8 @@ export function MoviePlayer({
     oldAvailableSubtitleTracks: undefined,
   });
   const duration = player.duration;
+
+  useCastStream({ url: streamUrl, title, isLive: false, player });
 
   // Only loaded for style (font size/color) here — "habilitar legendas"
   // itself is applied explicitly below, once, via the same code path the
@@ -366,6 +374,7 @@ export function MoviePlayer({
                     <ThemedText style={[styles.toolIcon, subtitlesOn && styles.toolIconActive]}>💬</ThemedText>
                   )}
                 </PlayerControlButton>
+                <CastButton />
                 <PlayerControlButton
                   onPress={onToggleFavorite}
                   hitSlop={4}

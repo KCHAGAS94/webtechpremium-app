@@ -209,6 +209,7 @@ function MovieVodPlayer({
       <MoviePlayer
         player={player}
         title={title}
+        streamUrl={movie.url}
         year={year}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}

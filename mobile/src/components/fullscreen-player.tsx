@@ -7,10 +7,12 @@ import * as Brightness from 'expo-brightness';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 
+import { CastButton } from '@/components/cast-button';
 import { PlayerControlButton } from '@/components/player-control-button';
 import { SeekBar } from '@/components/seek-bar';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
+import { useCastStream } from '@/utils/cast-stream';
 import { loadSubtitleSettings } from '@/utils/subtitle-settings-storage';
 
 const AUTO_HIDE_MS = 4000;
@@ -20,6 +22,9 @@ const LIVE_EDGE_THRESHOLD_SECONDS = 10;
 type Props = {
   player: VideoPlayer;
   title: string;
+  /** Raw stream URL — handed to the Chromecast receiver as-is when the user
+   * casts (see cast-stream.ts); expo-video never sees this directly. */
+  streamUrl: string;
   onClose: () => void;
   /** How far behind the live edge playback is, in seconds (see content-browser-screen.tsx). */
   offsetFromLive: number | null;
@@ -50,6 +55,7 @@ function formatTime(totalSeconds: number): string {
 export function FullscreenPlayer({
   player,
   title,
+  streamUrl,
   onClose,
   offsetFromLive,
   onGoLive,
@@ -88,6 +94,14 @@ export function FullscreenPlayer({
   });
   const duration = player.duration;
   const isLive = player.isLive || !Number.isFinite(duration) || duration <= 0;
+
+  useCastStream({
+    url: streamUrl,
+    contentType: 'application/x-mpegurl',
+    title,
+    isLive: true,
+    player,
+  });
 
   // timeUpdate is opt-in (emits every `timeUpdateEventInterval` seconds, 0 =
   // disabled) but it's enabled by the parent (content-browser-screen), which
@@ -243,6 +257,7 @@ export function FullscreenPlayer({
               <ThemedText style={styles.title} numberOfLines={1}>
                 {title}
               </ThemedText>
+              <CastButton />
               <PlayerControlButton
                 onPress={onToggleFavorite}
                 hitSlop={12}

@@ -696,6 +696,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         <FullscreenPlayer
           player={player}
           title={selectedChannel.name}
+          streamUrl={selectedChannel.url}
           onClose={handleCloseFullscreen}
           offsetFromLive={offsetFromLive}
           onGoLive={handleGoLive}
