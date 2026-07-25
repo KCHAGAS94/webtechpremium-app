@@ -45,9 +45,17 @@ export async function loadPlaylist(
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }
-  const raw = await response.text();
 
-  const channels = await parseM3u(raw, onProgress);
+  // Scoped so the raw text (tens of MB on large playlists) is eligible for
+  // GC as soon as parsing is done, instead of staying referenced for the
+  // rest of this function while the enrichment fetches below run — that
+  // would otherwise stack a second memory-heavy phase on top of it right at
+  // the peak, which is what tips low-RAM Android TV boxes into an OOM kill.
+  let channels: M3uChannel[];
+  {
+    const raw = await response.text();
+    channels = await parseM3u(raw, onProgress);
+  }
 
   const tv: M3uChannel[] = [];
   const filmes: M3uChannel[] = [];
