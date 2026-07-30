@@ -119,14 +119,23 @@ function formatHistoryDate(timestampMs: number): string {
 // Highlights whichever card currently has TV-remote (D-pad) focus. Without
 // this, navigating the grid with a remote gives no visual clue which card
 // is selected — see App.tsx's FocusableCard for the same pattern on Home.
-function SettingsCard({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
-  const [focused, setFocused] = useState(false);
+function SettingsCard({
+  onPress,
+  children,
+  hasTVPreferredFocus,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  hasTVPreferredFocus?: boolean;
+}) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
       style={[styles.card, focused && styles.cardFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       {children}
     </Pressable>
@@ -427,7 +436,11 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
 
         <View style={styles.grid}>
           {settingsItems.map((item) => (
-            <SettingsCard key={item.id} onPress={() => handleSelectItem(item.id)}>
+            <SettingsCard
+              key={item.id}
+              onPress={() => handleSelectItem(item.id)}
+              hasTVPreferredFocus={item.id === 'parental-control'}
+            >
               <Text allowFontScaling={false} style={styles.cardIcon}>{item.icon}</Text>
               <View style={styles.cardTextWrap}>
                 <Text allowFontScaling={false} style={styles.cardLabel} numberOfLines={1}>
