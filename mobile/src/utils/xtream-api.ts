@@ -57,11 +57,17 @@ type SeriesEntry = {
   name: string;
   category_id: string;
   series_id: number;
+  cover?: string;
 };
 
 export type SeriesMeta = {
   genre: string | null;
   seriesId: string;
+  // Xtream's own poster for the show — used as a fallback when the M3U
+  // itself never carries a `tvg-logo` on any of that show's episode lines
+  // (see series-grouping.ts), instead of depending on the provider's M3U
+  // being complete for every show.
+  cover: string | null;
 };
 
 export type SeriesInfo = {
@@ -191,6 +197,7 @@ export async function fetchSeriesMetaByName(creds: XtreamCredentials): Promise<M
     metaByName.set(entry.name, {
       genre: categoryNameById.get(entry.category_id) ?? null,
       seriesId: String(entry.series_id),
+      cover: entry.cover?.trim() || null,
     });
   }
   return metaByName;

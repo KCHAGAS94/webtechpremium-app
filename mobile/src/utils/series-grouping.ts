@@ -134,7 +134,11 @@ export async function groupSeriesShows(
       show = {
         id: key,
         name: showName,
-        logo: channel.logo,
+        // Falls back to Xtream's own series cover when the M3U's first
+        // episode for this show has no tvg-logo — some providers only ever
+        // tag a handful of episodes per show with a logo, so relying on the
+        // M3U alone left some shows permanently stuck without a poster.
+        logo: channel.logo || meta?.cover || '',
         groupTitle: meta?.genre ?? channel.groupTitle,
         seasons: [],
         episodesBySeason: new Map(),
