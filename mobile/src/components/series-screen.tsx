@@ -292,7 +292,6 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
       (partialShows) => {
         if (!cancelled) {
           setAllShows(partialShows);
-          setIsGrouping(false);
         }
       },
       metaByShowName

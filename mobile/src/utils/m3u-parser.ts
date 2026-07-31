@@ -98,13 +98,14 @@ export async function parseM3u(
         // Any non-comment, non-empty line after an #EXTINF is the stream URL.
         index += 1;
         const groupTitle = pendingGroup || 'Geral';
+        const name = pendingName || `Canal ${index}`;
         channels.push({
           id: String(index),
-          name: pendingName || `Canal ${index}`,
+          name,
           logo: pendingLogo,
           groupTitle,
           url: trimmed,
-          category: categorizeGroup(groupTitle),
+          category: categorizeGroup(groupTitle, name),
         });
         pendingName = '';
         pendingLogo = '';
