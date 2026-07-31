@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 type CategoryOption = {
   id: string;
@@ -13,6 +13,53 @@ type Props = {
   onSave: (hidden: Set<string>) => void;
   onCancel: () => void;
 };
+
+// Same D-pad focus-highlight pattern as settings-screen.tsx's SettingsCard.
+function FocusableRow({
+  onPress,
+  children,
+  hasTVPreferredFocus,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  hasTVPreferredFocus?: boolean;
+}) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  return (
+    <Pressable
+      style={[styles.row, focused && styles.rowFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+function FocusableActionButton({
+  onPress,
+  children,
+  hasTVPreferredFocus,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  hasTVPreferredFocus?: boolean;
+}) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  return (
+    <Pressable
+      style={[styles.actionButton, focused && styles.actionButtonFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+    >
+      {children}
+    </Pressable>
+  );
+}
 
 /** "Selecione as categorias que deseja ocultar" — per-section (live/movies/series). */
 export function HideCategoriesModal({ visible, categories, initiallyHidden, onSave, onCancel }: Props) {
@@ -51,34 +98,36 @@ export function HideCategoriesModal({ visible, categories, initiallyHidden, onSa
             </Text>
           </View>
 
-          <FlatList
-            data={categories}
-            keyExtractor={(item) => item.id}
-            style={styles.list}
-            renderItem={({ item }) => (
-              <TouchableOpacity style={styles.row} onPress={() => toggle(item.id)} activeOpacity={0.75}>
-                <Text allowFontScaling={false} style={styles.rowLabel} numberOfLines={1}>
-                  {item.title}
+          <View style={styles.body}>
+            <View style={styles.sideActions}>
+              <FocusableActionButton onPress={() => onSave(selected)}>
+                <Text allowFontScaling={false} style={styles.actionButtonText}>SIM</Text>
+              </FocusableActionButton>
+              <FocusableActionButton onPress={toggleAll}>
+                <Text allowFontScaling={false} style={styles.actionButtonText}>
+                  {allSelected ? 'DESMARCAR\nTUDO' : 'SELECIONAR\nTUDO'}
                 </Text>
-                <View style={[styles.checkbox, selected.has(item.id) && styles.checkboxChecked]}>
-                  {selected.has(item.id) && <Text style={styles.checkboxMark}>✓</Text>}
-                </View>
-              </TouchableOpacity>
-            )}
-          />
+              </FocusableActionButton>
+              <FocusableActionButton onPress={onCancel}>
+                <Text allowFontScaling={false} style={styles.actionButtonText}>CANCELAR</Text>
+              </FocusableActionButton>
+            </View>
 
-          <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionButton} onPress={() => onSave(selected)} activeOpacity={0.75}>
-              <Text allowFontScaling={false} style={styles.actionButtonText}>SIM</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={toggleAll} activeOpacity={0.75}>
-              <Text allowFontScaling={false} style={styles.actionButtonText}>
-                {allSelected ? 'DESMARCAR TUDO' : 'SELECIONAR TUDO'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={onCancel} activeOpacity={0.75}>
-              <Text allowFontScaling={false} style={styles.actionButtonText}>CANCELAR</Text>
-            </TouchableOpacity>
+            <FlatList
+              data={categories}
+              keyExtractor={(item) => item.id}
+              style={styles.list}
+              renderItem={({ item, index }) => (
+                <FocusableRow onPress={() => toggle(item.id)} hasTVPreferredFocus={index === 0}>
+                  <Text allowFontScaling={false} style={styles.rowLabel} numberOfLines={1}>
+                    {item.title}
+                  </Text>
+                  <View style={[styles.checkbox, selected.has(item.id) && styles.checkboxChecked]}>
+                    {selected.has(item.id) && <Text style={styles.checkboxMark}>✓</Text>}
+                  </View>
+                </FocusableRow>
+              )}
+            />
           </View>
         </View>
       </View>
@@ -98,7 +147,7 @@ const styles = StyleSheet.create({
     borderColor: '#1aa2ff',
     borderWidth: 1,
     borderRadius: 10,
-    width: 420,
+    width: 460,
     maxHeight: '75%',
     overflow: 'hidden',
   },
@@ -113,7 +162,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
   },
+  body: {
+    flexDirection: 'row',
+  },
+  sideActions: {
+    width: 160,
+    padding: 16,
+    gap: 12,
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(26, 162, 255, 0.25)',
+  },
   list: {
+    flex: 1,
     maxHeight: 360,
   },
   row: {
@@ -124,6 +184,9 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(26, 162, 255, 0.25)',
     paddingHorizontal: 16,
     paddingVertical: 12,
+  },
+  rowFocused: {
+    backgroundColor: '#1f24c2',
   },
   rowLabel: {
     flex: 1,
@@ -148,26 +211,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  actions: {
-    flexDirection: 'row',
-    gap: 8,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(26, 162, 255, 0.25)',
-  },
   actionButton: {
     flex: 1,
+    width: '100%',
     backgroundColor: '#170066',
     borderColor: '#1aa2ff',
     borderWidth: 1,
-    borderRadius: 6,
-    paddingVertical: 10,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  actionButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
+    transform: [{ scale: 1.04 }],
   },
   actionButtonText: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 13,
     fontWeight: '700',
+    letterSpacing: 0.5,
     textAlign: 'center',
+    lineHeight: 18,
   },
 });
