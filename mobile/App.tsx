@@ -6,7 +6,6 @@ import {
   Pressable,
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
@@ -489,20 +488,22 @@ function AppContent() {
               Deseja sair do app?
             </Text>
             <View style={styles.exitModalActions}>
-              <TouchableOpacity
+              <FocusableCard
+                key={exitModalVisible ? 'exit-no-open' : 'exit-no-closed'}
                 style={[styles.exitModalButton, styles.exitModalButtonNo]}
+                focusedStyle={styles.exitModalButtonNoFocused}
                 onPress={() => setExitModalVisible(false)}
-                activeOpacity={0.75}
+                autoFocus={exitModalVisible}
               >
                 <Text allowFontScaling={false} style={styles.exitModalButtonText}>Não</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+              </FocusableCard>
+              <FocusableCard
                 style={[styles.exitModalButton, styles.exitModalButtonYes]}
+                focusedStyle={styles.exitModalButtonYesFocused}
                 onPress={handleConfirmExit}
-                activeOpacity={0.75}
               >
                 <Text allowFontScaling={false} style={styles.exitModalButtonText}>Sim</Text>
-              </TouchableOpacity>
+              </FocusableCard>
             </View>
           </View>
         </View>
@@ -537,13 +538,15 @@ function AppContent() {
               <Text style={styles.accountRenewLink}>webtech.pro.kchagas.com.br</Text>
             </Text>
 
-            <TouchableOpacity
+            <FocusableCard
+              key={accountModalVisible ? 'account-close-open' : 'account-close-closed'}
               style={styles.accountModalClose}
+              focusedStyle={styles.accountModalCloseFocused}
               onPress={() => setAccountModalVisible(false)}
-              activeOpacity={0.75}
+              autoFocus={accountModalVisible}
             >
               <Text allowFontScaling={false} style={styles.exitModalButtonText}>Fechar</Text>
-            </TouchableOpacity>
+            </FocusableCard>
           </View>
         </View>
       </Modal>
@@ -698,26 +701,26 @@ const styles = StyleSheet.create({
     borderColor: '#1aa2ff',
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    width: 220,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    width: 280,
     alignItems: 'center',
   },
   exitModalTitle: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 15,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   exitModalActions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 12,
   },
   exitModalButton: {
     flex: 1,
     borderRadius: 8,
-    paddingVertical: 7,
+    paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
   },
@@ -725,13 +728,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#170066',
     borderColor: '#1aa2ff',
   },
+  exitModalButtonNoFocused: {
+    borderColor: '#4dd6ff',
+    borderWidth: 3,
+    backgroundColor: '#1f0d8a',
+  },
   exitModalButtonYes: {
     backgroundColor: '#7a0000',
     borderColor: '#ff4d4d',
   },
+  exitModalButtonYesFocused: {
+    borderColor: '#ff8a8a',
+    borderWidth: 3,
+    backgroundColor: '#a30000',
+  },
   exitModalButtonText: {
     color: '#ffffff',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
   },
   accountModalBox: {
@@ -789,5 +802,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 8,
+  },
+  accountModalCloseFocused: {
+    borderColor: '#4dd6ff',
+    borderWidth: 3,
+    backgroundColor: '#1f0d8a',
   },
 });
