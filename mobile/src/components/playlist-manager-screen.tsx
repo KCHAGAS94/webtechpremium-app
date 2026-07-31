@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -13,6 +13,20 @@ type Props = {
   onSelect: (playlist: PanelPlaylist) => Promise<void> | void;
   onClose: () => void;
 };
+
+function CloseButton({ onPress }: { onPress: () => void }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.closeButtonBox, focused && styles.closeButtonBoxFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      <ThemedText style={styles.closeButton}>Fechar</ThemedText>
+    </Pressable>
+  );
+}
 
 function ServerCard({
   isActive,
@@ -75,9 +89,7 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <ThemedText style={styles.title}>Minhas listas</ThemedText>
-          <TouchableOpacity onPress={onClose}>
-            <ThemedText style={styles.closeButton}>Fechar</ThemedText>
-          </TouchableOpacity>
+          <CloseButton onPress={onClose} />
         </View>
 
         <ThemedText style={styles.subtitle}>
@@ -158,6 +170,17 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#fff',
+  },
+  closeButtonBox: {
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  closeButtonBoxFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: '#1f24c2',
   },
   closeButton: {
     color: '#4dd6ff',
