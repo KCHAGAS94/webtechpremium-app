@@ -142,6 +142,43 @@ function SettingsCard({
   );
 }
 
+function FocusableModalInput({
+  onPress,
+  children,
+  hasTVPreferredFocus,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  hasTVPreferredFocus?: boolean;
+}) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  return (
+    <Pressable
+      style={[styles.modalInput, focused && styles.modalInputFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+function FocusableModalButton({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.modalButton, focused && styles.modalButtonFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 function FocusableBackButton({ onPress }: { onPress: () => void }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -470,80 +507,52 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
             {parentalPassword ? (
               <>
                 <Text allowFontScaling={false} style={styles.modalLabel}>Digite a senha para remover</Text>
-                <TouchableOpacity
-                  style={styles.modalInput}
-                  onPress={() => openParentalKeyboard('senha')}
-                  activeOpacity={0.75}
-                >
+                <FocusableModalInput onPress={() => openParentalKeyboard('senha')}>
                   <Text allowFontScaling={false} style={styles.modalInputText}>
                     {'•'.repeat(senha.length) || ' '}
                   </Text>
-                </TouchableOpacity>
+                </FocusableModalInput>
 
                 {!!parentalError && (
                   <Text allowFontScaling={false} style={styles.modalErrorText}>{parentalError}</Text>
                 )}
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={styles.modalButton}
-                    onPress={handleRemoveParentalPassword}
-                    activeOpacity={0.75}
-                  >
+                  <FocusableModalButton onPress={handleRemoveParentalPassword}>
                     <Text allowFontScaling={false} style={styles.modalButtonText}>REMOVER</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modalButton}
-                    onPress={closeParentalModal}
-                    activeOpacity={0.75}
-                  >
+                  </FocusableModalButton>
+                  <FocusableModalButton onPress={closeParentalModal}>
                     <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
-                  </TouchableOpacity>
+                  </FocusableModalButton>
                 </View>
               </>
             ) : (
               <>
                 <Text allowFontScaling={false} style={styles.modalLabel}>Nova Senha</Text>
-                <TouchableOpacity
-                  style={styles.modalInput}
-                  onPress={() => openParentalKeyboard('novaSenha')}
-                  activeOpacity={0.75}
-                >
+                <FocusableModalInput onPress={() => openParentalKeyboard('novaSenha')} hasTVPreferredFocus>
                   <Text allowFontScaling={false} style={styles.modalInputText}>
                     {'•'.repeat(novaSenha.length) || ' '}
                   </Text>
-                </TouchableOpacity>
+                </FocusableModalInput>
 
                 <Text allowFontScaling={false} style={styles.modalLabel}>Confirme a Senha</Text>
-                <TouchableOpacity
-                  style={styles.modalInput}
-                  onPress={() => openParentalKeyboard('confirmarSenha')}
-                  activeOpacity={0.75}
-                >
+                <FocusableModalInput onPress={() => openParentalKeyboard('confirmarSenha')}>
                   <Text allowFontScaling={false} style={styles.modalInputText}>
                     {'•'.repeat(confirmarSenha.length) || ' '}
                   </Text>
-                </TouchableOpacity>
+                </FocusableModalInput>
 
                 {!!parentalError && (
                   <Text allowFontScaling={false} style={styles.modalErrorText}>{parentalError}</Text>
                 )}
 
                 <View style={styles.modalActions}>
-                  <TouchableOpacity
-                    style={styles.modalButton}
-                    onPress={handleSaveParentalPassword}
-                    activeOpacity={0.75}
-                  >
+                  <FocusableModalButton onPress={handleSaveParentalPassword}>
                     <Text allowFontScaling={false} style={styles.modalButtonText}>SIM</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.modalButton}
-                    onPress={closeParentalModal}
-                    activeOpacity={0.75}
-                  >
+                  </FocusableModalButton>
+                  <FocusableModalButton onPress={closeParentalModal}>
                     <Text allowFontScaling={false} style={styles.modalButtonText}>CANCELAR</Text>
-                  </TouchableOpacity>
+                  </FocusableModalButton>
                 </View>
               </>
             )}
@@ -857,6 +866,10 @@ const styles = StyleSheet.create({
     minHeight: 30,
     justifyContent: 'center',
   },
+  modalInputFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
+  },
   modalInputText: {
     color: '#ffffff',
     fontSize: 14,
@@ -875,6 +888,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingHorizontal: 18,
     paddingVertical: 8,
+  },
+  modalButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
   },
   modalButtonText: {
     color: '#ffffff',
