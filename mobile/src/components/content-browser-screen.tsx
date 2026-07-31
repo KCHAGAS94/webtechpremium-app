@@ -111,20 +111,23 @@ const CategoryRow = memo(function CategoryRow({
   isFavorite,
   onPress,
   onToggleFavorite,
+  hasTVPreferredFocus,
 }: {
   item: Category;
   isActive: boolean;
   isFavorite: boolean;
   onPress: (id: string) => void;
   onToggleFavorite: (id: string) => void;
+  hasTVPreferredFocus?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
       style={[styles.categoryRow, focused && styles.categoryRowFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item.id)}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       <View style={styles.categoryLeft}>
         {item.isGroup && (
@@ -157,18 +160,13 @@ const HeaderNavItem = memo(function HeaderNavItem({
   label: string;
   onPress: () => void;
 }) {
-  // Whichever tab this screen was entered on (TV ao Vivo/Filmes/Séries) should
-  // already have D-pad focus on mount, same as Home's own default focus —
-  // otherwise arriving here via remote leaves focus nowhere until the user
-  // presses a direction key.
-  const [focused, setFocused] = useState(active);
+  const [focused, setFocused] = useState(false);
   return (
     <Pressable
       style={[styles.headerNavItemBox, focused && styles.headerNavItemFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={onPress}
-      hasTVPreferredFocus={active}
     >
       <ThemedText style={[styles.headerNavItem, active && styles.headerNavItemActive]}>{label}</ThemedText>
     </Pressable>
@@ -259,7 +257,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     return { categoryShells: cats, channelsByGroup: byGroup, bucketChannels: bucket };
   }, [channels, category, hiddenGroups]);
 
-  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY_ID);
+  const [selectedCategory, setSelectedCategory] = useState(FAVORITES_CATEGORY_ID);
   const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(bucketChannels[0]);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -506,6 +504,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         isFavorite={favoriteGroups.has(item.id)}
         onPress={setSelectedCategory}
         onToggleFavorite={handleToggleFavoriteGroup}
+        hasTVPreferredFocus={item.id === FAVORITES_CATEGORY_ID}
       />
     ),
     [selectedCategory, favoriteGroups, handleToggleFavoriteGroup]
@@ -741,13 +740,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: 'transparent',
   },
   headerNavItemFocused: {
-    borderColor: '#4dd6ff',
-    borderWidth: 3,
-    backgroundColor: '#1f0d8a',
+    backgroundColor: '#132a4d',
   },
   headerNavItem: {
     fontSize: 15,
