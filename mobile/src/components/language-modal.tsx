@@ -1,4 +1,5 @@
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
@@ -17,6 +18,44 @@ type Props = {
   onClose: () => void;
 };
 
+// Same D-pad focus-highlight pattern as settings-screen.tsx's SettingsCard.
+function FocusableRow({
+  onPress,
+  children,
+  hasTVPreferredFocus,
+}: {
+  onPress: () => void;
+  children: React.ReactNode;
+  hasTVPreferredFocus?: boolean;
+}) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  return (
+    <Pressable
+      style={[styles.row, focused && styles.rowFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+function FocusableActionButton({ onPress, children }: { onPress: () => void; children: React.ReactNode }) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.actionButton, focused && styles.actionButtonFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 /** "mudar idioma" — picks the app's UI language, persisted via language-storage.ts. */
 export function LanguageModal({ visible, onClose }: Props) {
   const { language, setLanguage, t } = useTranslation();
@@ -32,26 +71,25 @@ export function LanguageModal({ visible, onClose }: Props) {
           </View>
 
           {LANGUAGE_OPTIONS.map((option) => (
-            <TouchableOpacity
+            <FocusableRow
               key={option.code}
-              style={styles.row}
               onPress={() => {
                 setLanguage(option.code);
                 onClose();
               }}
-              activeOpacity={0.75}
+              hasTVPreferredFocus={option.code === language}
             >
               <Text allowFontScaling={false} style={styles.rowLabel}>
                 {t(option.labelKey)}
               </Text>
               {option.code === language && <Text style={styles.rowCheck}>✓</Text>}
-            </TouchableOpacity>
+            </FocusableRow>
           ))}
 
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionButton} onPress={onClose} activeOpacity={0.75}>
+            <FocusableActionButton onPress={onClose}>
               <Text allowFontScaling={false} style={styles.actionButtonText}>{t('action_close')}</Text>
-            </TouchableOpacity>
+            </FocusableActionButton>
           </View>
         </View>
       </View>
@@ -94,6 +132,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  rowFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
+  },
   rowLabel: {
     color: '#ffffff',
     fontSize: 14,
@@ -115,6 +157,10 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: 'center',
+  },
+  actionButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
   },
   actionButtonText: {
     color: '#ffffff',
