@@ -349,11 +349,21 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // Xtream/live stream URLs (e.g. get.php?...&output=hls) rarely end in
   // `.m3u8`, so expo-video's `auto` content-type detection (by extension)
   // misses them and falls back to a progressive-download demuxer, which
-  // can't parse an HLS playlist. Live channels need `contentType: 'hls'`
-  // forced explicitly; movies/series keep `auto` since those already work.
+  // can't parse an HLS playlist — most live channels need `contentType:
+  // 'hls'` forced explicitly. But some providers (this app no longer ships
+  // with a fixed one — servers are user-added, see local-playlists.ts) serve
+  // raw MPEG-TS instead: those URLs end in `.ts` and are NOT an HLS
+  // manifest, so forcing 'hls' on them makes expo-video try to parse the
+  // .ts payload as an m3u8 playlist and fail with a "does not start with
+  // the #EXTM3U header" error. Only `.ts`-extension URLs skip the force;
+  // everything else (no extension, `.m3u8`, unknown) still defaults to hls
+  // since that's what most Xtream panels serve without an extension.
   const videoSource = useMemo(() => {
     if (!selectedChannel) return null;
-    if (category === 'live') return { uri: selectedChannel.url, contentType: 'hls' as const };
+    if (category === 'live') {
+      const isRawTs = /\.ts(\?|$)/i.test(selectedChannel.url);
+      return isRawTs ? selectedChannel.url : { uri: selectedChannel.url, contentType: 'hls' as const };
+    }
     return selectedChannel.url;
   }, [selectedChannel, category]);
 
