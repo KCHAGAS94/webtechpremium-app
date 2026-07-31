@@ -142,7 +142,13 @@ export async function groupSeriesShows(
       };
       shows.set(key, show);
     } else if (!show.logo && channel.logo) {
-      show.logo = channel.logo;
+      // Replace the object instead of mutating `show.logo` in place: PosterCard
+      // (series-screen.tsx) is memoized on `item`'s reference, so a later
+      // episode filling in the logo after the show's row already rendered
+      // needs a new object identity to actually trigger a re-render —
+      // otherwise the tile stays stuck on the 📺 placeholder forever.
+      show = { ...show, logo: channel.logo };
+      shows.set(key, show);
     }
 
     let seasonEpisodes = show.episodesBySeason.get(season);
