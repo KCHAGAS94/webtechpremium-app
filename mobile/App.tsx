@@ -575,13 +575,15 @@ const styles = StyleSheet.create({
   layoutRow: {
     flex: 1,
     flexDirection: 'row',
-    width: '95%',
+    width: '90%',
     gap: 8,
     minHeight: 0,
     maxHeight: 286,
   },
   tvCard: {
-    flex: 1.25,
+    width: 220,
+    flexGrow: 0,
+    flexShrink: 0,
     backgroundColor: '#170066',
     borderColor: '#1aa2ff',
     borderWidth: 1,
@@ -608,7 +610,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   midColumn: {
-    flex: 1,
+    flex: 1.15,
     gap: 8,
     minHeight: 0,
   },
@@ -640,7 +642,7 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   sideMenu: {
-    width: 255,
+    width: 190,
     gap: 8,
   },
   sideMenuItem: {
@@ -649,7 +651,7 @@ const styles = StyleSheet.create({
     borderColor: '#1aa2ff',
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'row',
