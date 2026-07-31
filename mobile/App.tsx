@@ -12,7 +12,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { BootLoadingScreen } from './src/components/boot-loading-screen';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
-import { DeviceActivationScreen } from './src/components/device-activation-screen';
 import { MoviesScreen } from './src/components/movies-screen';
 import { PlaylistManagerScreen } from './src/components/playlist-manager-screen';
 import { SeriesScreen } from './src/components/series-screen';
@@ -22,6 +21,7 @@ import type { TranslationKey } from './src/i18n/translations';
 import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
+import { addLocalPlaylist, getLocalPlaylists, removeLocalPlaylist, type LocalPlaylistInput } from './src/utils/local-playlists';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
 import { loadPlaylist } from './src/utils/playlist-loader';
 import type { SeriesMeta } from './src/utils/xtream-api';
@@ -109,8 +109,12 @@ function AppContent() {
   const [channels, setChannels] = useState<M3uChannel[]>([]);
   const [seriesMetaByShowName, setSeriesMetaByShowName] = useState<Map<string, SeriesMeta>>(new Map());
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
+  // Servers the user typed in themselves (servidor/usuário/senha) — kept
+  // separate from the painel-managed `playlists` above so a painel refresh
+  // (fetchAndActivateFromPanel) never wipes them out; the two are only
+  // combined at render/lookup time via `displayPlaylists`.
+  const [localPlaylists, setLocalPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
-  const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
   const [reloadingChannels, setReloadingChannels] = useState(false);
   const [reloadChannelsError, setReloadChannelsError] = useState('');
   const [reloadBlockedMessage, setReloadBlockedMessage] = useState('');
@@ -127,7 +131,13 @@ function AppContent() {
   const centerBottom = menuItems[3];
   const rightBottom = menuItems[4];
   const settingsItem = menuItems[5];
-  const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
+  const localPlaylistIds = new Set(localPlaylists.map((p) => p.id));
+  // `playlists` may itself contain local entries after a cache restore (the
+  // cached blob is whatever was merged at the last activation) — filtered
+  // out here so they don't render twice alongside the freshly loaded
+  // `localPlaylists` state.
+  const displayPlaylists = [...playlists.filter((p) => !localPlaylistIds.has(p.id)), ...localPlaylists];
+  const activePlaylist = displayPlaylists.find((p) => p.id === activePlaylistId);
   const playlistExpiration = activePlaylist?.expiracaoData;
 
   useEffect(() => {
@@ -159,7 +169,7 @@ function AppContent() {
     return () => subscription.remove();
   }, [currentScreen]);
 
-  const activatePlaylist = async (playlist: PanelPlaylist, mac: string = deviceMac, panelPlaylists: PanelPlaylist[] = playlists) => {
+  const activatePlaylist = async (playlist: PanelPlaylist, mac: string = deviceMac, panelPlaylists: PanelPlaylist[] = displayPlaylists) => {
     // Drops the previous playlist's full channel array before fetching the
     // new one, instead of after, so the old list is eligible for GC while
     // loadPlaylist's raw M3U text + parsed arrays + Xtream JSON responses are
@@ -205,6 +215,7 @@ function AppContent() {
     (async () => {
       const mac = await getDeviceMac();
       setDeviceMac(mac);
+      setLocalPlaylists(await getLocalPlaylists(mac));
 
       // Fast path: show last session's channels instantly instead of making
       // the user stare at the boot screen through a full panel+M3U+genre
@@ -243,14 +254,20 @@ function AppContent() {
     return <BootLoadingScreen />;
   }
 
-  const handleReloadPlaylist = async () => {
-    setReloadingPlaylist(true);
-    try {
-      await fetchAndActivateFromPanel(deviceMac);
-    } catch {
-      // Reload is best-effort; user stays on the activation screen to retry.
-    } finally {
-      setReloadingPlaylist(false);
+  const handleAddServer = async (input: LocalPlaylistInput) => {
+    const playlist = await addLocalPlaylist(deviceMac, input);
+    const nextLocalPlaylists = [...localPlaylists, playlist];
+    setLocalPlaylists(nextLocalPlaylists);
+    await activatePlaylist(playlist, deviceMac, [...playlists, ...nextLocalPlaylists]);
+  };
+
+  const handleRemoveServer = async (playlist: PanelPlaylist) => {
+    const remaining = await removeLocalPlaylist(deviceMac, playlist.id);
+    setLocalPlaylists(remaining);
+    if (playlist.id === activePlaylistId) {
+      setActivePlaylistId(null);
+      setChannels([]);
+      setCurrentScreen('playlist');
     }
   };
 
@@ -261,7 +278,7 @@ function AppContent() {
   // list index, so they're untouched by this — they only change if the user
   // acts on them or the list itself changes (a title added/removed).
   const handleReloadChannels = async () => {
-    const active = playlists.find((p) => p.id === activePlaylistId);
+    const active = displayPlaylists.find((p) => p.id === activePlaylistId);
     if (!active) {
       setCurrentScreen('playlist');
       return;
@@ -306,22 +323,15 @@ function AppContent() {
   };
 
   if (currentScreen === 'playlist') {
-    if (playlists.length === 0) {
-      return (
-        <DeviceActivationScreen
-          macAddress={deviceMac}
-          onReload={handleReloadPlaylist}
-          reloading={reloadingPlaylist}
-        />
-      );
-    }
-
     return (
       <PlaylistManagerScreen
-        playlists={playlists}
+        playlists={displayPlaylists}
         activePlaylistId={activePlaylistId}
+        localPlaylistIds={localPlaylistIds}
         macAddress={deviceMac}
         onSelect={activatePlaylist}
+        onAddServer={handleAddServer}
+        onRemoveServer={handleRemoveServer}
         onClose={() => setCurrentScreen('home')}
       />
     );
@@ -331,7 +341,7 @@ function AppContent() {
     return (
       <MoviesScreen
         channels={channels}
-        playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
+        playlistUrl={displayPlaylists.find((p) => p.id === activePlaylistId)?.url ?? ''}
         activeNav="movies"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
       />
@@ -343,7 +353,7 @@ function AppContent() {
       <SeriesScreen
         channels={channels}
         metaByShowName={seriesMetaByShowName}
-        playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
+        playlistUrl={displayPlaylists.find((p) => p.id === activePlaylistId)?.url ?? ''}
         activeNav="series"
         onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
       />
