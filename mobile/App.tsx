@@ -160,6 +160,13 @@ function AppContent() {
   }, [currentScreen]);
 
   const activatePlaylist = async (playlist: PanelPlaylist, mac: string = deviceMac, panelPlaylists: PanelPlaylist[] = playlists) => {
+    // Drops the previous playlist's full channel array before fetching the
+    // new one, instead of after, so the old list is eligible for GC while
+    // loadPlaylist's raw M3U text + parsed arrays + Xtream JSON responses are
+    // being held — otherwise both the outgoing and incoming full catalogs
+    // are alive in memory at once, which is enough to OOM-kill the app on
+    // low-RAM Android TV boxes when switching between large playlists.
+    setChannels([]);
     const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await loadPlaylist(playlist.url);
     const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
     setActivePlaylistId(playlist.id);
