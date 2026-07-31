@@ -65,18 +65,21 @@ const CategoryRow = memo(function CategoryRow({
   item,
   isActive,
   onPress,
+  hasTVPreferredFocus,
 }: {
   item: Category;
   isActive: boolean;
   onPress: (id: string) => void;
+  hasTVPreferredFocus?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
       style={[styles.categoryRow, focused && styles.categoryRowFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item.id)}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       <ThemedText style={[styles.categoryTitle, isActive && styles.categoryTitleActive]} numberOfLines={1}>
         {item.title}
@@ -371,7 +374,12 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
-      <CategoryRow item={item} isActive={item.id === selectedCategory} onPress={setSelectedCategory} />
+      <CategoryRow
+        item={item}
+        isActive={item.id === selectedCategory}
+        onPress={setSelectedCategory}
+        hasTVPreferredFocus={item.id === CONTINUE_WATCHING_CATEGORY_ID}
+      />
     ),
     [selectedCategory]
   );

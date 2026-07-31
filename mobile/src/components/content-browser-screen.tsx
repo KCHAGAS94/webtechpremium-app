@@ -157,13 +157,18 @@ const HeaderNavItem = memo(function HeaderNavItem({
   label: string;
   onPress: () => void;
 }) {
-  const [focused, setFocused] = useState(false);
+  // Whichever tab this screen was entered on (TV ao Vivo/Filmes/Séries) should
+  // already have D-pad focus on mount, same as Home's own default focus —
+  // otherwise arriving here via remote leaves focus nowhere until the user
+  // presses a direction key.
+  const [focused, setFocused] = useState(active);
   return (
     <Pressable
       style={[styles.headerNavItemBox, focused && styles.headerNavItemFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={onPress}
+      hasTVPreferredFocus={active}
     >
       <ThemedText style={[styles.headerNavItem, active && styles.headerNavItemActive]}>{label}</ThemedText>
     </Pressable>
@@ -736,9 +741,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
   headerNavItemFocused: {
-    backgroundColor: '#132a4d',
+    borderColor: '#4dd6ff',
+    borderWidth: 3,
+    backgroundColor: '#1f0d8a',
   },
   headerNavItem: {
     fontSize: 15,
