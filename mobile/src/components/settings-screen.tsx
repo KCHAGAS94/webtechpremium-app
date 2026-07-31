@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -158,6 +158,39 @@ function FocusableModalInput({
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
+// Generic D-pad focus-highlight wrapper for one-off elements (subtitle
+// settings modal) whose base style varies per element — SettingsCard/
+// FocusableModalButton hardcode a single style pair, this one takes both.
+function Focusable({
+  style,
+  focusedStyle,
+  onPress,
+  children,
+  disabled,
+  hasTVPreferredFocus,
+}: {
+  style: object;
+  focusedStyle: object;
+  onPress: () => void;
+  children: React.ReactNode;
+  disabled?: boolean;
+  hasTVPreferredFocus?: boolean;
+}) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  return (
+    <Pressable
+      style={[style, focused && focusedStyle]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      disabled={disabled}
       hasTVPreferredFocus={hasTVPreferredFocus}
     >
       {children}
@@ -582,16 +615,21 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
               <Text allowFontScaling={false} style={[styles.modalTitle, styles.subtitleModalHeaderTitle]}>
                 Configurações de legenda
               </Text>
-              <TouchableOpacity
-                onPress={() => setSubtitleModalVisible(false)}
-                activeOpacity={0.75}
+              <Focusable
                 style={styles.subtitleModalCloseButton}
+                focusedStyle={styles.subtitleModalCloseButtonFocused}
+                onPress={() => setSubtitleModalVisible(false)}
+                hasTVPreferredFocus
               >
                 <Text allowFontScaling={false} style={styles.subtitleModalCloseText}>✕</Text>
-              </TouchableOpacity>
+              </Focusable>
             </View>
 
-            <View style={styles.subtitleRow}>
+            <Focusable
+              style={styles.subtitleRow}
+              focusedStyle={styles.subtitleRowFocused}
+              onPress={() => setLegendasHabilitadas((v) => !v)}
+            >
               <Text allowFontScaling={false} style={styles.subtitleRowIcon}>▤</Text>
               <Text allowFontScaling={false} style={styles.subtitleRowLabel}>habilitar legendas</Text>
               <Switch
@@ -599,65 +637,73 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
                 onValueChange={setLegendasHabilitadas}
                 trackColor={{ false: '#3a3a4a', true: '#1aa2ff' }}
                 thumbColor="#ffffff"
+                pointerEvents="none"
               />
-            </View>
+            </Focusable>
 
             <View style={styles.subtitleRow}>
               <Text allowFontScaling={false} style={styles.subtitleRowIcon}>Tt</Text>
               <Text allowFontScaling={false} style={styles.subtitleRowLabel}>tamanho da legenda</Text>
               <View style={styles.subtitleStepper}>
-                <TouchableOpacity
+                <Focusable
                   style={styles.subtitleStepperButton}
+                  focusedStyle={styles.subtitleStepperButtonFocused}
                   onPress={() => setTamanhoLegenda((size) => Math.max(8, size - 1))}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.subtitleStepperButtonText}>−</Text>
-                </TouchableOpacity>
+                </Focusable>
                 <View style={styles.subtitleStepperValue}>
                   <Text allowFontScaling={false} style={styles.subtitleStepperValueText}>
                     {tamanhoLegenda}pt
                   </Text>
                 </View>
-                <TouchableOpacity
+                <Focusable
                   style={styles.subtitleStepperButton}
+                  focusedStyle={styles.subtitleStepperButtonFocused}
                   onPress={() => setTamanhoLegenda((size) => Math.min(32, size + 1))}
-                  activeOpacity={0.75}
                 >
                   <Text allowFontScaling={false} style={styles.subtitleStepperButtonText}>+</Text>
-                </TouchableOpacity>
+                </Focusable>
               </View>
             </View>
 
-            <TouchableOpacity
+            <Focusable
               style={styles.subtitleRow}
+              focusedStyle={styles.subtitleRowFocused}
               onPress={() => {
                 setColorModalTarget('texto');
                 setColorModalVisible(true);
               }}
-              activeOpacity={0.75}
             >
               <Text allowFontScaling={false} style={styles.subtitleRowIcon}>A</Text>
               <Text allowFontScaling={false} style={styles.subtitleRowLabel}>cor da legenda</Text>
               <View style={[styles.subtitleColorSwatch, { backgroundColor: corLegenda }]} />
-            </TouchableOpacity>
+            </Focusable>
 
             <View style={[styles.subtitleRow, styles.subtitleRowLast]}>
-              <Text allowFontScaling={false} style={styles.subtitleRowIcon}>◒</Text>
-              <Text allowFontScaling={false} style={styles.subtitleRowLabel}>fundo da legenda</Text>
-              <Switch
-                value={fundoLegendaHabilitado}
-                onValueChange={setFundoLegendaHabilitado}
-                trackColor={{ false: '#3a3a4a', true: '#1aa2ff' }}
-                thumbColor="#ffffff"
-              />
-              <TouchableOpacity
+              <Focusable
+                style={styles.subtitleRowFundoToggle}
+                focusedStyle={styles.subtitleRowFocused}
+                onPress={() => setFundoLegendaHabilitado((v) => !v)}
+              >
+                <Text allowFontScaling={false} style={styles.subtitleRowIcon}>◒</Text>
+                <Text allowFontScaling={false} style={styles.subtitleRowLabel}>fundo da legenda</Text>
+                <Switch
+                  value={fundoLegendaHabilitado}
+                  onValueChange={setFundoLegendaHabilitado}
+                  trackColor={{ false: '#3a3a4a', true: '#1aa2ff' }}
+                  thumbColor="#ffffff"
+                  pointerEvents="none"
+                />
+              </Focusable>
+              <Focusable
+                style={styles.subtitleSwitchSpacing}
+                focusedStyle={styles.subtitleRowFocused}
                 onPress={() => {
                   setColorModalTarget('fundo');
                   setColorModalVisible(true);
                 }}
                 disabled={!fundoLegendaHabilitado}
-                activeOpacity={0.75}
-                style={styles.subtitleSwitchSpacing}
               >
                 <View
                   style={[
@@ -666,7 +712,7 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
                     !fundoLegendaHabilitado && styles.subtitleColorSwatchDisabled,
                   ]}
                 />
-              </TouchableOpacity>
+              </Focusable>
             </View>
           </View>
         </View>
@@ -684,36 +730,40 @@ export function SettingsScreen({ onBack, onSelectItem, channels = [], seriesMeta
               <Text allowFontScaling={false} style={[styles.modalTitle, styles.subtitleModalHeaderTitle]}>
                 {colorModalTarget === 'texto' ? 'Cor da legenda' : 'Fundo da legenda'}
               </Text>
-              <TouchableOpacity
-                onPress={() => setColorModalVisible(false)}
-                activeOpacity={0.75}
+              <Focusable
                 style={styles.subtitleModalCloseButton}
+                focusedStyle={styles.subtitleModalCloseButtonFocused}
+                onPress={() => setColorModalVisible(false)}
               >
                 <Text allowFontScaling={false} style={styles.subtitleModalCloseText}>✕</Text>
-              </TouchableOpacity>
+              </Focusable>
             </View>
 
             <View style={styles.colorModalBody}>
               <View style={styles.colorGrid}>
-                {subtitleColors.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[styles.colorSwatchOption, { backgroundColor: color }]}
-                    onPress={() => {
-                      if (colorModalTarget === 'texto') {
-                        setCorLegenda(color);
-                      } else {
-                        setFundoLegenda(color);
-                      }
-                      setColorModalVisible(false);
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    {color === (colorModalTarget === 'texto' ? corLegenda : fundoLegenda) && (
-                      <Text allowFontScaling={false} style={styles.colorSwatchCheck}>✓</Text>
-                    )}
-                  </TouchableOpacity>
-                ))}
+                {subtitleColors.map((color) => {
+                  const isSelected = color === (colorModalTarget === 'texto' ? corLegenda : fundoLegenda);
+                  return (
+                    <Focusable
+                      key={color}
+                      style={[styles.colorSwatchOption, { backgroundColor: color }]}
+                      focusedStyle={styles.colorSwatchOptionFocused}
+                      hasTVPreferredFocus={isSelected}
+                      onPress={() => {
+                        if (colorModalTarget === 'texto') {
+                          setCorLegenda(color);
+                        } else {
+                          setFundoLegenda(color);
+                        }
+                        setColorModalVisible(false);
+                      }}
+                    >
+                      {isSelected && (
+                        <Text allowFontScaling={false} style={styles.colorSwatchCheck}>✓</Text>
+                      )}
+                    </Focusable>
+                  );
+                })}
               </View>
             </View>
           </View>
@@ -925,6 +975,14 @@ const styles = StyleSheet.create({
   },
   subtitleModalCloseButton: {
     marginLeft: 12,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    paddingHorizontal: 6,
+  },
+  subtitleModalCloseButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
   },
   subtitleModalCloseText: {
     color: '#ffffff',
@@ -939,6 +997,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     gap: 12,
+  },
+  subtitleRowFundoToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  subtitleRowFocused: {
+    backgroundColor: '#1f24c2',
   },
   subtitleRowLast: {
     paddingBottom: 16,
@@ -977,8 +1044,14 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  subtitleStepperButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
   },
   subtitleStepperButtonText: {
     color: '#ffffff',
@@ -1018,8 +1091,13 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 6,
+    borderWidth: 3,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  colorSwatchOptionFocused: {
+    borderColor: '#3ddc84',
   },
   colorSwatchCheck: {
     color: '#f4c542',
