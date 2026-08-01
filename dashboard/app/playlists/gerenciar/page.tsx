@@ -50,45 +50,61 @@ function GerenciarPlaylistsContent() {
   const searchParams = useSearchParams();
   const mac = searchParams.get('mac') || '52:91:FA:0D:91:95';
 
-  const [activeTab, setActiveTab] = useState<'m3u' | 'xc'>('m3u');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [modalType, setModalType] = useState<'m3u' | 'xc' | null>(null);
 
-  const [m3uNome, setM3uNome] = useState('');
-  const [m3uUrl, setM3uUrl] = useState('');
+  const [nome, setNome] = useState('');
+  const [url, setUrl] = useState('');
+  const [servidor, setServidor] = useState('');
+  const [usuario, setUsuario] = useState('');
+  const [senha, setSenha] = useState('');
+  const [protegerComPin, setProtegerComPin] = useState(false);
+  const [pin, setPin] = useState('');
+  const [confirmarPin, setConfirmarPin] = useState('');
+  const [pinError, setPinError] = useState('');
 
-  const [xcNome, setXcNome] = useState('');
-  const [xcServidor, setXcServidor] = useState('');
-  const [xcUsuario, setXcUsuario] = useState('');
-  const [xcSenha, setXcSenha] = useState('');
-
-  const handleAddM3u = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!m3uNome || !m3uUrl) return;
-    setPlaylists((prev) => [
-      ...prev,
-      { id: crypto.randomUUID(), nome: m3uNome, url: m3uUrl, tipo: 'M3U', protegido: false },
-    ]);
-    setM3uNome('');
-    setM3uUrl('');
+  const closeModal = () => {
+    setModalType(null);
+    setNome('');
+    setUrl('');
+    setServidor('');
+    setUsuario('');
+    setSenha('');
+    setProtegerComPin(false);
+    setPin('');
+    setConfirmarPin('');
+    setPinError('');
   };
 
-  const handleAddXc = (e: React.FormEvent) => {
+  const handleSubmitModal = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!xcNome || !xcServidor || !xcUsuario || !xcSenha) return;
-    setPlaylists((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        nome: xcNome,
-        url: `${xcServidor} · ${xcUsuario}`,
-        tipo: 'XC',
-        protegido: true,
-      },
-    ]);
-    setXcNome('');
-    setXcServidor('');
-    setXcUsuario('');
-    setXcSenha('');
+
+    if (protegerComPin) {
+      if (pin.length < 4) {
+        setPinError('O PIN deve ter pelo menos 4 dígitos');
+        return;
+      }
+      if (pin !== confirmarPin) {
+        setPinError('Os PINs não coincidem');
+        return;
+      }
+    }
+
+    if (modalType === 'm3u') {
+      if (!nome || !url) return;
+      setPlaylists((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), nome, url, tipo: 'M3U', protegido: protegerComPin },
+      ]);
+    } else if (modalType === 'xc') {
+      if (!nome || !servidor || !usuario || !senha) return;
+      setPlaylists((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), nome, url: `${servidor} · ${usuario}`, tipo: 'XC', protegido: true },
+      ]);
+    }
+
+    closeModal();
   };
 
   const handleRemove = (id: string) => {
@@ -159,94 +175,18 @@ function GerenciarPlaylistsContent() {
           <div>
             <div className="flex gap-3 mb-6">
               <button
-                onClick={() => setActiveTab('m3u')}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
-                  activeTab === 'm3u'
-                    ? 'bg-white text-[#0b0a12] border-white'
-                    : 'border-white/20 text-gray-200 hover:bg-white/5'
-                }`}
+                onClick={() => setModalType('m3u')}
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-white/20 text-gray-200 hover:bg-white/5 transition-colors"
               >
                 Adicionar Playlist
               </button>
               <button
-                onClick={() => setActiveTab('xc')}
-                className={`px-5 py-2.5 rounded-lg text-sm font-semibold border transition-colors ${
-                  activeTab === 'xc'
-                    ? 'bg-white text-[#0b0a12] border-white'
-                    : 'border-white/20 text-gray-200 hover:bg-white/5'
-                }`}
+                onClick={() => setModalType('xc')}
+                className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-white/20 text-gray-200 hover:bg-white/5 transition-colors"
               >
                 Adicionar Playlist XC
               </button>
             </div>
-
-            {activeTab === 'm3u' ? (
-              <form
-                onSubmit={handleAddM3u}
-                className="mb-8 rounded-xl bg-white/5 border border-white/10 p-6 grid sm:grid-cols-2 gap-4"
-              >
-                <input
-                  type="text"
-                  placeholder="Nome da playlist"
-                  value={m3uNome}
-                  onChange={(e) => setM3uNome(e.target.value)}
-                  className="rounded-lg bg-[#1e3a5f] border border-white/10 px-4 py-2.5 text-white placeholder:text-blue-200/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                />
-                <input
-                  type="url"
-                  placeholder="URL M3U"
-                  value={m3uUrl}
-                  onChange={(e) => setM3uUrl(e.target.value)}
-                  className="rounded-lg bg-[#1e3a5f] border border-white/10 px-4 py-2.5 text-white placeholder:text-blue-200/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                />
-                <button
-                  type="submit"
-                  className="sm:col-span-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 transition-colors font-semibold py-2.5"
-                >
-                  Adicionar
-                </button>
-              </form>
-            ) : (
-              <form
-                onSubmit={handleAddXc}
-                className="mb-8 rounded-xl bg-white/5 border border-white/10 p-6 grid sm:grid-cols-2 gap-4"
-              >
-                <input
-                  type="text"
-                  placeholder="Nome da playlist"
-                  value={xcNome}
-                  onChange={(e) => setXcNome(e.target.value)}
-                  className="rounded-lg bg-[#1e3a5f] border border-white/10 px-4 py-2.5 text-white placeholder:text-blue-200/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Servidor (host:porta)"
-                  value={xcServidor}
-                  onChange={(e) => setXcServidor(e.target.value)}
-                  className="rounded-lg bg-[#1e3a5f] border border-white/10 px-4 py-2.5 text-white placeholder:text-blue-200/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                />
-                <input
-                  type="text"
-                  placeholder="Usuário"
-                  value={xcUsuario}
-                  onChange={(e) => setXcUsuario(e.target.value)}
-                  className="rounded-lg bg-[#1e3a5f] border border-white/10 px-4 py-2.5 text-white placeholder:text-blue-200/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                />
-                <input
-                  type="password"
-                  placeholder="Senha"
-                  value={xcSenha}
-                  onChange={(e) => setXcSenha(e.target.value)}
-                  className="rounded-lg bg-[#1e3a5f] border border-white/10 px-4 py-2.5 text-white placeholder:text-blue-200/50 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                />
-                <button
-                  type="submit"
-                  className="sm:col-span-2 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 transition-colors font-semibold py-2.5"
-                >
-                  Adicionar
-                </button>
-              </form>
-            )}
 
             <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
               <h2 className="text-lg font-semibold px-6 py-4 border-b border-white/10">Playlists Adicionadas</h2>
@@ -305,6 +245,126 @@ function GerenciarPlaylistsContent() {
           </div>
         </div>
       </section>
+
+      {modalType && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-[#151320] border border-white/10 p-8">
+            <h2 className="text-xl font-bold mb-6">Gerenciar Playlist</h2>
+
+            <form onSubmit={handleSubmitModal} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Nome da Playlist *"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                required
+                className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+              />
+
+              {modalType === 'm3u' ? (
+                <input
+                  type="url"
+                  placeholder="URL da Playlist *"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  required
+                  className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                />
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Servidor (host:porta) *"
+                    value={servidor}
+                    onChange={(e) => setServidor(e.target.value)}
+                    required
+                    className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Usuário *"
+                    value={usuario}
+                    onChange={(e) => setUsuario(e.target.value)}
+                    required
+                    className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                  />
+                  <input
+                    type="password"
+                    placeholder="Senha *"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                    required
+                    className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                  />
+                </>
+              )}
+
+              <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={protegerComPin}
+                  onChange={(e) => {
+                    setProtegerComPin(e.target.checked);
+                    setPinError('');
+                  }}
+                  className="w-4 h-4 rounded border-white/30 bg-transparent accent-fuchsia-600"
+                />
+                Proteja sua playlist com um PIN
+              </label>
+
+              {protegerComPin && (
+                <>
+                  <div className="flex gap-3 rounded-xl bg-yellow-900/20 border border-yellow-600/30 p-4">
+                    <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                      <line x1="12" y1="9" x2="12" y2="13" strokeLinecap="round" />
+                      <line x1="12" y1="17" x2="12.01" y2="17" strokeLinecap="round" />
+                    </svg>
+                    <p className="text-sm text-yellow-500/90 leading-relaxed">
+                      Defina um PIN para proteger suas playlists contra acessos e alterações não autorizadas.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="password"
+                      placeholder="PIN"
+                      value={pin}
+                      onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                      inputMode="numeric"
+                      maxLength={8}
+                      className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Confirmar PIN"
+                      value={confirmarPin}
+                      onChange={(e) => setConfirmarPin(e.target.value.replace(/\D/g, ''))}
+                      inputMode="numeric"
+                      maxLength={8}
+                      className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                    />
+                  </div>
+
+                  {pinError && <p className="text-sm text-red-400">{pinError}</p>}
+                </>
+              )}
+
+              <div className="flex justify-end gap-6 pt-2">
+                <button type="button" onClick={closeModal} className="text-sm font-semibold text-gray-300 hover:text-white">
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 transition-colors"
+                >
+                  Enviar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
