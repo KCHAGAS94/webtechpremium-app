@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '../../components/site-header';
 import { ActivateDeviceCard } from './activate-device-card';
+import { TransferActivationCard } from './transfer-activation-card';
 
 type Playlist = {
   id: string;
@@ -253,7 +254,7 @@ function GerenciarPlaylistsContent() {
                 </div>
               </>
             ) : (
-              <p className="text-sm text-gray-400">Em breve.</p>
+              <TransferActivationCard />
             )}
           </div>
         </div>
