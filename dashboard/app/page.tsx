@@ -281,7 +281,7 @@ export default function Home() {
           <div>
             <h4 className="text-fuchsia-400 font-semibold mb-4">LINKS RÁPIDOS</h4>
             <ul className="space-y-3 text-sm text-gray-300">
-              <li><a href="#contato" className="hover:text-fuchsia-400">Entre em contato</a></li>
+              <li><Link href="/contato" className="hover:text-fuchsia-400">Entre em contato</Link></li>
               <li><a href="#faqs" className="hover:text-fuchsia-400">FAQs</a></li>
               <li><Link href="/playlists" className="hover:text-fuchsia-400">Gerenciar Playlists</Link></li>
               <li><a href="#ativar" className="hover:text-fuchsia-400">Ativar</a></li>

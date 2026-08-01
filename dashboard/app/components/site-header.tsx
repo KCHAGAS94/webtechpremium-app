@@ -6,8 +6,7 @@ import Link from 'next/link';
 const NAV_LINKS = [
   { label: 'Início', href: '/#inicio' },
   { label: 'Gerenciar Playlists', href: '/playlists' },
-  { label: 'Ativar', href: '/#ativar' },
-  { label: 'Entre em Contato', href: '/#contato' },
+  { label: 'Entre em Contato', href: '/contato' },
 ];
 
 export function SiteHeader() {
