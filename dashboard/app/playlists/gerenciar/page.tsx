@@ -3,6 +3,7 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '../../components/site-header';
+import { ActivateDeviceCard } from './activate-device-card';
 
 type Playlist = {
   id: string;
@@ -50,6 +51,7 @@ function GerenciarPlaylistsContent() {
   const searchParams = useSearchParams();
   const mac = searchParams.get('mac') || '52:91:FA:0D:91:95';
 
+  const [activeSection, setActiveSection] = useState<'gerenciamento' | 'ativar' | 'transferir'>('gerenciamento');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [modalType, setModalType] = useState<'m3u' | 'xc' | null>(null);
 
@@ -121,7 +123,9 @@ function GerenciarPlaylistsContent() {
         <div className="absolute -top-24 left-1/3 w-[500px] h-[500px] bg-fuchsia-600/20 rounded-full blur-3xl" />
 
         <div className="relative max-w-7xl mx-auto px-6 py-16">
-          <h1 className="text-4xl md:text-5xl font-extrabold mb-10">Gerenciar suas playlists</h1>
+          <h1 className="text-4xl md:text-5xl font-extrabold mb-10">
+            {activeSection === 'ativar' ? 'Ative seu dispositivo' : 'Gerenciar suas playlists'}
+          </h1>
 
           <div className="inline-block rounded-xl bg-black/40 border border-white/10 px-8 py-6">
             <dl className="space-y-2 text-sm">
@@ -150,8 +154,9 @@ function GerenciarPlaylistsContent() {
             {SIDEBAR_ITEMS.map((item) => (
               <button
                 key={item.key}
+                onClick={() => setActiveSection(item.key as typeof activeSection)}
                 className={`w-full flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-semibold text-left whitespace-pre-line transition-colors ${
-                  item.key === 'gerenciamento'
+                  activeSection === item.key
                     ? 'bg-fuchsia-700/40 border border-fuchsia-500/60 text-white'
                     : 'bg-white/5 border border-white/10 text-gray-200 hover:bg-white/10'
                 }`}
@@ -173,75 +178,83 @@ function GerenciarPlaylistsContent() {
 
           {/* Conteúdo */}
           <div>
-            <div className="flex gap-3 mb-6">
-              <button
-                onClick={() => setModalType('m3u')}
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-white/20 text-gray-200 hover:bg-white/5 transition-colors"
-              >
-                Adicionar Playlist
-              </button>
-              <button
-                onClick={() => setModalType('xc')}
-                className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-white/20 text-gray-200 hover:bg-white/5 transition-colors"
-              >
-                Adicionar Playlist XC
-              </button>
-            </div>
+            {activeSection === 'ativar' ? (
+              <ActivateDeviceCard />
+            ) : activeSection === 'gerenciamento' ? (
+              <>
+                <div className="flex gap-3 mb-6">
+                  <button
+                    onClick={() => setModalType('m3u')}
+                    className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-white/20 text-gray-200 hover:bg-white/5 transition-colors"
+                  >
+                    Adicionar Playlist
+                  </button>
+                  <button
+                    onClick={() => setModalType('xc')}
+                    className="px-5 py-2.5 rounded-lg text-sm font-semibold border border-white/20 text-gray-200 hover:bg-white/5 transition-colors"
+                  >
+                    Adicionar Playlist XC
+                  </button>
+                </div>
 
-            <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
-              <h2 className="text-lg font-semibold px-6 py-4 border-b border-white/10">Playlists Adicionadas</h2>
+                <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
+                  <h2 className="text-lg font-semibold px-6 py-4 border-b border-white/10">Playlists Adicionadas</h2>
 
-              {playlists.length === 0 ? (
-                <p className="px-6 py-10 text-center text-sm text-gray-400">
-                  Nenhuma playlist adicionada ainda.
-                </p>
-              ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-400 border-b border-white/10">
-                      <th className="px-6 py-3 font-medium">Nome</th>
-                      <th className="px-6 py-3 font-medium">URL</th>
-                      <th className="px-6 py-3 font-medium">Tipo</th>
-                      <th className="px-6 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {playlists.map((playlist) => (
-                      <tr key={playlist.id} className="border-b border-white/5 last:border-0">
-                        <td className="px-6 py-4 font-medium">{playlist.nome}</td>
-                        <td className="px-6 py-4 text-gray-300 max-w-xs truncate">
-                          {playlist.protegido ? (
-                            <span className="inline-block rounded border border-orange-500/60 text-orange-400 text-xs font-semibold px-2 py-0.5">
-                              Protegido
-                            </span>
-                          ) : (
-                            playlist.url
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="inline-block rounded bg-emerald-600/20 text-emerald-400 text-xs font-semibold px-2 py-0.5">
-                            {playlist.tipo}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex gap-2 justify-end">
-                            <button className="flex items-center gap-1 rounded-lg border border-sky-500/50 text-sky-400 text-xs font-semibold px-3 py-1.5 hover:bg-sky-500/10">
-                              Editar
-                            </button>
-                            <button
-                              onClick={() => handleRemove(playlist.id)}
-                              className="flex items-center gap-1 rounded-lg border border-red-500/50 text-red-400 text-xs font-semibold px-3 py-1.5 hover:bg-red-500/10"
-                            >
-                              Excluir
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                  {playlists.length === 0 ? (
+                    <p className="px-6 py-10 text-center text-sm text-gray-400">
+                      Nenhuma playlist adicionada ainda.
+                    </p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-400 border-b border-white/10">
+                          <th className="px-6 py-3 font-medium">Nome</th>
+                          <th className="px-6 py-3 font-medium">URL</th>
+                          <th className="px-6 py-3 font-medium">Tipo</th>
+                          <th className="px-6 py-3" />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {playlists.map((playlist) => (
+                          <tr key={playlist.id} className="border-b border-white/5 last:border-0">
+                            <td className="px-6 py-4 font-medium">{playlist.nome}</td>
+                            <td className="px-6 py-4 text-gray-300 max-w-xs truncate">
+                              {playlist.protegido ? (
+                                <span className="inline-block rounded border border-orange-500/60 text-orange-400 text-xs font-semibold px-2 py-0.5">
+                                  Protegido
+                                </span>
+                              ) : (
+                                playlist.url
+                              )}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="inline-block rounded bg-emerald-600/20 text-emerald-400 text-xs font-semibold px-2 py-0.5">
+                                {playlist.tipo}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex gap-2 justify-end">
+                                <button className="flex items-center gap-1 rounded-lg border border-sky-500/50 text-sky-400 text-xs font-semibold px-3 py-1.5 hover:bg-sky-500/10">
+                                  Editar
+                                </button>
+                                <button
+                                  onClick={() => handleRemove(playlist.id)}
+                                  className="flex items-center gap-1 rounded-lg border border-red-500/50 text-red-400 text-xs font-semibold px-3 py-1.5 hover:bg-red-500/10"
+                                >
+                                  Excluir
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-gray-400">Em breve.</p>
+            )}
           </div>
         </div>
       </section>
