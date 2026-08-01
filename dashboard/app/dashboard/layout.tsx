@@ -8,6 +8,7 @@ import axios from 'axios';
 const menuItems = [
   { label: 'USUÁRIOS', icon: '👥', href: '/dashboard/usuarios' },
   { label: 'SERVIDORES', icon: '🖥️', href: '/dashboard/servidores' },
+  { label: 'CRÉDITO', icon: '💳', href: '/dashboard/creditos' },
   { label: 'BANNERS', icon: '📋' },
   { label: 'BACKGROUND', icon: '🖼️' },
   { label: 'LOGO', icon: '🏠' },
