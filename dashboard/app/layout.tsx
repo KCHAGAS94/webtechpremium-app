@@ -5,8 +5,8 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'WebTech Premium - Dashboard',
-  description: 'Painel de gerenciamento de apps',
+  title: 'WebTech Premium',
+  description: 'Reprodutor IPTV rápido, confiável e multiplataforma',
 };
 
 export default function RootLayout({
