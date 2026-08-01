@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { SiteHeader } from '../components/site-header';
 
 function formatMacAddress(value: string) {
@@ -9,12 +10,14 @@ function formatMacAddress(value: string) {
 }
 
 export default function PlaylistsPage() {
+  const router = useRouter();
   const [macAddress, setMacAddress] = useState('');
   const [deviceKey, setDeviceKey] = useState('');
   const [showKey, setShowKey] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    router.push(`/playlists/gerenciar?mac=${encodeURIComponent(macAddress)}`);
   };
 
   return (
