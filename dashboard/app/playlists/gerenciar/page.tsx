@@ -1,18 +1,28 @@
 'use client';
 
-import { Suspense, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { SiteHeader } from '../../components/site-header';
 import { ActivateDeviceCard } from './activate-device-card';
 import { TransferActivationCard } from './transfer-activation-card';
 
 type Playlist = {
-  id: string;
+  id: number;
   nome: string;
   url: string;
   tipo: 'M3U' | 'XC';
   protegido: boolean;
 };
+
+// Xtream credentials get folded into the same get.php URL format the painel
+// already expects (see mobile/src/utils/xtream-api.ts:parseXtreamCredentials,
+// which reads username/password back out of the querystring).
+function buildXtreamUrl(servidor: string, usuario: string, senha: string): string {
+  const base = /^https?:\/\//i.test(servidor) ? servidor : `http://${servidor}`;
+  const trimmed = base.replace(/\/+$/, '');
+  const params = new URLSearchParams({ username: usuario, password: senha, type: 'm3u_plus', output: 'ts' });
+  return `${trimmed}/get.php?${params.toString()}`;
+}
 
 const SIDEBAR_ITEMS = [
   {
@@ -55,6 +65,7 @@ function GerenciarPlaylistsContent() {
   const [activeSection, setActiveSection] = useState<'gerenciamento' | 'ativar' | 'transferir'>('gerenciamento');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [modalType, setModalType] = useState<'m3u' | 'xc' | null>(null);
+  const [submitError, setSubmitError] = useState('');
 
   const [nome, setNome] = useState('');
   const [url, setUrl] = useState('');
@@ -65,6 +76,29 @@ function GerenciarPlaylistsContent() {
   const [pin, setPin] = useState('');
   const [confirmarPin, setConfirmarPin] = useState('');
   const [pinError, setPinError] = useState('');
+
+  const loadPlaylists = async () => {
+    try {
+      const response = await fetch(`/api/app/listas?mac=${encodeURIComponent(mac)}`);
+      const data = await response.json();
+      setPlaylists(
+        (data.listas ?? []).map((lista: { id: number; nome: string; url: string }) => ({
+          id: lista.id,
+          nome: lista.nome,
+          url: lista.url,
+          tipo: lista.url.includes('get.php') ? 'XC' : 'M3U',
+          protegido: lista.url.includes('get.php'),
+        }))
+      );
+    } catch (error) {
+      console.error('Falha ao carregar playlists do app', error);
+    }
+  };
+
+  useEffect(() => {
+    loadPlaylists();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mac]);
 
   const closeModal = () => {
     setModalType(null);
@@ -77,9 +111,10 @@ function GerenciarPlaylistsContent() {
     setPin('');
     setConfirmarPin('');
     setPinError('');
+    setSubmitError('');
   };
 
-  const handleSubmitModal = (e: React.FormEvent) => {
+  const handleSubmitModal = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (protegerComPin) {
@@ -93,25 +128,43 @@ function GerenciarPlaylistsContent() {
       }
     }
 
+    let playlistUrl: string;
     if (modalType === 'm3u') {
       if (!nome || !url) return;
-      setPlaylists((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), nome, url, tipo: 'M3U', protegido: protegerComPin },
-      ]);
+      playlistUrl = url;
     } else if (modalType === 'xc') {
       if (!nome || !servidor || !usuario || !senha) return;
-      setPlaylists((prev) => [
-        ...prev,
-        { id: crypto.randomUUID(), nome, url: `${servidor} · ${usuario}`, tipo: 'XC', protegido: true },
-      ]);
+      playlistUrl = buildXtreamUrl(servidor, usuario, senha);
+    } else {
+      return;
     }
 
-    closeModal();
+    setSubmitError('');
+    try {
+      const response = await fetch('/api/app/listas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mac, nome, url: playlistUrl }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Falha ao salvar playlist');
+      }
+      await loadPlaylists();
+      closeModal();
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Falha ao salvar playlist');
+    }
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: number) => {
     setPlaylists((prev) => prev.filter((p) => p.id !== id));
+    try {
+      const response = await fetch(`/api/app/listas?id=${id}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error();
+    } catch {
+      await loadPlaylists();
+    }
   };
 
   return (
@@ -363,6 +416,8 @@ function GerenciarPlaylistsContent() {
                   {pinError && <p className="text-sm text-red-400">{pinError}</p>}
                 </>
               )}
+
+              {submitError && <p className="text-sm text-red-400">{submitError}</p>}
 
               <div className="flex justify-end gap-6 pt-2">
                 <button type="button" onClick={closeModal} className="text-sm font-semibold text-gray-300 hover:text-white">

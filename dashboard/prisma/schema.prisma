@@ -66,16 +66,28 @@ model Servidor {
 // (e.g. http://host:port/get.php?username=...&password=...&type=m3u_plus) —
 // the reseller now pastes the full URL instead of the panel building it from
 // three separate fields.
+//
+// A device's playlists can come from two places: a reseller assigning one in
+// the painel ("Usuários"), or the end user pasting their own directly in the
+// app's "Gerenciamento de Playlist" screen (not every MAC has a reseller who
+// bothers linking a list). Both feed the same device — `origem` distinguishes
+// them so /api/devices can prioritize PAINEL over APP without a second table.
 model Lista {
-  id            Int       @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   nome          String
-  url           String    @default("")
+  url           String      @default("")
   dataExpiracao DateTime?
-  isActive      Boolean   @default(true)
+  isActive      Boolean     @default(true)
+  origem        ListaOrigem @default(PAINEL)
   appId         Int
-  app           App       @relation(fields: [appId], references: [id], onDelete: Cascade)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  app           App         @relation(fields: [appId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@index([appId])
+}
+
+enum ListaOrigem {
+  PAINEL
+  APP
 }

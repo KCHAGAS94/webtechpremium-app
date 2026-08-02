@@ -26,16 +26,20 @@ async function registerDevice(macAddress: string) {
     include: {
       listas: {
         where: { isActive: true },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ origem: 'asc' }, { createdAt: 'asc' }],
       },
     },
   });
 }
 
 // Public endpoint the mobile app polls when the user presses "Recarregar
-// Lista": given a device's MAC, return the M3U links a reseller has linked
-// to it in the painel. No auth — the MAC itself is the credential here, same
-// as an Xtream/IPTV portal keying access off a device id.
+// Lista": given a device's MAC, return the M3U links assigned to it — either
+// by a reseller in the painel, or pasted by the end user in the app's own
+// "Gerenciamento de Playlist" screen when no reseller has linked one. Panel
+// lists come first (ListaOrigem declares PAINEL before APP, and Prisma sorts
+// enums by declaration order), so the app tries those before falling back to
+// self-added ones. No auth — the MAC itself is the credential here, same as
+// an Xtream/IPTV portal keying access off a device id.
 export async function GET(request: NextRequest) {
   const mac = request.nextUrl.searchParams.get('mac');
   if (!mac) {
@@ -48,7 +52,7 @@ export async function GET(request: NextRequest) {
     include: {
       listas: {
         where: { isActive: true },
-        orderBy: { createdAt: 'asc' },
+        orderBy: [{ origem: 'asc' }, { createdAt: 'asc' }],
       },
     },
   });

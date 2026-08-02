@@ -532,7 +532,7 @@ function AppContent() {
             </View>
             <Text allowFontScaling={false} style={styles.accountRenewHint}>
               Renove sua assinatura em{'\n'}
-              <Text style={styles.accountRenewLink}>webtech.pro.kchagas.com.br</Text>
+              <Text style={styles.accountRenewLink}>https://painel.webtechpremium.kchagas.com.br/</Text>
             </Text>
 
             <FocusableCard

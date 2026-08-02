@@ -134,8 +134,8 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
             <ThemedText style={styles.macLabel}>Data de Expiração</ThemedText>
             <ThemedText style={styles.expirationValue}>{expirationDate || 'Não informada'}</ThemedText>
             <ThemedText style={styles.macHint}>
-              Renove sua assinatura em{' '}
-              <ThemedText style={styles.renewLink}>webtech.pro.kchagas.com.br</ThemedText>
+              Renove sua assinatura em{' \n'}
+              <ThemedText style={styles.renewLink}>https://painel.webtechpremium.kchagas.com.br/</ThemedText>
             </ThemedText>
           </View>
         </View>
