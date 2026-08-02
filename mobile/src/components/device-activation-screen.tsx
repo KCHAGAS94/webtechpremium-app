@@ -27,10 +27,10 @@ export function DeviceActivationScreen({
     >
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.card}>
-          <ThemedText style={styles.title}>Dispositivo não ativado</ThemedText>
-          <ThemedText style={styles.subtitle}>Insira a lista no painel</ThemedText>
+          {/* <ThemedText style={styles.title}>Dispositivo não ativado</ThemedText> */}
+          {/* <ThemedText style={styles.subtitle}>Insira a lista no painel</ThemedText> */}
 
-          <View style={styles.divider} />
+          {/* <View style={styles.divider} /> */}
 
           <View style={styles.detailBlock}>
             <ThemedText style={styles.detailLabel}>Seu Endereço MAC</ThemedText>
@@ -45,8 +45,9 @@ export function DeviceActivationScreen({
           <View style={styles.divider} />
 
           <ThemedText style={styles.instructions}>
-            Acesse o site{' '}
-            <ThemedText style={styles.link}>https://www.paineldousuario.com.br/</ThemedText>{' '}
+            Acesse o site{'\n'}
+            <ThemedText style={styles.link}>https://www.painel.webtechpremium.kchagas.com.br/</ThemedText>
+            {'\n'}
             ou fale com seu revendedor para vincular sua lista M3U a este endereço MAC.
           </ThemedText>
 
