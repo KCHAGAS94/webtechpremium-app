@@ -206,12 +206,12 @@ function AppContent() {
       const mac = await getDeviceMac();
       setDeviceMac(mac);
 
-      // Fast path: show last session's channels instantly instead of making
-      // the user stare at the boot screen through a full panel+M3U+genre
-      // fetch on every single launch. The network refresh below still runs
-      // right after, silently replacing this with fresh data (or leaving it
-      // as-is if the refresh fails) — this is just cached data shown early,
-      // never the source of truth.
+      // The app never contacts the painel on its own anymore — linking a
+      // MAC to a lista now happens on the painel side (reseller does it),
+      // and the app only asks "what's assigned to this MAC?" when the user
+      // explicitly presses "Recarregar Lista" on the activation screen (see
+      // handleReloadPlaylist below). Boot just restores whatever was cached
+      // locally from the last successful manual fetch.
       const cached = await getCachedPlaylistState(mac);
       if (cached) {
         setPlaylists(cached.panelPlaylists);
@@ -221,21 +221,10 @@ function AppContent() {
         if (cached.panelPlaylists.length === 0) {
           setCurrentScreen('playlist');
         }
-        setBooting(false);
-        fetchAndActivateFromPanel(mac).catch(() => {
-          // Background refresh failed — keep showing the cached data.
-        });
-        return;
-      }
-
-      try {
-        await fetchAndActivateFromPanel(mac);
-      } catch {
-        // No painel reachable at boot: stay on the activation/lock screen.
+      } else {
         setCurrentScreen('playlist');
-      } finally {
-        setBooting(false);
       }
+      setBooting(false);
     })();
   }, []);
 

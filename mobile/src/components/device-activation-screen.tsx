@@ -45,10 +45,9 @@ export function DeviceActivationScreen({
           <View style={styles.divider} />
 
           <ThemedText style={styles.instructions}>
-            Acesse o site{'\n'}
-            <ThemedText style={styles.link}>https://www.painel.webtechpremium.kchagas.com.br/</ThemedText>
-            {'\n'}
-            ou fale com seu revendedor para vincular sua lista M3U a este endereço MAC.
+            Fale com seu revendedor e informe este endereço MAC{'\n'}
+            para vincular sua lista M3U. Depois, toque em{'\n'}
+            "Recarregar Lista" para ativar.
           </ThemedText>
 
           <TouchableOpacity
