@@ -2,20 +2,11 @@
 
 import React, { useEffect, useState } from 'react';
 
-type Servidor = {
-  id: number;
-  nome: string;
-  url: string;
-};
-
 type Lista = {
   id: number;
   mac: string;
-  servidorId: number;
-  servidorNome: string;
   nome: string;
-  usuario: string;
-  senha: string;
+  url: string;
   expiracaoData: string;
   expirado: boolean;
   instaladoEm: string;
@@ -43,12 +34,10 @@ function formatMacAddress(value: string): string {
 
 function EditModal({
   lista,
-  servidores,
   onClose,
   onSave,
 }: {
   lista: Lista | null;
-  servidores: Servidor[];
   onClose: () => void;
   onSave: (lista: Lista) => void;
 }) {
@@ -61,12 +50,12 @@ function EditModal({
   if (!lista) return null;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const { name, value } = e.target;
     setFormData({
       ...formData,
-      [name]: name === 'mac' ? formatMacAddress(value) : name === 'servidorId' ? Number(value) : value,
+      [name]: name === 'mac' ? formatMacAddress(value) : value,
     });
   };
 
@@ -100,47 +89,6 @@ function EditModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Servidor</label>
-            <select
-              name="servidorId"
-              value={formData.servidorId || ''}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-            >
-              <option value="" disabled>
-                Selecione um servidor
-              </option>
-              {servidores.map((servidor) => (
-                <option key={servidor.id} value={servidor.id}>
-                  {servidor.nome}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Usuário</label>
-            <input
-              type="text"
-              name="usuario"
-              value={formData.usuario}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Senha</label>
-            <input
-              type="text"
-              name="senha"
-              value={formData.senha}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Lista</label>
             <input
               type="text"
@@ -148,6 +96,18 @@ function EditModal({
               value={formData.nome}
               onChange={handleChange}
               placeholder="Ex: Lista principal"
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Link da lista (M3U)</label>
+            <input
+              type="text"
+              name="url"
+              value={formData.url}
+              onChange={handleChange}
+              placeholder="http://host:porta/get.php?username=...&password=...&type=m3u_plus&output=ts"
               className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
             />
           </div>
@@ -185,7 +145,6 @@ function EditModal({
 
 export default function UsuariosPage() {
   const [listas, setListas] = useState(mockListas);
-  const [servidores, setServidores] = useState<Servidor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
 
@@ -201,23 +160,13 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     loadListas();
-
-    (async () => {
-      try {
-        const response = await fetch('/api/painel/servidores');
-        const data = await response.json();
-        setServidores(data.servidores ?? []);
-      } catch (error) {
-        console.error('Falha ao carregar servidores', error);
-      }
-    })();
   }, []);
 
   const filteredListas = listas.filter(
     (lista) =>
       (lista.mac ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lista.usuario ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lista.nome ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+      (lista.nome ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (lista.url ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleDelete = async (lista: Lista) => {
@@ -250,11 +199,8 @@ export default function UsuariosPage() {
     setEditingLista({
       id: 0,
       mac: '',
-      servidorId: servidores[0]?.id ?? 0,
-      servidorNome: '',
       nome: '',
-      usuario: '',
-      senha: '',
+      url: '',
       expiracaoData: '',
       expirado: false,
       instaladoEm: '',
@@ -269,10 +215,8 @@ export default function UsuariosPage() {
         body: JSON.stringify({
           id: lista.id || undefined,
           mac: lista.mac,
-          servidorId: lista.servidorId,
           nome: lista.nome,
-          usuario: lista.usuario,
-          senha: lista.senha,
+          url: lista.url,
           expiracaoData: lista.expiracaoData,
         }),
       });
@@ -315,7 +259,7 @@ export default function UsuariosPage() {
           <span>🔍</span>
           <input
             type="text"
-            placeholder="Pesquisar Mac / Usuário / Lista..."
+            placeholder="Pesquisar Mac / Lista / Link..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-3 py-2 outline-none min-w-0"
@@ -352,20 +296,12 @@ export default function UsuariosPage() {
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <div>
-                <div className="text-xs text-gray-400">Usuário</div>
-                <div className="text-gray-700">{lista.usuario || '—'}</div>
-              </div>
-              <div>
-                <div className="text-xs text-gray-400">Senha</div>
-                <div className="text-gray-700">{lista.senha || '—'}</div>
-              </div>
-              <div>
                 <div className="text-xs text-gray-400">Lista</div>
                 <div className="text-gray-700">{lista.nome}</div>
               </div>
-              <div>
-                <div className="text-xs text-gray-400">Servidor</div>
-                <div className="text-gray-700">{lista.servidorNome}</div>
+              <div className="col-span-2">
+                <div className="text-xs text-gray-400">Link</div>
+                <div className="text-gray-700 truncate" title={lista.url}>{lista.url || '—'}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-400">Instalado em</div>
@@ -398,10 +334,8 @@ export default function UsuariosPage() {
             <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Mac</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Usuário</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Senha</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Lista</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Servidor</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Link</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Instalado em</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
@@ -412,10 +346,8 @@ export default function UsuariosPage() {
               {filteredListas.map((lista) => (
                 <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
-                  <td className="px-6 py-3 text-gray-600">{lista.usuario}</td>
-                  <td className="px-6 py-3 text-gray-600">{lista.senha}</td>
                   <td className="px-6 py-3 text-gray-600">{lista.nome}</td>
-                  <td className="px-6 py-3 text-gray-600">{lista.servidorNome}</td>
+                  <td className="px-6 py-3 text-gray-600 max-w-xs truncate" title={lista.url}>{lista.url}</td>
                   <td className="px-6 py-3 text-gray-600 whitespace-nowrap">{formatInstaladoEm(lista.instaladoEm)}</td>
                   <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
                   <td className="px-6 py-3">
@@ -456,7 +388,7 @@ export default function UsuariosPage() {
       </div>
 
       {/* Edit/Add Modal */}
-      <EditModal lista={editingLista} servidores={servidores} onClose={handleCloseModal} onSave={handleSave} />
+      <EditModal lista={editingLista} onClose={handleCloseModal} onSave={handleSave} />
     </div>
   );
 }

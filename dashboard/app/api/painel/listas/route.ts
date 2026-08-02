@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   const listas = await prisma.lista.findMany({
     where: appId ? { appId: Number(appId) } : undefined,
     orderBy: { createdAt: 'asc' },
-    include: { servidor: true, app: true },
+    include: { app: true },
   });
 
   return NextResponse.json(
@@ -34,11 +34,8 @@ export async function GET(request: NextRequest) {
       listas: listas.map((lista) => ({
         id: lista.id,
         mac: lista.app.macAddress,
-        servidorId: lista.servidorId,
-        servidorNome: lista.servidor.nome,
         nome: lista.nome,
-        usuario: lista.usuario,
-        senha: lista.senha,
+        url: lista.url,
         expiracaoData: lista.dataExpiracao ? lista.dataExpiracao.toISOString().slice(0, 10) : '',
         expirado: isExpirado(lista.dataExpiracao),
         instaladoEm: lista.app.createdAt.toISOString(),
@@ -49,13 +46,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { id, mac, servidorId, nome, usuario, senha, expiracaoData } = await request.json();
+  const { id, mac, nome, url, expiracaoData } = await request.json();
 
   if (!mac) {
     return NextResponse.json({ error: 'MAC é obrigatório' }, { status: 400 });
   }
-  if (!servidorId) {
-    return NextResponse.json({ error: 'servidorId é obrigatório' }, { status: 400 });
+  if (!url) {
+    return NextResponse.json({ error: 'Link da lista é obrigatório' }, { status: 400 });
   }
 
   const macAddress = String(mac).toUpperCase();
@@ -69,10 +66,8 @@ export async function POST(request: NextRequest) {
   const dataExpiracao = expiracaoData ? new Date(expiracaoData) : null;
   const data = {
     appId: app.id,
-    servidorId: Number(servidorId),
     nome: nome || 'Lista',
-    usuario,
-    senha,
+    url,
     dataExpiracao,
   };
 

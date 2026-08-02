@@ -60,24 +60,22 @@ model Servidor {
   url       String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  listas Lista[]
 }
 
+// usuario/senha/servidor were merged into a single manually-pasted M3U link
+// (e.g. http://host:port/get.php?username=...&password=...&type=m3u_plus) —
+// the reseller now pastes the full URL instead of the panel building it from
+// three separate fields.
 model Lista {
   id            Int       @id @default(autoincrement())
   nome          String
-  usuario       String
-  senha         String
+  url           String    @default("")
   dataExpiracao DateTime?
   isActive      Boolean   @default(true)
   appId         Int
   app           App       @relation(fields: [appId], references: [id], onDelete: Cascade)
-  servidorId    Int
-  servidor      Servidor  @relation(fields: [servidorId], references: [id])
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   @@index([appId])
-  @@index([servidorId])
 }
