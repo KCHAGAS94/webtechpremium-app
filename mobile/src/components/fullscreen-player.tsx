@@ -13,6 +13,7 @@ import { SeekBar } from '@/components/seek-bar';
 import { ThemedText } from '@/components/themed-text';
 import { VerticalSlider } from '@/components/vertical-slider';
 import { useCastStream } from '@/utils/cast-stream';
+import { isHlsStreamUrl } from '@/utils/stream-format';
 import { loadSubtitleSettings } from '@/utils/subtitle-settings-storage';
 
 const AUTO_HIDE_MS = 4000;
@@ -97,7 +98,10 @@ export function FullscreenPlayer({
 
   useCastStream({
     url: streamUrl,
-    contentType: 'application/x-mpegurl',
+    // Only HLS streams need the receiver told explicitly what they are (see
+    // stream-format.ts) — a `output=ts` URL is a raw MPEG-TS stream, which
+    // the receiver already sniffs correctly on its own.
+    contentType: isHlsStreamUrl(streamUrl) ? 'application/x-mpegurl' : undefined,
     title,
     isLive: true,
     player,

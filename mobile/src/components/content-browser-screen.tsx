@@ -23,6 +23,7 @@ import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { addLiveWatchHistoryEntry } from '@/utils/live-watch-history-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { normalizeSearchText } from '@/utils/text-normalize';
+import { isHlsStreamUrl } from '@/utils/stream-format';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
 
@@ -346,14 +347,20 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
 
   const isSelectedChannelFavorite = !!selectedChannel && favorites.has(selectedChannel.name);
 
-  // Xtream/live stream URLs (e.g. get.php?...&output=hls) rarely end in
-  // `.m3u8`, so expo-video's `auto` content-type detection (by extension)
-  // misses them and falls back to a progressive-download demuxer, which
-  // can't parse an HLS playlist. Live channels need `contentType: 'hls'`
-  // forced explicitly; movies/series keep `auto` since those already work.
+  // Xtream/live stream URLs served as HLS (e.g. get.php?...&output=hls)
+  // rarely end in `.m3u8`, so expo-video's `auto` content-type detection (by
+  // extension) misses them and falls back to a progressive-download demuxer,
+  // which can't parse an HLS playlist — those need `contentType: 'hls'`
+  // forced explicitly. A `output=ts` URL is the opposite: it's a raw
+  // MPEG-TS stream that `auto` already plays fine, and forcing 'hls' on it
+  // would break it the same way. So this is decided per-URL (see
+  // stream-format.ts), not assumed for every live channel; movies/series
+  // keep `auto` since those already work.
   const videoSource = useMemo(() => {
     if (!selectedChannel) return null;
-    if (category === 'live') return { uri: selectedChannel.url, contentType: 'hls' as const };
+    if (category === 'live' && isHlsStreamUrl(selectedChannel.url)) {
+      return { uri: selectedChannel.url, contentType: 'hls' as const };
+    }
     return selectedChannel.url;
   }, [selectedChannel, category]);
 
