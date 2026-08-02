@@ -111,6 +111,7 @@ function AppContent() {
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
+  const [reloadPlaylistError, setReloadPlaylistError] = useState('');
   const [reloadingChannels, setReloadingChannels] = useState(false);
   const [reloadChannelsError, setReloadChannelsError] = useState('');
   const [reloadBlockedMessage, setReloadBlockedMessage] = useState('');
@@ -187,20 +188,6 @@ function AppContent() {
     }
   };
 
-  const fetchAndActivateFromPanel = async (mac: string) => {
-    const panelPlaylists = await fetchDevicePlaylists(mac);
-    setPlaylists(panelPlaylists);
-
-    if (panelPlaylists.length === 0) {
-      setActivePlaylistId(null);
-      setChannels([]);
-      setCurrentScreen('playlist');
-      return;
-    }
-
-    await activatePlaylist(panelPlaylists[0], mac, panelPlaylists);
-  };
-
   useEffect(() => {
     (async () => {
       const mac = await getDeviceMac();
@@ -234,10 +221,23 @@ function AppContent() {
 
   const handleReloadPlaylist = async () => {
     setReloadingPlaylist(true);
+    setReloadPlaylistError('');
     try {
-      await fetchAndActivateFromPanel(deviceMac);
-    } catch {
-      // Reload is best-effort; user stays on the activation screen to retry.
+      const panelPlaylists = await fetchDevicePlaylists(deviceMac);
+      setPlaylists(panelPlaylists);
+
+      if (panelPlaylists.length === 0) {
+        setActivePlaylistId(null);
+        setChannels([]);
+        setReloadPlaylistError('Nenhuma lista vinculada a este MAC ainda no painel.');
+        return;
+      }
+
+      await activatePlaylist(panelPlaylists[0], deviceMac, panelPlaylists);
+    } catch (err) {
+      setReloadPlaylistError(
+        err instanceof Error ? `Falha ao consultar o painel: ${err.message}` : 'Falha ao consultar o painel.'
+      );
     } finally {
       setReloadingPlaylist(false);
     }
@@ -300,6 +300,7 @@ function AppContent() {
         <DeviceActivationScreen
           macAddress={deviceMac}
           onReload={handleReloadPlaylist}
+          error={reloadPlaylistError}
           reloading={reloadingPlaylist}
         />
       );

@@ -10,6 +10,7 @@ type Props = {
   subscriptionStatus?: string;
   onReload: () => void;
   reloading?: boolean;
+  error?: string;
 };
 
 export function DeviceActivationScreen({
@@ -17,6 +18,7 @@ export function DeviceActivationScreen({
   subscriptionStatus = 'Expirado / Não Conectado',
   onReload,
   reloading = false,
+  error = '',
 }: Props) {
   return (
     <LinearGradient
@@ -49,6 +51,8 @@ export function DeviceActivationScreen({
             para vincular sua lista M3U. Depois, toque em{'\n'}
             "Recarregar Lista" para ativar.
           </ThemedText>
+
+          {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
           <TouchableOpacity
             style={[styles.reloadButton, reloading && styles.reloadButtonDisabled]}
@@ -136,6 +140,12 @@ const styles = StyleSheet.create({
   link: {
     color: '#4dd6ff',
     fontWeight: '600',
+  },
+  errorText: {
+    color: '#ff8a8a',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 10,
   },
   reloadButton: {
     marginTop: 16,
