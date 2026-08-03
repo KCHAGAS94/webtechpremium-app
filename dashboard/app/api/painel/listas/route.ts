@@ -46,13 +46,26 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { id, mac, nome, url, expiracaoData } = await request.json();
+  const { id, mac, nome, url, expiracaoData, enforceUniqueMac } = await request.json();
 
   if (!mac) {
     return NextResponse.json({ error: 'MAC é obrigatório' }, { status: 400 });
   }
 
   const macAddress = String(mac).toUpperCase();
+
+  // Ativação App has one row per device: creating a second activation entry
+  // for a mac that's already registered would be a silent duplicate (the
+  // "Data expira" row the reseller means to edit already exists). Usuários
+  // doesn't set this flag since a device can legitimately have more than
+  // one playlist.
+  if (!id && enforceUniqueMac) {
+    const existingApp = await prisma.app.findUnique({ where: { macAddress }, include: { listas: true } });
+    if (existingApp && existingApp.listas.length > 0) {
+      return NextResponse.json({ error: 'MAC já está cadastrado' }, { status: 409 });
+    }
+  }
+
   const systemUser = await getOrCreateSystemUser();
   const app = await prisma.app.upsert({
     where: { macAddress },
