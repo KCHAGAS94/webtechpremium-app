@@ -35,7 +35,7 @@ export default function DashboardLayout({
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 overflow-hidden">
+    <div className="flex h-screen bg-[#0b0a12] overflow-hidden">
       {/* Mobile overlay behind the drawer */}
       {menuOpen && (
         <div
@@ -46,13 +46,13 @@ export default function DashboardLayout({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-purple-900 to-purple-800 text-white flex flex-col transform transition-transform duration-200 ease-in-out
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-gradient-to-b from-fuchsia-950 via-[#151320] to-[#0b0a12] text-white flex flex-col transform transition-transform duration-200 ease-in-out border-r border-white/10
           ${menuOpen ? 'translate-x-0' : '-translate-x-full'}
           md:static md:translate-x-0 md:w-48`}
       >
         {/* Logo */}
-        <div className="p-4 border-b border-purple-700 flex items-center justify-between">
-          <div className="text-2xl font-bold">webtech</div>
+        <div className="p-4 border-b border-white/10 flex items-center justify-between">
+          <div className="text-2xl font-bold text-fuchsia-500">webtech</div>
           <button
             className="md:hidden text-white text-2xl leading-none"
             onClick={() => setMenuOpen(false)}
@@ -70,7 +70,7 @@ export default function DashboardLayout({
                 key={item.label}
                 href={item.href}
                 onClick={() => setMenuOpen(false)}
-                className="w-full text-left px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium flex items-center gap-2"
+                className="w-full text-left px-4 py-2 rounded hover:bg-fuchsia-700/40 hover:border hover:border-fuchsia-500/60 border border-transparent transition text-sm font-medium flex items-center gap-2 text-gray-200 hover:text-white"
               >
                 <span>{item.icon}</span>
                 {item.label}
@@ -78,7 +78,7 @@ export default function DashboardLayout({
             ) : (
               <button
                 key={item.label}
-                className="w-full text-left px-4 py-2 rounded hover:bg-purple-700 transition text-sm font-medium flex items-center gap-2"
+                className="w-full text-left px-4 py-2 rounded hover:bg-fuchsia-700/40 hover:border hover:border-fuchsia-500/60 border border-transparent transition text-sm font-medium flex items-center gap-2 text-gray-200 hover:text-white"
               >
                 <span>{item.icon}</span>
                 {item.label}
@@ -88,10 +88,10 @@ export default function DashboardLayout({
         </nav>
 
         {/* Logout */}
-        <div className="p-3 border-t border-purple-700">
+        <div className="p-3 border-t border-white/10">
           <button
             onClick={handleLogout}
-            className="w-full text-left px-4 py-2 rounded hover:bg-red-600 transition text-sm font-medium flex items-center gap-2"
+            className="w-full text-left px-4 py-2 rounded hover:bg-red-600/80 transition text-sm font-medium flex items-center gap-2 text-gray-200 hover:text-white"
           >
             <span>🚪</span>
             SAIR
@@ -102,15 +102,15 @@ export default function DashboardLayout({
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-3 bg-white shadow px-4 py-3">
+        <div className="md:hidden flex items-center gap-3 bg-[#0b0a12] border-b border-white/10 px-4 py-3">
           <button
-            className="text-2xl leading-none text-gray-700"
+            className="text-2xl leading-none text-white"
             onClick={() => setMenuOpen(true)}
             aria-label="Abrir menu"
           >
             ☰
           </button>
-          <div className="text-lg font-bold text-purple-900">webtech</div>
+          <div className="text-lg font-bold text-fuchsia-500">webtech</div>
         </div>
 
         {/* Content */}
