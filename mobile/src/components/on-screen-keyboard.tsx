@@ -34,6 +34,9 @@ const SYMBOL_ROWS = [
 /** On-screen QWERTY grid keyboard for devices without a physical/touch keyboard (e.g. Android TV remotes). */
 export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, onClose }: Props) {
   const [mode, setMode] = useState<'letters' | 'symbols'>('letters');
+  // Which key currently has D-pad focus, so we can render a visible ring —
+  // TouchableOpacity gives no focus styling for free like a web button does.
+  const [focusedKey, setFocusedKey] = useState<string | null>('1');
   // For people with bigger fingers who keep mis-tapping neighboring keys —
   // toggled per session, not persisted, since it's a quick in-the-moment fix.
   const [largeKeys, setLargeKeys] = useState(false);
@@ -94,7 +97,13 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
           {rows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
               {row.map((char) => (
-                <TouchableOpacity key={char} style={keyStyle} onPress={() => handleKey(char)}>
+                <TouchableOpacity
+                  key={char}
+                  style={[keyStyle, focusedKey === char && styles.keyFocused]}
+                  hasTVPreferredFocus={char === '1'}
+                  onFocus={() => setFocusedKey(char)}
+                  onPress={() => handleKey(char)}
+                >
                   <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>{char}</ThemedText>
                 </TouchableOpacity>
               ))}
@@ -177,6 +186,11 @@ const styles = StyleSheet.create({
   },
   keyLarge: {
     height: 42,
+  },
+  keyFocused: {
+    backgroundColor: '#3a3a8f',
+    borderWidth: 2,
+    borderColor: '#5ac8fa',
   },
   wideKey: {
     flex: 1.6,
