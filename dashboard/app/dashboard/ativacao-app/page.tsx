@@ -14,6 +14,17 @@ type Lista = {
 
 const mockListas: Lista[] = [];
 
+function formatInstaladoEm(iso: string): string {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
 // Formats free-typed input into AA:BB:CC:DD:EE:FF as the user types: strips
 // anything but hex chars, uppercases, and inserts ':' every 2 characters.
 function formatMacAddress(value: string): string {
@@ -57,7 +68,7 @@ function EditModal({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white w-[70%] max-w-xl flex flex-col rounded-lg shadow-lg">
         <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-800">Usuário</h2>
+          <h2 className="text-2xl font-bold text-gray-800">Ativação App</h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-3xl font-bold">
             ✕
           </button>
@@ -78,25 +89,12 @@ function EditModal({
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Lista</label>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Data expira</label>
             <input
-              type="text"
-              name="nome"
-              value={formData.nome}
+              type="date"
+              name="expiracaoData"
+              value={formData.expiracaoData}
               onChange={handleChange}
-              placeholder="Ex: Lista principal"
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Link da lista (M3U)</label>
-            <input
-              type="text"
-              name="url"
-              value={formData.url}
-              onChange={handleChange}
-              placeholder="http://host:porta/get.php?username=...&password=...&type=m3u_plus&output=ts"
               className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
             />
           </div>
@@ -121,7 +119,7 @@ function EditModal({
   );
 }
 
-export default function UsuariosPage() {
+export default function AtivacaoAppPage() {
   const [listas, setListas] = useState(mockListas);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
@@ -132,7 +130,7 @@ export default function UsuariosPage() {
       const data = await response.json();
       setListas(data.listas ?? []);
     } catch (error) {
-      console.error('Falha ao carregar listas do painel', error);
+      console.error('Falha ao carregar apps do painel', error);
     }
   };
 
@@ -140,21 +138,33 @@ export default function UsuariosPage() {
     loadListas();
   }, []);
 
-  const filteredListas = listas.filter(
-    (lista) =>
-      (lista.mac ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lista.nome ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (lista.url ?? '').toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredListas = listas.filter((lista) =>
+    (lista.mac ?? '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleDelete = async (lista: Lista) => {
-    if (!confirm('Tem certeza que deseja deletar esta lista?')) return;
+    if (!confirm('Tem certeza que deseja deletar este app?')) return;
 
     setListas(listas.filter((l) => l.id !== lista.id));
     try {
       await fetch(`/api/painel/listas?id=${lista.id}`, { method: 'DELETE' });
     } catch (error) {
-      console.error('Falha ao remover lista do painel', error);
+      console.error('Falha ao remover app do painel', error);
+    }
+  };
+
+  const handleRemoveExpirados = async () => {
+    const expirados = listas.filter((l) => l.expirado);
+    if (expirados.length === 0) return;
+    if (!confirm(`Remover ${expirados.length} app(s) expirado(s)?`)) return;
+
+    try {
+      await Promise.all(
+        expirados.map((lista) => fetch(`/api/painel/listas?id=${lista.id}`, { method: 'DELETE' }))
+      );
+      await loadListas();
+    } catch (error) {
+      console.error('Falha ao remover apps expirados', error);
     }
   };
 
@@ -185,7 +195,7 @@ export default function UsuariosPage() {
       });
       await loadListas();
     } catch (error) {
-      console.error('Falha ao salvar lista no painel', error);
+      console.error('Falha ao salvar app no painel', error);
     }
 
     setEditingLista(null);
@@ -199,7 +209,7 @@ export default function UsuariosPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h2 className="text-2xl font-bold text-white">Usuários</h2>
+        <h2 className="text-2xl font-bold text-white">Ativação App</h2>
       </div>
 
       {/* Actions */}
@@ -211,17 +221,29 @@ export default function UsuariosPage() {
           >
             ✓ Adicionar
           </button>
+          <button
+            onClick={handleRemoveExpirados}
+            className="sm:hidden flex-1 bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition"
+          >
+            🗑️ Expirados
+          </button>
         </div>
         <div className="flex-1 flex items-center bg-white rounded border border-gray-300 px-3">
           <span>🔍</span>
           <input
             type="text"
-            placeholder="Pesquisar Mac / Lista / Link..."
+            placeholder="Pesquisar Mac..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-3 py-2 outline-none min-w-0"
           />
         </div>
+        <button
+          onClick={handleRemoveExpirados}
+          className="hidden sm:block bg-red-500 text-white px-6 py-2 rounded font-semibold hover:bg-red-600 transition whitespace-nowrap"
+        >
+          🗑️ Remover Expirados
+        </button>
       </div>
 
       {/* Cards (mobile) */}
@@ -247,13 +269,24 @@ export default function UsuariosPage() {
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <div>
-                <div className="text-xs text-gray-400">Lista</div>
-                <div className="text-gray-700">{lista.nome}</div>
+                <div className="text-xs text-gray-400">Instalado em</div>
+                <div className="text-gray-700">{formatInstaladoEm(lista.instaladoEm)}</div>
               </div>
-              <div className="col-span-2">
-                <div className="text-xs text-gray-400">Link</div>
-                <div className="text-gray-700 truncate" title={lista.url}>{lista.url || '—'}</div>
+              <div>
+                <div className="text-xs text-gray-400">Data expira</div>
+                <div className="text-gray-700">{lista.expiracaoData || '—'}</div>
               </div>
+            </div>
+            <div>
+              {lista.expirado ? (
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                  Expirado
+                </span>
+              ) : (
+                <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                  Ativo
+                </span>
+              )}
             </div>
           </div>
         ))}
@@ -266,8 +299,8 @@ export default function UsuariosPage() {
             <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Mac</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Lista</th>
-                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Link</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
                 <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
               </tr>
             </thead>
@@ -275,8 +308,18 @@ export default function UsuariosPage() {
               {filteredListas.map((lista) => (
                 <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
-                  <td className="px-6 py-3 text-gray-600">{lista.nome}</td>
-                  <td className="px-6 py-3 text-gray-600 max-w-xs truncate" title={lista.url}>{lista.url}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
+                  <td className="px-6 py-3">
+                    {lista.expirado ? (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                        Sim
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs font-semibold">
+                        Não
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-3 flex justify-center gap-2">
                     <button
                       onClick={() => setEditingLista(lista)}
@@ -300,7 +343,7 @@ export default function UsuariosPage() {
 
       {/* Results Info */}
       <div className="text-sm text-gray-600">
-        Mostrando {filteredListas.length} de {listas.length} usuários
+        Mostrando {filteredListas.length} de {listas.length} apps
       </div>
 
       {/* Edit/Add Modal */}

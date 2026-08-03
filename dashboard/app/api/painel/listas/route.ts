@@ -51,9 +51,6 @@ export async function POST(request: NextRequest) {
   if (!mac) {
     return NextResponse.json({ error: 'MAC é obrigatório' }, { status: 400 });
   }
-  if (!url) {
-    return NextResponse.json({ error: 'Link da lista é obrigatório' }, { status: 400 });
-  }
 
   const macAddress = String(mac).toUpperCase();
   const systemUser = await getOrCreateSystemUser();
@@ -67,7 +64,7 @@ export async function POST(request: NextRequest) {
   const data = {
     appId: app.id,
     nome: nome || 'Lista',
-    url,
+    url: url || '',
     dataExpiracao,
   };
 

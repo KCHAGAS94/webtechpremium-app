@@ -7,16 +7,9 @@ import axios from 'axios';
 
 const menuItems = [
   { label: 'USUÁRIOS', icon: '👥', href: '/dashboard/usuarios' },
+  { label: 'ATIVAÇÃO APP', icon: '📱', href: '/dashboard/ativacao-app' },
   { label: 'SERVIDORES', icon: '🖥️', href: '/dashboard/servidores' },
   { label: 'CRÉDITO', icon: '💳', href: '/dashboard/creditos' },
-  { label: 'BANNERS', icon: '📋' },
-  { label: 'BACKGROUND', icon: '🖼️' },
-  { label: 'LOGO', icon: '🏠' },
-  { label: 'TEMAS', icon: '🎨' },
-  { label: 'CHATBOT', icon: '🤖' },
-  { label: 'PERFIL', icon: '⚙️' },
-  { label: 'COR DO PAINEL', icon: '🎭' },
-  { label: 'SUPORTE', icon: '💬' },
   { label: 'SAIR', icon: '🚪' },
 ];
 
