@@ -358,10 +358,15 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // keep `auto` since those already work.
   const videoSource = useMemo(() => {
     if (!selectedChannel) return null;
+    // Some IPTV/CDN providers (e.g. Cloudflare-fronted panels) block ExoPlayer's
+    // default User-Agent and serve a challenge page instead of the stream,
+    // which surfaces as "none of the extractors could read the stream". VLC's
+    // User-Agent is accepted by these providers, so we spoof it here too.
+    const headers = { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' };
     if (category === 'live' && isHlsStreamUrl(selectedChannel.url)) {
-      return { uri: selectedChannel.url, contentType: 'hls' as const };
+      return { uri: selectedChannel.url, contentType: 'hls' as const, headers };
     }
-    return selectedChannel.url;
+    return { uri: selectedChannel.url, headers };
   }, [selectedChannel, category]);
 
   const player = useVideoPlayer(videoSource, (instance) => {

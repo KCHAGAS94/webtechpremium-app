@@ -41,7 +41,11 @@ export async function loadPlaylist(
   url: string,
   onProgress?: (progress: ParseM3uProgress) => void
 ): Promise<ClassifiedPlaylist> {
-  const response = await fetch(url);
+  // Some Xtream panels sit behind Cloudflare's bot protection and reject
+  // React Native's default fetch User-Agent (returning a 403 challenge page
+  // instead of the playlist) while accepting VLC's — see stream-format.ts's
+  // header spoof for the same reason on individual channel/episode streams.
+  const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } });
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`);
   }

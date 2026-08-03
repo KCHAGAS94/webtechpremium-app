@@ -85,7 +85,8 @@ type LiveStream = {
 
 async function fetchXtream<T>(creds: XtreamCredentials, action: string, extraParams = ''): Promise<T> {
   const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}${extraParams}`;
-  const response = await fetch(url);
+  // Same Cloudflare User-Agent block as playlist-loader.ts's playlist fetch.
+  const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   return response.json();
 }
