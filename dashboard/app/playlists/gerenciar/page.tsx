@@ -64,6 +64,10 @@ function GerenciarPlaylistsContent() {
 
   const [activeSection, setActiveSection] = useState<'gerenciamento' | 'ativar' | 'transferir'>('gerenciamento');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [deviceStatus, setDeviceStatus] = useState<{ dataExpiracao: string | null; expirado: boolean | null }>({
+    dataExpiracao: null,
+    expirado: null,
+  });
   const [modalType, setModalType] = useState<'m3u' | 'xc' | null>(null);
   const [submitError, setSubmitError] = useState('');
 
@@ -95,8 +99,19 @@ function GerenciarPlaylistsContent() {
     }
   };
 
+  const loadDeviceStatus = async () => {
+    try {
+      const response = await fetch(`/api/app/device-status?mac=${encodeURIComponent(mac)}`);
+      const data = await response.json();
+      setDeviceStatus({ dataExpiracao: data.dataExpiracao ?? null, expirado: data.expirado ?? null });
+    } catch (error) {
+      console.error('Falha ao carregar status do dispositivo', error);
+    }
+  };
+
   useEffect(() => {
     loadPlaylists();
+    loadDeviceStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mac]);
 
@@ -189,11 +204,17 @@ function GerenciarPlaylistsContent() {
               </div>
               <div className="flex gap-6">
                 <dt className="font-semibold w-32">Status :</dt>
-                <dd className="text-gray-300">Teste</dd>
+                <dd className="text-gray-300">
+                  {deviceStatus.expirado === null
+                    ? 'Sem lista vinculada'
+                    : deviceStatus.expirado
+                      ? 'Expirado'
+                      : 'Ativo'}
+                </dd>
               </div>
               <div className="flex gap-6">
                 <dt className="font-semibold w-32">Expiração :</dt>
-                <dd className="text-gray-300">2026-08-31</dd>
+                <dd className="text-gray-300">{deviceStatus.dataExpiracao ?? '—'}</dd>
               </div>
             </dl>
           </div>
