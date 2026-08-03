@@ -154,7 +154,14 @@ function SeriesVodPlayer({
   onClose: () => void;
   onProgress: (positionSeconds: number, durationSeconds: number) => void;
 }) {
-  const player = useVideoPlayer(episode.channel.url);
+  // Some IPTV/CDN providers block ExoPlayer's default User-Agent and serve a
+  // challenge page instead of the stream; VLC's User-Agent is accepted, same
+  // spoof already used for live channels (see content-browser-screen.tsx).
+  const videoSource = useMemo(
+    () => ({ uri: episode.channel.url, headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } }),
+    [episode.channel.url]
+  );
+  const player = useVideoPlayer(videoSource);
   const { currentTime } = useEvent(player, 'timeUpdate', {
     currentTime: 0,
     currentLiveTimestamp: null,
