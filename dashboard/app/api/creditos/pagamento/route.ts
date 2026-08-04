@@ -18,9 +18,9 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { credits, payment_method, payer, token, installments, payment_method_id, issuer_id } = body;
+  const { packageId, payment_method, payer, token, installments, payment_method_id, issuer_id } = body;
 
-  const pkg = findCreditPackage(Number(credits));
+  const pkg = findCreditPackage(String(packageId));
   if (!pkg) {
     return NextResponse.json({ error: 'Pacote de créditos inválido' }, { status: 400 });
   }

@@ -82,7 +82,7 @@ function CheckoutModal({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          credits: pkg.credits,
+          packageId: pkg.id,
           payment_method: 'pix',
           payer: { email, first_name: name },
         }),
@@ -214,7 +214,7 @@ function CheckoutModal({
                     <p className="text-sm text-gray-400">Preencha nome e email para carregar o formulário de cartão.</p>
                   ) : (
                     <CardPayment
-                      key={pkg.credits}
+                      key={pkg.id}
                       initialization={{
                         amount: pkg.amount,
                         payer: {
@@ -240,7 +240,7 @@ function CheckoutModal({
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
-                              credits: pkg.credits,
+                              packageId: pkg.id,
                               payment_method: 'card',
                               token: data.token,
                               installments: data.installments,
@@ -310,7 +310,7 @@ export default function CreditosPage() {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {CREDIT_PACKAGES.map((pkg) => (
-          <div key={pkg.credits} className="rounded-xl bg-[#151320] border border-white/10 p-6">
+          <div key={pkg.id} className="rounded-xl bg-[#151320] border border-white/10 p-6">
             <div className="flex items-center justify-between mb-6">
               <span className="rounded-lg bg-white/10 text-white text-sm font-semibold px-3 py-1.5">
                 {pkg.credits} Créditos
