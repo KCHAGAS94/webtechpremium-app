@@ -10,29 +10,27 @@ const ATIVACAO_CREDITS: Record<'ANUAL' | 'VITALICIO', number> = {
   VITALICIO: 3,
 };
 
-// Backs the flat "Usuários" table in the panel — one row per Lista
+// Backs the flat "Usuários" table in the panel — one row por Lista
 // (credential), not per device. A device (App) is created/reused
 // automatically from the `mac` field; there's no separate device CRUD UI.
-// Same intentionally-open pattern as the other painel/* routes — tighten
-// once the panel gets real auth.
-async function getOrCreateSystemUser() {
-  const existing = await prisma.user.findFirst();
-  if (existing) return existing;
-
-  return prisma.user.create({
-    data: {
-      email: 'system@webtechpremium.local',
-      password: 'unused',
-      name: 'Sistema',
-    },
-  });
-}
+// O App é sempre criado com o userId do revendedor logado, o que é o que
+// amarra cada MAC ao revendedor que o cadastrou (usado pela página de admin
+// "MACs por revendedor").
 
 export async function GET(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
   const appId = request.nextUrl.searchParams.get('appId');
 
   const listas = await prisma.lista.findMany({
-    where: appId ? { appId: Number(appId) } : undefined,
+    where: {
+      ...(appId && { appId: Number(appId) }),
+      // Revendedor só vê os próprios MACs; admin vê tudo.
+      ...(auth.role !== 'ADMIN' && { app: { userId: auth.id } }),
+    },
     orderBy: { createdAt: 'asc' },
     include: { app: true },
   });
@@ -55,6 +53,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
   const { id, mac, nome, url, expiracaoData, enforceUniqueMac, tipo } = await request.json();
 
   if (!mac) {
@@ -75,6 +78,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (id) {
+    const existingLista = await prisma.lista.findUnique({ where: { id }, include: { app: true } });
+    if (!existingLista || (auth.role !== 'ADMIN' && existingLista.app.userId !== auth.id)) {
+      return NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 });
+    }
+  } else {
+    // Se o MAC já existe e pertence a outro revendedor, não deixa "roubar"
+    // o dispositivo criando uma lista nele — só o dono (ou o admin) pode.
+    const existingApp = await prisma.app.findUnique({ where: { macAddress } });
+    if (existingApp && auth.role !== 'ADMIN' && existingApp.userId !== auth.id) {
+      return NextResponse.json({ error: 'MAC pertence a outro revendedor' }, { status: 403 });
+    }
+  }
+
   // Cobrança de créditos é exclusiva da tela "Ativação App" (que sempre
   // manda `tipo`). A tela "Usuários" cria linhas de Lista para o mesmo
   // dispositivo sem passar `tipo`, e continua sem custo — ela só adiciona
@@ -87,11 +104,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Tipo de ativação inválido' }, { status: 400 });
     }
     tipoAtivacao = tipo;
-
-    const auth = getAuthUser(request);
-    if (!auth) {
-      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
-    }
 
     const cost = ATIVACAO_CREDITS[tipo as 'ANUAL' | 'VITALICIO'];
     const debited = await prisma.user.updateMany({
@@ -111,11 +123,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const systemUser = await getOrCreateSystemUser();
   const app = await prisma.app.upsert({
     where: { macAddress },
     update: {},
-    create: { macAddress, name: macAddress, version: '1.0.0', userId: systemUser.id },
+    create: { macAddress, name: macAddress, version: '1.0.0', userId: auth.id },
   });
 
   const data = {
@@ -134,9 +145,19 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+
   const id = request.nextUrl.searchParams.get('id');
   if (!id) {
     return NextResponse.json({ error: 'Parâmetro id é obrigatório' }, { status: 400 });
+  }
+
+  const lista = await prisma.lista.findUnique({ where: { id: Number(id) }, include: { app: true } });
+  if (!lista || (auth.role !== 'ADMIN' && lista.app.userId !== auth.id)) {
+    return NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 });
   }
 
   await prisma.lista.delete({ where: { id: Number(id) } }).catch(() => null);

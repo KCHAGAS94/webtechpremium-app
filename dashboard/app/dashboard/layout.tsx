@@ -14,6 +14,7 @@ const baseMenuItems = [
 
 const adminMenuItems = [
   { label: 'REVENDEDORES', icon: '🧑‍💼', href: '/dashboard/revendedores' },
+  { label: 'MACS POR REVENDEDOR', icon: '📋', href: '/dashboard/macs-revendedores' },
 ];
 
 export default function DashboardLayout({
