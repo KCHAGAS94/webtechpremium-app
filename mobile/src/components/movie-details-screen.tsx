@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PlayerControlButton } from '@/components/player-control-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { M3uChannel } from '@/utils/m3u-parser';
@@ -88,19 +89,25 @@ export function MovieDetailsScreen({ movie, playlistUrl, isFavorite, onToggleFav
               {info?.plot && <ThemedText style={styles.plot}>{info.plot}</ThemedText>}
 
               <View style={styles.actions}>
-                <TouchableOpacity style={styles.playButton} onPress={onPlay}>
+                <PlayerControlButton
+                  style={styles.playButton}
+                  focusedStyle={styles.playButtonFocused}
+                  onPress={onPlay}
+                  autoFocus
+                >
                   <ThemedText style={styles.playIcon}>▶</ThemedText>
                   <ThemedText style={styles.playLabel}>Assista agora</ThemedText>
-                </TouchableOpacity>
+                </PlayerControlButton>
 
-                <TouchableOpacity
+                <PlayerControlButton
                   style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
+                  focusedStyle={styles.favoriteButtonFocused}
                   onPress={onToggleFavorite}
                 >
                   <ThemedText style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
                     {isFavorite ? '♥' : '♡'}
                   </ThemedText>
-                </TouchableOpacity>
+                </PlayerControlButton>
               </View>
             </View>
           </View>
@@ -237,6 +244,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#fff',
   },
+  playButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    transform: [{ scale: 1.05 }],
+  },
   favoriteButton: {
     width: 44,
     height: 44,
@@ -249,6 +261,11 @@ const styles = StyleSheet.create({
   favoriteButtonActive: {
     backgroundColor: 'rgba(230,57,70,0.15)',
     borderColor: '#e63946',
+  },
+  favoriteButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    transform: [{ scale: 1.08 }],
   },
   favoriteIcon: {
     fontSize: 20,
