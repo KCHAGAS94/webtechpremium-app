@@ -6,6 +6,7 @@ import { VideoView, type VideoPlayer } from 'expo-video';
 import * as Brightness from 'expo-brightness';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CastButton } from '@/components/cast-button';
 import { ExitConfirmModal } from '@/components/exit-confirm-modal';
@@ -85,6 +86,7 @@ export function MoviePlayer({
   // result looks identical to the button silently doing nothing.
   const [subtitleToast, setSubtitleToast] = useState<string | null>(null);
   const subtitleToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const insets = useSafeAreaInsets();
 
   useKeepAwake();
 
@@ -344,11 +346,12 @@ export function MoviePlayer({
 
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
-            <View style={styles.topBar}>
+            <View style={[styles.topBar, { paddingTop: insets.top + 16 }]}>
               <PlayerControlButton
                 style={styles.topBarLeft}
                 focusedStyle={styles.iconButtonFocused}
                 onPress={handleRequestExit}
+                hitSlop={12}
               >
                 <View style={styles.iconButton}>
                   <ThemedText style={styles.backIcon}>‹</ThemedText>

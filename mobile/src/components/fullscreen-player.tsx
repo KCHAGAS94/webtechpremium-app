@@ -6,6 +6,7 @@ import { VideoView, type VideoPlayer } from 'expo-video';
 import * as Brightness from 'expo-brightness';
 import * as NavigationBar from 'expo-navigation-bar';
 import { useKeepAwake } from 'expo-keep-awake';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CastButton } from '@/components/cast-button';
 import { PlayerControlButton } from '@/components/player-control-button';
@@ -69,6 +70,7 @@ export function FullscreenPlayer({
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [brightness, setBrightness] = useState(1);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const insets = useSafeAreaInsets();
 
   useKeepAwake();
 
@@ -254,8 +256,13 @@ export function FullscreenPlayer({
 
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
-            <View style={styles.topBar}>
-              <PlayerControlButton onPress={onClose} style={styles.backButton} focusedStyle={styles.backButtonFocused}>
+            <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+              <PlayerControlButton
+                onPress={onClose}
+                style={styles.backButton}
+                focusedStyle={styles.backButtonFocused}
+                hitSlop={12}
+              >
                 <ThemedText style={styles.backIcon}>‹</ThemedText>
               </PlayerControlButton>
               <ThemedText style={styles.title} numberOfLines={1}>
