@@ -23,13 +23,20 @@ export default function DashboardLayout({
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [me, setMe] = useState<{ name: string; credits: number } | null>(null);
   const router = useRouter();
 
   useEffect(() => {
     axios
       .get('/api/auth/me')
-      .then((res) => setIsAdmin(res.data.user?.role === 'ADMIN'))
-      .catch(() => setIsAdmin(false));
+      .then((res) => {
+        setIsAdmin(res.data.user?.role === 'ADMIN');
+        setMe(res.data.user ? { name: res.data.user.name, credits: res.data.user.credits } : null);
+      })
+      .catch(() => {
+        setIsAdmin(false);
+        setMe(null);
+      });
   }, []);
 
   const menuItems = [...baseMenuItems, ...(isAdmin ? adminMenuItems : [])];
@@ -67,6 +74,16 @@ export default function DashboardLayout({
             ✕
           </button>
         </div>
+
+        {/* Revendedor logado + créditos */}
+        {me && (
+          <div className="px-4 py-3 border-b border-white/10 space-y-1">
+            <div className="text-sm font-medium text-gray-200 truncate">{me.name}</div>
+            <div className="text-xs text-fuchsia-400 flex items-center gap-1">
+              💳 {me.credits} créditos
+            </div>
+          </div>
+        )}
 
         {/* Menu */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-2">
