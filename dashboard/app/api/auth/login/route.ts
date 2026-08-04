@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     // Gerar token
     const token = signToken(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       '24h'
     );
 
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
           id: user.id,
           email: user.email,
           name: user.name,
+          role: user.role,
         },
         token,
       },

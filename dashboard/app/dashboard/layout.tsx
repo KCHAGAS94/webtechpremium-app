@@ -1,16 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
-const menuItems = [
+const baseMenuItems = [
   { label: 'USUÁRIOS', icon: '👥', href: '/dashboard/usuarios' },
   { label: 'ATIVAÇÃO APP', icon: '📱', href: '/dashboard/ativacao-app' },
   { label: 'SERVIDORES', icon: '🖥️', href: '/dashboard/servidores' },
   { label: 'CRÉDITO', icon: '💳', href: '/dashboard/creditos' },
-  { label: 'SAIR', icon: '🚪' },
+];
+
+const adminMenuItems = [
+  { label: 'REVENDEDORES', icon: '🧑‍💼', href: '/dashboard/revendedores' },
 ];
 
 export default function DashboardLayout({
@@ -19,7 +22,17 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    axios
+      .get('/api/auth/me')
+      .then((res) => setIsAdmin(res.data.user?.role === 'ADMIN'))
+      .catch(() => setIsAdmin(false));
+  }, []);
+
+  const menuItems = [...baseMenuItems, ...(isAdmin ? adminMenuItems : [])];
 
   const handleLogout = async () => {
     await axios.post('/api/auth/logout');
@@ -57,7 +70,7 @@ export default function DashboardLayout({
 
         {/* Menu */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-2">
-          {menuItems.slice(0, -1).map((item) =>
+          {menuItems.map((item) =>
             item.href ? (
               <Link
                 key={item.label}

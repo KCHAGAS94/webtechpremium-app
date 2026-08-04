@@ -39,18 +39,20 @@ export async function POST(request: NextRequest) {
     // Hash da senha
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Criar usuário
+    // Criar usuário. Este cadastro só roda uma vez (a checagem de userCount
+    // acima), então quem se cadastra aqui é sempre o dono do painel.
     const user = await prisma.user.create({
       data: {
         email,
         password: hashedPassword,
         name: name || email.split('@')[0],
+        role: 'ADMIN',
       },
     });
 
     // Gerar token
     const token = signToken(
-      { id: user.id, email: user.email },
+      { id: user.id, email: user.email, role: user.role },
       '7d'
     );
 
