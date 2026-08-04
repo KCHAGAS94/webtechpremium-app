@@ -136,13 +136,13 @@ function EditModal({
           ) : (
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Data expira</label>
-              <input
-                type="date"
-                name="expiracaoData"
-                value={formData.expiracaoData}
-                onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-              />
+              <div className="w-full px-4 py-2 border border-gray-200 rounded bg-gray-100 text-gray-600">
+                {formData.expiracaoData || 'Vitalício'}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                A data de expiração é calculada automaticamente no momento da ativação e não pode ser
+                alterada.
+              </p>
             </div>
           )}
 
@@ -275,7 +275,6 @@ export default function AtivacaoAppPage() {
           mac: lista.mac,
           nome: lista.nome,
           url: lista.url,
-          expiracaoData: lista.expiracaoData,
           enforceUniqueMac: true,
           tipo: lista.id ? undefined : lista.tipo,
         }),

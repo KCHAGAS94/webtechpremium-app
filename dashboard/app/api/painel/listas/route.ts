@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
-  const { id, mac, nome, url, expiracaoData, enforceUniqueMac, tipo } = await request.json();
+  const { id, mac, nome, url, enforceUniqueMac, tipo } = await request.json();
 
   if (!mac) {
     return NextResponse.json({ error: 'MAC é obrigatório' }, { status: 400 });
@@ -92,11 +92,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // A data de expiração é sempre calculada pelo servidor, nunca aceita do
+  // cliente: nem na criação (depende do tipo escolhido) nem na edição (uma
+  // vez ativada, a data não muda — "ninguém" pode alterá-la, nem admin).
   // Cobrança de créditos é exclusiva da tela "Ativação App" (que sempre
   // manda `tipo`). A tela "Usuários" cria linhas de Lista para o mesmo
   // dispositivo sem passar `tipo`, e continua sem custo — ela só adiciona
   // playlists a um app já existente, não ativa um app novo.
-  let dataExpiracao = expiracaoData ? new Date(expiracaoData) : null;
+  let dataExpiracao: Date | null = null;
   let tipoAtivacao: 'ANUAL' | 'VITALICIO' | null = null;
 
   if (!id && tipo) {
@@ -129,17 +132,21 @@ export async function POST(request: NextRequest) {
     create: { macAddress, name: macAddress, version: '1.0.0', userId: auth.id },
   });
 
-  const data = {
-    appId: app.id,
-    nome: nome || 'Lista',
-    url: url || '',
-    dataExpiracao,
-    ...(tipoAtivacao && { tipo: tipoAtivacao }),
-  };
-
   const lista = id
-    ? await prisma.lista.update({ where: { id }, data })
-    : await prisma.lista.create({ data });
+    ? // Edição: dataExpiracao/tipo nunca mudam depois da ativação.
+      await prisma.lista.update({
+        where: { id },
+        data: { appId: app.id, nome: nome || 'Lista', url: url || '' },
+      })
+    : await prisma.lista.create({
+        data: {
+          appId: app.id,
+          nome: nome || 'Lista',
+          url: url || '',
+          dataExpiracao,
+          ...(tipoAtivacao && { tipo: tipoAtivacao }),
+        },
+      });
 
   return NextResponse.json({ lista }, { status: 200 });
 }
