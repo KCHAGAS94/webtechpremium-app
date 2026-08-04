@@ -21,10 +21,42 @@ model User {
   password  String
   name      String
   role      Role     @default(REVENDA)
+  credits   Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  apps App[]
+  apps             App[]
+  creditPurchases  CreditPurchase[]
+}
+
+enum CreditPurchaseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum PaymentMethod {
+  PIX
+  CARD
+}
+
+// Uma linha por tentativa de compra de créditos via Mercado Pago. `status`
+// começa PENDING e só vira APPROVED quando o pagamento é confirmado (via
+// polling em /api/creditos/status) — é nesse momento, e só uma vez por
+// mpPaymentId, que os créditos são somados ao User.
+model CreditPurchase {
+  id            Int                   @id @default(autoincrement())
+  userId        Int
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credits       Int
+  amount        Float
+  paymentMethod PaymentMethod
+  status        CreditPurchaseStatus  @default(PENDING)
+  mpPaymentId   String                @unique
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([userId])
 }
 
 model App {

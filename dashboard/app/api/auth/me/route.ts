@@ -10,14 +10,12 @@ export async function GET(request: NextRequest) {
 
   const user = await prisma.user.findUnique({
     where: { id: auth.id },
-    select: { id: true, name: true, email: true, role: true },
+    select: { id: true, name: true, email: true, role: true, credits: true },
   });
 
   if (!user) {
     return NextResponse.json({ user: null }, { status: 200 });
   }
 
-  // Créditos ainda não têm lógica de compra via API — placeholder fixo até
-  // isso ser implementado.
-  return NextResponse.json({ user: { ...user, credits: 0 } }, { status: 200 });
+  return NextResponse.json({ user }, { status: 200 });
 }
