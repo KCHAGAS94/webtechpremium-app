@@ -65,7 +65,18 @@ export default function DashboardLayout({
       >
         {/* Logo */}
         <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <div className="text-2xl font-bold text-fuchsia-500">webtech</div>
+          <div className="flex items-center gap-2">
+            <div className="text-2xl font-bold text-fuchsia-500">webtech</div>
+            <Link
+              href="/dashboard/configuracoes"
+              onClick={() => setMenuOpen(false)}
+              className="text-gray-300 hover:text-white transition text-lg leading-none"
+              aria-label="Configurações"
+              title="Configurações"
+            >
+              ⚙️
+            </Link>
+          </div>
           <button
             className="md:hidden text-white text-2xl leading-none"
             onClick={() => setMenuOpen(false)}
