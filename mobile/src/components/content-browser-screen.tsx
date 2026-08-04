@@ -106,6 +106,13 @@ const FavoriteHeartButton = memo(function FavoriteHeartButton({
   );
 });
 
+// D-pad remotes can't reach the nested heart button inside a category row —
+// TV focus engines only stop at one level, so OK always fires the row's own
+// onPress (open the category) and the heart never gets focus on its own.
+// Touch users tap the heart directly; TV users instead press OK twice in a
+// row (double-click, like a mouse) to favorite without leaving the list.
+const DOUBLE_PRESS_MS = 400;
+
 const CategoryRow = memo(function CategoryRow({
   item,
   isActive,
@@ -122,12 +129,25 @@ const CategoryRow = memo(function CategoryRow({
   hasTVPreferredFocus?: boolean;
 }) {
   const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  const lastPressRef = useRef(0);
+
+  const handlePress = () => {
+    const now = Date.now();
+    if (item.isGroup && now - lastPressRef.current < DOUBLE_PRESS_MS) {
+      lastPressRef.current = 0;
+      onToggleFavorite(item.id);
+      return;
+    }
+    lastPressRef.current = now;
+    onPress(item.id);
+  };
+
   return (
     <Pressable
       style={[styles.categoryRow, focused && styles.categoryRowFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
-      onPress={() => onPress(item.id)}
+      onPress={handlePress}
       hasTVPreferredFocus={hasTVPreferredFocus}
     >
       <View style={styles.categoryLeft}>

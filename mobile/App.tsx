@@ -243,22 +243,30 @@ function AppContent() {
     }
   };
 
-  // Re-downloads and re-parses the *currently active* playlist's channels
-  // (same URL, fresh content) without touching `playlists`/`activePlaylistId`.
-  // Favorites and watch history live in AsyncStorage keyed by title/show id
-  // (see favorites-storage.ts, watch-history-storage.ts), not by channel
-  // list index, so they're untouched by this — they only change if the user
-  // acts on them or the list itself changes (a title added/removed).
+  // "Recarregar" on the home menu: goes back to the painel to fetch whatever
+  // M3U link is *currently* linked to this device's MAC (the reseller may
+  // have changed servers, as in the painel screenshot showing the same MAC
+  // re-pointed to a different SERVIDOR), then re-activates with that fresh
+  // link — not just re-downloading the same stale URL that was cached at
+  // boot. Favorites and watch history live in AsyncStorage keyed by
+  // title/show id (see favorites-storage.ts, watch-history-storage.ts), not
+  // by channel list index, so they're untouched by this.
   const handleReloadChannels = async () => {
-    const active = playlists.find((p) => p.id === activePlaylistId);
-    if (!active) {
+    if (!deviceMac) {
       setCurrentScreen('playlist');
       return;
     }
     setReloadingChannels(true);
     setReloadChannelsError('');
     try {
-      await activatePlaylist(active);
+      const panelPlaylists = await fetchDevicePlaylists(deviceMac);
+      if (panelPlaylists.length === 0) {
+        setReloadChannelsError('Nenhuma lista vinculada a este MAC ainda no painel.');
+        return;
+      }
+      setPlaylists(panelPlaylists);
+      const fresh = panelPlaylists.find((p) => p.id === activePlaylistId) ?? panelPlaylists[0];
+      await activatePlaylist(fresh, deviceMac, panelPlaylists);
     } catch (err) {
       // Previously failed silently, so a network hiccup looked exactly like
       // the button doing nothing. Now it's visible (banner below) instead
