@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
+import { getAuthUser } from '@/lib/auth';
+
+// Custo em créditos de cada tipo de ativação. ANUAL expira 1 ano após a
+// ativação; VITALICIO nunca expira (dataExpiracao fica null).
+const ATIVACAO_CREDITS: Record<'ANUAL' | 'VITALICIO', number> = {
+  ANUAL: 1,
+  VITALICIO: 3,
+};
 
 // Backs the flat "Usuários" table in the panel — one row per Lista
 // (credential), not per device. A device (App) is created/reused
@@ -39,6 +47,7 @@ export async function GET(request: NextRequest) {
         expiracaoData: lista.dataExpiracao ? lista.dataExpiracao.toISOString().slice(0, 10) : '',
         expirado: isExpirado(lista.dataExpiracao),
         instaladoEm: lista.app.createdAt.toISOString(),
+        tipo: lista.tipo,
       })),
     },
     { status: 200 }
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const { id, mac, nome, url, expiracaoData, enforceUniqueMac } = await request.json();
+  const { id, mac, nome, url, expiracaoData, enforceUniqueMac, tipo } = await request.json();
 
   if (!mac) {
     return NextResponse.json({ error: 'MAC é obrigatório' }, { status: 400 });
@@ -66,6 +75,42 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Cobrança de créditos é exclusiva da tela "Ativação App" (que sempre
+  // manda `tipo`). A tela "Usuários" cria linhas de Lista para o mesmo
+  // dispositivo sem passar `tipo`, e continua sem custo — ela só adiciona
+  // playlists a um app já existente, não ativa um app novo.
+  let dataExpiracao = expiracaoData ? new Date(expiracaoData) : null;
+  let tipoAtivacao: 'ANUAL' | 'VITALICIO' | null = null;
+
+  if (!id && tipo) {
+    if (tipo !== 'ANUAL' && tipo !== 'VITALICIO') {
+      return NextResponse.json({ error: 'Tipo de ativação inválido' }, { status: 400 });
+    }
+    tipoAtivacao = tipo;
+
+    const auth = getAuthUser(request);
+    if (!auth) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+    }
+
+    const cost = ATIVACAO_CREDITS[tipo as 'ANUAL' | 'VITALICIO'];
+    const debited = await prisma.user.updateMany({
+      where: { id: auth.id, credits: { gte: cost } },
+      data: { credits: { decrement: cost } },
+    });
+    if (debited.count === 0) {
+      return NextResponse.json({ error: 'Créditos insuficientes para ativar este app' }, { status: 402 });
+    }
+
+    if (tipoAtivacao === 'ANUAL') {
+      const expira = new Date();
+      expira.setFullYear(expira.getFullYear() + 1);
+      dataExpiracao = expira;
+    } else {
+      dataExpiracao = null;
+    }
+  }
+
   const systemUser = await getOrCreateSystemUser();
   const app = await prisma.app.upsert({
     where: { macAddress },
@@ -73,12 +118,12 @@ export async function POST(request: NextRequest) {
     create: { macAddress, name: macAddress, version: '1.0.0', userId: systemUser.id },
   });
 
-  const dataExpiracao = expiracaoData ? new Date(expiracaoData) : null;
   const data = {
     appId: app.id,
     nome: nome || 'Lista',
     url: url || '',
     dataExpiracao,
+    ...(tipoAtivacao && { tipo: tipoAtivacao }),
   };
 
   const lista = id

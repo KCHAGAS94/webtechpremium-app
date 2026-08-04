@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 
+type TipoAtivacao = 'ANUAL' | 'VITALICIO';
+
 type Lista = {
   id: number;
   mac: string;
@@ -10,6 +12,12 @@ type Lista = {
   expiracaoData: string;
   expirado: boolean;
   instaladoEm: string;
+  tipo: TipoAtivacao | null;
+};
+
+const ATIVACAO_LABEL: Record<TipoAtivacao, string> = {
+  ANUAL: 'Anual (1 crédito)',
+  VITALICIO: 'Vitalício (3 créditos)',
 };
 
 const mockListas: Lista[] = [];
@@ -43,6 +51,7 @@ function EditModal({
 }) {
   const [formData, setFormData] = useState<Lista>(lista || ({} as Lista));
   const [error, setError] = useState('');
+  const isNew = !lista?.id;
 
   useEffect(() => {
     if (lista) setFormData(lista);
@@ -59,6 +68,11 @@ function EditModal({
       ...formData,
       [name]: name === 'mac' ? formatMacAddress(value) : value,
     });
+    setError('');
+  };
+
+  const handleTipoChange = (tipo: TipoAtivacao) => {
+    setFormData({ ...formData, tipo });
     setError('');
   };
 
@@ -95,16 +109,41 @@ function EditModal({
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Data expira</label>
-            <input
-              type="date"
-              name="expiracaoData"
-              value={formData.expiracaoData}
-              onChange={handleChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
-            />
-          </div>
+          {isNew ? (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de ativação</label>
+              <div className="flex gap-3">
+                {(Object.keys(ATIVACAO_LABEL) as TipoAtivacao[]).map((tipo) => (
+                  <button
+                    key={tipo}
+                    type="button"
+                    onClick={() => handleTipoChange(tipo)}
+                    className={`flex-1 px-4 py-2 rounded border font-semibold text-sm transition ${
+                      formData.tipo === tipo
+                        ? 'border-green-500 bg-green-50 text-green-700'
+                        : 'border-gray-300 bg-gray-50 text-gray-600'
+                    }`}
+                  >
+                    {ATIVACAO_LABEL[tipo]}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Anual expira automaticamente 1 ano após a ativação. Vitalício nunca expira.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Data expira</label>
+              <input
+                type="date"
+                name="expiracaoData"
+                value={formData.expiracaoData}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
+              />
+            </div>
+          )}
 
           {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
         </div>
@@ -186,10 +225,15 @@ export default function AtivacaoAppPage() {
       expiracaoData: '',
       expirado: false,
       instaladoEm: '',
+      tipo: null,
     });
   };
 
   const handleSave = async (lista: Lista): Promise<string | void> => {
+    if (!lista.id && !lista.tipo) {
+      return 'Selecione o tipo de ativação';
+    }
+
     try {
       const response = await fetch('/api/painel/listas', {
         method: 'POST',
@@ -201,6 +245,7 @@ export default function AtivacaoAppPage() {
           url: lista.url,
           expiracaoData: lista.expiracaoData,
           enforceUniqueMac: true,
+          tipo: lista.id ? undefined : lista.tipo,
         }),
       });
       if (!response.ok) {
@@ -289,7 +334,11 @@ export default function AtivacaoAppPage() {
               </div>
               <div>
                 <div className="text-xs text-gray-400">Data expira</div>
-                <div className="text-gray-700">{lista.expiracaoData || '—'}</div>
+                <div className="text-gray-700">{lista.expiracaoData || 'Vitalício'}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-400">Tipo</div>
+                <div className="text-gray-700">{lista.tipo ? ATIVACAO_LABEL[lista.tipo] : '—'}</div>
               </div>
             </div>
             <div>
@@ -314,6 +363,7 @@ export default function AtivacaoAppPage() {
             <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Mac</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Tipo</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
                 <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
@@ -323,7 +373,8 @@ export default function AtivacaoAppPage() {
               {filteredListas.map((lista) => (
                 <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
-                  <td className="px-6 py-3 text-gray-600">{lista.expiracaoData}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.tipo ? ATIVACAO_LABEL[lista.tipo] : '—'}</td>
+                  <td className="px-6 py-3 text-gray-600">{lista.expiracaoData || 'Vitalício'}</td>
                   <td className="px-6 py-3">
                     {lista.expirado ? (
                       <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">

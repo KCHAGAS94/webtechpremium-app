@@ -118,6 +118,7 @@ model Lista {
   dataExpiracao DateTime?
   isActive      Boolean     @default(true)
   origem        ListaOrigem @default(PAINEL)
+  tipo          TipoAtivacao?
   appId         Int
   app           App         @relation(fields: [appId], references: [id], onDelete: Cascade)
   createdAt     DateTime    @default(now())
@@ -129,4 +130,13 @@ model Lista {
 enum ListaOrigem {
   PAINEL
   APP
+}
+
+// Tipo de ativação escolhido ao criar o app: ANUAL desconta 1 crédito e
+// expira 1 ano após a ativação; VITALICIO desconta 3 créditos e nunca
+// expira (dataExpiracao fica null). Nulo em linhas antigas, criadas antes
+// dessa cobrança existir.
+enum TipoAtivacao {
+  ANUAL
+  VITALICIO
 }
