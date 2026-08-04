@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, UIManager, View, type StyleProp, type ViewStyle } from 'react-native';
 import { CastButton as GoogleCastButton } from 'react-native-google-cast';
 
@@ -27,12 +28,23 @@ const CAST_BUTTON_SUPPORTED = UIManager.hasViewManagerConfig('RNGoogleCastButton
  * Tapping it opens the system Cast device picker; once connected, the
  * screens that render this button start sending the stream to the selected
  * device (see `useCastStream` in cast-stream.ts).
+ *
+ * The native view still takes D-pad focus itself (it's a real focusable
+ * MediaRouteButton), but gave no visual cue when the remote moved onto it —
+ * it extends RN's ViewProps, so it fires onFocus/onBlur like any other view;
+ * this just mirrors PlayerControlButton's highlighted-ring pattern on top.
  */
 export function CastButton({ style }: Props) {
+  const [focused, setFocused] = useState(false);
   if (!CAST_BUTTON_SUPPORTED) return null;
   return (
-    <View style={[styles.container, style]}>
-      <GoogleCastButton style={styles.button} tintColor="#fff" />
+    <View style={[styles.container, focused && styles.containerFocused, style]}>
+      <GoogleCastButton
+        style={styles.button}
+        tintColor="#fff"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+      />
     </View>
   );
 }
@@ -46,6 +58,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
     overflow: 'hidden',
+  },
+  containerFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
   },
   button: {
     width: 24,
