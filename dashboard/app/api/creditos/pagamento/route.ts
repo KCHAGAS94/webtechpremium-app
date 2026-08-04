@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
 
   try {
     if (payment_method === 'pix') {
+      const appUrl = process.env.NEXT_PUBLIC_API_URL;
       const payment = await mpPaymentClient.create({
         body: {
           transaction_amount: pkg.amount,
@@ -40,6 +41,7 @@ export async function POST(request: NextRequest) {
             email: payer?.email || 'no-reply@webtechpremium.local',
             first_name: payer?.first_name || payer?.name || '',
           },
+          ...(appUrl && { notification_url: `${appUrl}/api/creditos/webhook` }),
         },
       });
 
@@ -64,6 +66,7 @@ export async function POST(request: NextRequest) {
 
     const requestedInstallments = Number(installments || 1);
     const safeInstallments = Math.min(Math.max(requestedInstallments, 1), 12);
+    const appUrl = process.env.NEXT_PUBLIC_API_URL;
 
     const payment = await mpPaymentClient.create({
       body: {
@@ -83,6 +86,7 @@ export async function POST(request: NextRequest) {
             },
           }),
         },
+        ...(appUrl && { notification_url: `${appUrl}/api/creditos/webhook` }),
       },
     });
 

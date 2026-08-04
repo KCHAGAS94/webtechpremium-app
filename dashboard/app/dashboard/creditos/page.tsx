@@ -291,6 +291,19 @@ function CheckoutModal({
 export default function CreditosPage() {
   const [selectedPkg, setSelectedPkg] = useState<CreditPackage | null>(null);
 
+  useEffect(() => {
+    fetch('/api/creditos/pendentes', { method: 'POST' })
+      .then((res) => res.json())
+      .then((data) => {
+        // recarrega pra atualizar o contador de créditos na sidebar (que só
+        // busca /api/auth/me uma vez, no mount do layout)
+        if (data?.approvedCount > 0) window.location.reload();
+      })
+      .catch(() => {
+        // ignora — a próxima visita à página tenta reconciliar de novo
+      });
+  }, []);
+
   return (
     <div className="-m-4 md:-m-6 min-h-full bg-[#0b0a12] p-4 md:p-6">
       <h2 className="text-2xl font-bold text-white mb-6">Comprar Crédito</h2>

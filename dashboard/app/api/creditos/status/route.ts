@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { getAuthUser } from '@/lib/auth';
-import { mpPaymentClient, hasMercadoPagoAccessToken } from '@/lib/mercadopago';
+import { hasMercadoPagoAccessToken } from '@/lib/mercadopago';
+import { syncPaymentStatus } from '@/lib/creditPurchase';
 
 export async function GET(request: NextRequest) {
   const auth = getAuthUser(request);
@@ -24,31 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const payment = await mpPaymentClient.get({ id });
-    const status = payment.status;
-    const newStatus = status === 'approved' ? 'APPROVED' : status === 'rejected' || status === 'cancelled' ? 'REJECTED' : 'PENDING';
-
-    if (newStatus === 'APPROVED') {
-      // updateMany com where status: PENDING garante que o crédito só é
-      // somado uma vez, mesmo que o polling chegue aqui mais de uma vez.
-      const updated = await prisma.creditPurchase.updateMany({
-        where: { id: purchase.id, status: 'PENDING' },
-        data: { status: 'APPROVED' },
-      });
-
-      if (updated.count > 0) {
-        await prisma.user.update({
-          where: { id: purchase.userId },
-          data: { credits: { increment: purchase.credits } },
-        });
-      }
-    } else if (newStatus !== purchase.status) {
-      await prisma.creditPurchase.update({
-        where: { id: purchase.id },
-        data: { status: newStatus },
-      });
-    }
-
+    const payment = await syncPaymentStatus(id);
     return NextResponse.json(payment);
   } catch (error: any) {
     console.error('[creditos/status] erro', error);
