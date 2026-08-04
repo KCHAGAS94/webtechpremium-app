@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 type TipoAtivacao = 'ANUAL' | 'VITALICIO';
 
@@ -167,10 +168,41 @@ function EditModal({
   );
 }
 
+function BuyCreditsModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white w-[90%] max-w-sm rounded-lg shadow-lg p-6 text-center space-y-4">
+        <div className="text-4xl">💳</div>
+        <h2 className="text-lg font-bold text-gray-800">Créditos insuficientes</h2>
+        <p className="text-sm text-gray-600">
+          Você não tem créditos suficientes para ativar este app. Compre mais créditos para continuar.
+        </p>
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={() => router.push('/dashboard/creditos')}
+            className="flex-1 bg-green-500 text-white px-4 py-2 rounded font-semibold hover:bg-green-600 transition"
+          >
+            Comprar créditos
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded font-semibold hover:bg-gray-400 transition"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AtivacaoAppPage() {
   const [listas, setListas] = useState(mockListas);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
+  const [showBuyCredits, setShowBuyCredits] = useState(false);
 
   const loadListas = async () => {
     try {
@@ -249,6 +281,11 @@ export default function AtivacaoAppPage() {
         }),
       });
       if (!response.ok) {
+        if (response.status === 402) {
+          setEditingLista(null);
+          setShowBuyCredits(true);
+          return;
+        }
         const data = await response.json().catch(() => ({}));
         return data.error || 'Falha ao salvar app';
       }
@@ -414,6 +451,8 @@ export default function AtivacaoAppPage() {
 
       {/* Edit/Add Modal */}
       <EditModal lista={editingLista} onClose={handleCloseModal} onSave={handleSave} />
+
+      {showBuyCredits && <BuyCreditsModal onClose={() => setShowBuyCredits(false)} />}
     </div>
   );
 }
