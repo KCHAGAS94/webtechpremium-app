@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PlayerControlButton } from '@/components/player-control-button';
 import { ThemedText } from '@/components/themed-text';
 
 type Props = {
@@ -54,16 +55,16 @@ export function DeviceActivationScreen({
 
           {!!error && <ThemedText style={styles.errorText}>{error}</ThemedText>}
 
-          <TouchableOpacity
+          <PlayerControlButton
             style={[styles.reloadButton, reloading && styles.reloadButtonDisabled]}
-            onPress={onReload}
-            disabled={reloading}
-            activeOpacity={0.8}
+            focusedStyle={styles.reloadButtonFocused}
+            onPress={() => !reloading && onReload()}
+            autoFocus
           >
             <ThemedText style={styles.reloadButtonText}>
               {reloading ? 'Verificando...' : 'Recarregar Lista'}
             </ThemedText>
-          </TouchableOpacity>
+          </PlayerControlButton>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -155,6 +156,12 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignSelf: 'stretch',
     alignItems: 'center',
+  },
+  reloadButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: '#3a6fe6',
+    transform: [{ scale: 1.03 }],
   },
   reloadButtonDisabled: {
     opacity: 0.6,
