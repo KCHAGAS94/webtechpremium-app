@@ -132,7 +132,10 @@ function CheckoutModal({
               {pkg.credits} créditos por R$ {formatBRL(pkg.amount)}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none">
+          <button
+            onClick={state === 'approved' ? () => window.location.reload() : onClose}
+            className="text-gray-400 hover:text-white text-2xl leading-none"
+          >
             ✕
           </button>
         </div>
@@ -146,7 +149,7 @@ function CheckoutModal({
                 {pkg.credits} créditos foram adicionados à sua conta.
               </p>
               <button
-                onClick={onClose}
+                onClick={() => window.location.reload()}
                 className="mt-2 bg-blue-600 hover:bg-blue-500 transition-colors text-white font-semibold px-6 py-2 rounded-lg"
               >
                 Fechar
