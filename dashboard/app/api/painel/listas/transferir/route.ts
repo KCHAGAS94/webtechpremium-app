@@ -60,6 +60,18 @@ export async function POST(request: NextRequest) {
     data: { appId: novoApp.id },
   });
 
+  // Registrado à parte porque o MAC de origem costuma ser apagado logo a
+  // seguir — sem isso não sobraria rastro nenhum de quem transferiu o quê.
+  await prisma.transferenciaAtivacao.create({
+    data: {
+      userId: auth.id,
+      macOrigem: lista.app.macAddress,
+      macDestino: novoMacAddress,
+      tipo: lista.tipo,
+      dataExpiracao: lista.dataExpiracao,
+    },
+  });
+
   // Se não sobrou nenhuma lista no MAC de origem, ele deixa de existir no painel.
   const restantesNaOrigem = await prisma.lista.count({ where: { appId: appOrigemId } });
   if (restantesNaOrigem === 0) {
