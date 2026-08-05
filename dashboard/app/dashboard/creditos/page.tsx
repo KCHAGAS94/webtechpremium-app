@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CardPayment, initMercadoPago } from '@mercadopago/sdk-react';
 import { CREDIT_PACKAGES, type CreditPackage } from '@/lib/creditPackages';
 
@@ -38,6 +38,24 @@ function CheckoutModal({
       setMpLoaded(true);
     }
   }, []);
+
+  // Congelado de propósito: o Brick do Mercado Pago destrói e recria o
+  // formulário inteiro sempre que a prop `initialization` muda de
+  // referência. Sem isso, digitar no CPF (ou qualquer outro campo que
+  // muda `email`/`cpf`) recriava o objeto a cada tecla e o formulário
+  // ficava piscando/recarregando até dar erro. O email/CPF enviados de
+  // fato no pagamento vêm do estado ao vivo em `onSubmit`, não daqui.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cardInitialization = useMemo(
+    () => ({
+      amount: pkg.amount,
+      payer: {
+        email,
+        identification: cpf ? { type: 'CPF', number: cpf.replace(/\D/g, '') } : undefined,
+      },
+    }),
+    [pkg.id]
+  );
 
   useEffect(() => {
     if (!paymentId) return;
@@ -215,13 +233,7 @@ function CheckoutModal({
                   ) : (
                     <CardPayment
                       key={pkg.id}
-                      initialization={{
-                        amount: pkg.amount,
-                        payer: {
-                          email,
-                          identification: cpf ? { type: 'CPF', number: cpf.replace(/\D/g, '') } : undefined,
-                        },
-                      }}
+                      initialization={cardInitialization}
                       customization={{
                         paymentMethods: { minInstallments: 1, maxInstallments: 3 },
                         visual: { hideFormTitle: true },
