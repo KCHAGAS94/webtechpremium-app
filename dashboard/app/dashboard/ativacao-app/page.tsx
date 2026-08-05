@@ -168,6 +168,93 @@ function EditModal({
   );
 }
 
+function TransferModal({
+  lista,
+  onClose,
+  onTransfer,
+}: {
+  lista: Lista | null;
+  onClose: () => void;
+  onTransfer: (novoMac: string) => Promise<string | void>;
+}) {
+  const [novoMac, setNovoMac] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setNovoMac('');
+    setError('');
+  }, [lista]);
+
+  if (!lista) return null;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    const errorMessage = await onTransfer(novoMac);
+    setLoading(false);
+    if (errorMessage) {
+      setError(errorMessage);
+      return;
+    }
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white w-[90%] max-w-md rounded-lg shadow-lg">
+        <div className="flex justify-between items-center p-6 border-b border-gray-200">
+          <h2 className="text-xl font-bold text-gray-800">Transferir ativação</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-3xl font-bold">
+            ✕
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <p className="text-sm text-gray-600">
+            MAC atual: <span className="font-mono">{lista.mac}</span>
+          </p>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Novo MAC</label>
+            <input
+              type="text"
+              value={novoMac}
+              onChange={(e) => {
+                setNovoMac(formatMacAddress(e.target.value));
+                setError('');
+              }}
+              maxLength={17}
+              placeholder="00:1A:3M:A3:02:11"
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
+            />
+          </div>
+          <p className="text-xs text-gray-500">
+            O MAC atual deixa de existir no painel. O tipo de ativação e a data de expiração continuam
+            os mesmos no novo MAC.
+          </p>
+
+          {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
+        </div>
+
+        <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
+          <button
+            onClick={handleConfirm}
+            disabled={loading || !novoMac}
+            className="flex-1 bg-green-500 text-white px-6 py-3 rounded font-semibold hover:bg-green-600 disabled:opacity-50 transition"
+          >
+            {loading ? 'Transferindo...' : '✓ Transferir'}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded font-semibold hover:bg-gray-400 transition"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BuyCreditsModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
 
@@ -203,6 +290,7 @@ export default function AtivacaoAppPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
+  const [transferindoLista, setTransferindoLista] = useState<Lista | null>(null);
 
   const loadListas = async () => {
     try {
@@ -301,6 +389,26 @@ export default function AtivacaoAppPage() {
     setEditingLista(null);
   };
 
+  const handleTransfer = async (novoMac: string): Promise<string | void> => {
+    if (!transferindoLista) return;
+
+    try {
+      const response = await fetch('/api/painel/listas/transferir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: transferindoLista.id, novoMac }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return data.error || 'Falha ao transferir ativação';
+      }
+      await loadListas();
+    } catch (error) {
+      console.error('Falha ao transferir ativação', error);
+      return 'Falha ao transferir ativação';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -349,6 +457,15 @@ export default function AtivacaoAppPage() {
             <div className="flex justify-between items-start">
               <span className="font-mono text-xs text-gray-600">{lista.mac}</span>
               <div className="flex gap-3">
+                {lista.tipo && (
+                  <button
+                    onClick={() => setTransferindoLista(lista)}
+                    className="text-purple-500 hover:text-purple-700 text-lg"
+                    title="Transferir ativação"
+                  >
+                    🔁
+                  </button>
+                )}
                 <button
                   onClick={() => setEditingLista(lista)}
                   className="text-blue-500 hover:text-blue-700 text-lg"
@@ -423,6 +540,15 @@ export default function AtivacaoAppPage() {
                     )}
                   </td>
                   <td className="px-6 py-3 flex justify-center gap-2">
+                    {lista.tipo && (
+                      <button
+                        onClick={() => setTransferindoLista(lista)}
+                        className="text-purple-500 hover:text-purple-700 font-semibold text-xl"
+                        title="Transferir ativação"
+                      >
+                        🔁
+                      </button>
+                    )}
                     <button
                       onClick={() => setEditingLista(lista)}
                       className="text-blue-500 hover:text-blue-700 font-semibold text-xl"
@@ -452,6 +578,12 @@ export default function AtivacaoAppPage() {
       <EditModal lista={editingLista} onClose={handleCloseModal} onSave={handleSave} />
 
       {showBuyCredits && <BuyCreditsModal onClose={() => setShowBuyCredits(false)} />}
+
+      <TransferModal
+        lista={transferindoLista}
+        onClose={() => setTransferindoLista(null)}
+        onTransfer={handleTransfer}
+      />
     </div>
   );
 }
