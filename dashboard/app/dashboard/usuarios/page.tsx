@@ -28,12 +28,14 @@ function EditModal({
 }: {
   lista: Lista | null;
   onClose: () => void;
-  onSave: (lista: Lista) => void;
+  onSave: (lista: Lista) => Promise<string | void>;
 }) {
   const [formData, setFormData] = useState<Lista>(lista || ({} as Lista));
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (lista) setFormData(lista);
+    setError('');
   }, [lista]);
 
   if (!lista) return null;
@@ -46,10 +48,15 @@ function EditModal({
       ...formData,
       [name]: name === 'mac' ? formatMacAddress(value) : value,
     });
+    setError('');
   };
 
-  const handleSave = () => {
-    onSave(formData);
+  const handleSave = async () => {
+    const errorMessage = await onSave(formData);
+    if (errorMessage) {
+      setError(errorMessage);
+      return;
+    }
     onClose();
   };
 
@@ -100,6 +107,8 @@ function EditModal({
               className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50"
             />
           </div>
+
+          {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
         </div>
 
         <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
@@ -170,9 +179,9 @@ export default function UsuariosPage() {
     });
   };
 
-  const handleSave = async (lista: Lista) => {
+  const handleSave = async (lista: Lista): Promise<string | void> => {
     try {
-      await fetch('/api/painel/listas', {
+      const response = await fetch('/api/painel/listas', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -180,12 +189,16 @@ export default function UsuariosPage() {
           mac: lista.mac,
           nome: lista.nome,
           url: lista.url,
-          expiracaoData: lista.expiracaoData,
         }),
       });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        return data.error || 'Falha ao salvar lista';
+      }
       await loadListas();
     } catch (error) {
       console.error('Falha ao salvar lista no painel', error);
+      return 'Falha ao salvar lista';
     }
 
     setEditingLista(null);

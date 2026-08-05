@@ -90,6 +90,24 @@ export async function POST(request: NextRequest) {
     if (existingApp && auth.role !== 'ADMIN' && existingApp.userId !== auth.id) {
       return NextResponse.json({ error: 'MAC pertence a outro revendedor' }, { status: 403 });
     }
+
+    // A tela "Usuários" (sem `tipo`) só pode adicionar playlist a um MAC que
+    // já tenha passado pela "Ativação App" e continue ativo (Vitalício ou
+    // dentro da data). `tipo` presente aqui é a própria ativação, que segue
+    // sem essa exigência.
+    if (!tipo) {
+      const appComAtivacoes = await prisma.app.findUnique({
+        where: { macAddress },
+        include: { listas: { where: { tipo: { not: null } } } },
+      });
+      const ativo = appComAtivacoes?.listas.some((l) => !isExpirado(l.dataExpiracao));
+      if (!ativo) {
+        return NextResponse.json(
+          { error: 'MAC não está ativado ou a ativação expirou' },
+          { status: 400 }
+        );
+      }
+    }
   }
 
   // A data de expiração é sempre calculada pelo servidor, nunca aceita do
