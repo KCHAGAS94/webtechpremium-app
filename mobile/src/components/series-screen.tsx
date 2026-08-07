@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Image, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Dimensions, FlatList, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
@@ -151,7 +152,7 @@ const PosterCard = memo(function PosterCard({
       hasTVPreferredFocus={hasTVPreferredFocus}
     >
       {item.logo ? (
-        <Image source={{ uri: item.logo }} style={styles.poster} resizeMode="cover" />
+        <Image source={{ uri: item.logo }} style={styles.poster} contentFit="cover" />
       ) : (
         <View style={[styles.poster, styles.posterPlaceholder]}>
           <ThemedText style={styles.posterPlaceholderIcon}>📺</ThemedText>

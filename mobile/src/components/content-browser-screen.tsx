@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   TextInput,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvent } from 'expo';
+import { Image } from 'expo-image';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { FullscreenPlayer } from '@/components/fullscreen-player';
@@ -228,7 +228,7 @@ const ChannelRow = memo(function ChannelRow({
       onLongPress={onLongPress ? () => onLongPress(item) : undefined}
     >
       {item.logo ? (
-        <Image source={{ uri: item.logo }} style={styles.channelLogo} resizeMode="contain" />
+        <Image source={{ uri: item.logo }} style={styles.channelLogo} contentFit="contain" />
       ) : (
         <View style={styles.channelLogoPlaceholder} />
       )}
