@@ -34,8 +34,58 @@ const READ_CHUNK_BYTES = 4 * 1024 * 1024;
 // under the ANR watchdog's ~5s budget between yields.
 const LINES_PER_YIELD = 20000;
 
+// Some providers' CDN edges close the connection early (without a proper
+// error) when the origin stalls generating a very large M3U response — OkHttp
+// then sees a clean EOF, not a network error, so File.downloadFileAsync
+// resolves "successfully" with a truncated file. That's what made Séries
+// (still fully dependent on this download, unlike TV ao Vivo/Filmes above)
+// intermittently come back with a fraction of the real catalog. Retrying a
+// handful of times when the file looks cut off is cheap insurance against
+// that — most retries succeed because it's a transient edge/origin hiccup,
+// not a persistent one.
+const MAX_DOWNLOAD_ATTEMPTS = 3;
+const TRUNCATION_CHECK_TAIL_BYTES = 4096;
+
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+// Heuristic: a well-formed M3U's last non-blank line is a stream URL (or the
+// lone `#EXTM3U` header, for a pathologically empty list) — never a dangling
+// `#EXTINF` whose URL line got cut off mid-transfer. Reading just the tail
+// instead of the whole file keeps this cheap even on huge playlists.
+function looksComplete(file: File): boolean {
+  const size = file.info().size ?? 0;
+  if (size === 0) return false;
+
+  const handle = file.open();
+  try {
+    const tailLength = Math.min(size, TRUNCATION_CHECK_TAIL_BYTES);
+    handle.offset = size - tailLength;
+    const tailText = new TextDecoder('utf-8').decode(handle.readBytes(tailLength));
+    const lines = tailText.split('\n').map((line) => line.trim()).filter(Boolean);
+    const lastLine = lines[lines.length - 1] ?? '';
+    return !lastLine.startsWith('#') || lastLine === '#EXTM3U';
+  } finally {
+    handle.close();
+  }
+}
+
+async function downloadPlaylistVerified(url: string, dest: File): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
+    try {
+      await File.downloadFileAsync(url, dest, {
+        headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
+        idempotent: true,
+      });
+      if (looksComplete(dest)) return;
+      lastError = new Error('Download da playlist parece incompleto (conexão encerrada no meio da lista)');
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Falha ao baixar a playlist');
 }
 
 // Where each device's last-downloaded M3U is kept permanently (Paths.document,
@@ -186,10 +236,7 @@ export async function loadPlaylist(
   // never happens — the same approach production IPTV apps use for large
   // M3U/Xtream lists.
   const persisted = persistedPlaylistFile(mac);
-  await File.downloadFileAsync(url, persisted, {
-    headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
-    idempotent: true,
-  });
+  await downloadPlaylistVerified(url, persisted);
 
   const channels = await parseM3uFile(persisted, onProgress);
   const { tv, filmes, series } = await classify(channels);
