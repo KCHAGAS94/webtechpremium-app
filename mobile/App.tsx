@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   BackHandler,
   Modal,
   Pressable,
@@ -9,6 +10,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -45,6 +47,11 @@ const CONTENT_SCREENS: Partial<Record<string, ContentCategory>> = {
 const ICON_SIZE_LARGE = 64;
 const ICON_SIZE_MEDIUM = 40;
 const ICON_SIZE_SMALL = 28;
+
+// Set right before BackHandler.exitApp() (see handleConfirmExit), checked on
+// the next resume (see the AppState effect) — survives even a real process
+// kill since it's on disk, not in memory.
+const PENDING_FRESH_START_KEY = 'webtechpremium:pending-fresh-start';
 
 interface MenuItem {
   id: string;
@@ -232,35 +239,68 @@ function AppContent() {
     }
   };
 
-  useEffect(() => {
-    (async () => {
-      const mac = await getDeviceMac();
-      setDeviceMac(mac);
+  // Shared by the initial mount and by the "Saída" fake-power-cycle (see
+  // handleConfirmExit/the AppState effect below) — both cases should behave
+  // exactly like a cold start: same boot screen, same fresh fetch, no stale
+  // in-memory state from before.
+  const bootstrap = useCallback(async () => {
+    setBooting(true);
+    const mac = await getDeviceMac();
+    setDeviceMac(mac);
 
-      // The app never contacts the painel on its own anymore — linking a
-      // MAC to a lista now happens on the painel side (reseller does it),
-      // and the app only asks "what's assigned to this MAC?" when the user
-      // explicitly presses "Recarregar Lista" on the activation screen (see
-      // handleReloadPlaylist below). Boot restores whatever the last
-      // successful manual fetch left behind: which playlist was active
-      // (cached metadata, see playlist-cache.ts), TV ao Vivo/Filmes from the
-      // Xtream API (fast, no size cap), and Séries read back from the
-      // per-device M3U file on disk (see loadPlaylistFromDisk) — no size cap
-      // there either, unlike the old AsyncStorage-JSON cache this replaced.
-      const cached = await getCachedPlaylistState(mac);
-      const activePlaylist = cached?.panelPlaylists.find((p) => p.id === cached.activePlaylistId);
-      const disk = activePlaylist ? await loadPlaylistFromDisk(activePlaylist.url, mac) : null;
+    // The app never contacts the painel on its own anymore — linking a
+    // MAC to a lista now happens on the painel side (reseller does it),
+    // and the app only asks "what's assigned to this MAC?" when the user
+    // explicitly presses "Recarregar Lista" on the activation screen (see
+    // handleReloadPlaylist below). Boot restores whatever the last
+    // successful manual fetch left behind: which playlist was active
+    // (cached metadata, see playlist-cache.ts), TV ao Vivo/Filmes from the
+    // Xtream API (fast, no size cap), and Séries read back from the
+    // per-device M3U file on disk (see loadPlaylistFromDisk) — no size cap
+    // there either, unlike the old AsyncStorage-JSON cache this replaced.
+    const cached = await getCachedPlaylistState(mac);
+    const activePlaylist = cached?.panelPlaylists.find((p) => p.id === cached.activePlaylistId);
+    const disk = activePlaylist ? await loadPlaylistFromDisk(activePlaylist.url, mac) : null;
 
-      if (cached && disk) {
-        setPlaylists(cached.panelPlaylists);
-        setActivePlaylistId(cached.activePlaylistId);
-        setChannels([...disk.tv, ...disk.filmes, ...disk.series]);
-      } else {
-        setCurrentScreen('playlist');
-      }
-      setBooting(false);
-    })();
+    if (cached && disk) {
+      setPlaylists(cached.panelPlaylists);
+      setActivePlaylistId(cached.activePlaylistId);
+      setChannels([...disk.tv, ...disk.filmes, ...disk.series]);
+      setCurrentScreen('home');
+    } else {
+      setCurrentScreen('playlist');
+    }
+    setBooting(false);
   }, []);
+
+  useEffect(() => {
+    bootstrap();
+    // Deliberately runs once on mount — bootstrap is stable (empty deps) and
+    // re-running it here would fight the AppState-triggered call below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // "Saída" can't force Android to actually kill the process (that's the
+  // OS's call, not something Expo/RN exposes control over — see the
+  // conversation that led to this) — some devices keep it cached in the
+  // background instead, so reopening the app can resume with stale
+  // in-memory state and a dead server connection instead of truly starting
+  // over. This simulates the "TV was turned off and on again" the user
+  // wants regardless of what the OS actually did with the process: a flag
+  // set right before exiting, checked here the next time the app becomes
+  // active, forces the exact same fresh boot sequence a real cold start
+  // would run — no stale channels, no stale connection.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      AsyncStorage.getItem(PENDING_FRESH_START_KEY).then((value) => {
+        if (!value) return;
+        AsyncStorage.removeItem(PENDING_FRESH_START_KEY);
+        bootstrap();
+      });
+    });
+    return () => subscription.remove();
+  }, [bootstrap]);
 
   if (booting) {
     return <BootLoadingScreen />;
@@ -346,7 +386,9 @@ function AppContent() {
 
   const handleConfirmExit = () => {
     setExitModalVisible(false);
-    BackHandler.exitApp();
+    AsyncStorage.setItem(PENDING_FRESH_START_KEY, '1').finally(() => {
+      BackHandler.exitApp();
+    });
   };
 
   if (currentScreen === 'playlist') {
