@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   TextInput,
@@ -60,7 +61,9 @@ const LIVE_EDGE_THRESHOLD_SECONDS = 10;
 // Must stay in sync with categoryRow / channelRow paddingVertical + borderBottomWidth below,
 // so FlatList can skip cell measurement (getItemLayout) on very large lists.
 const CATEGORY_ROW_HEIGHT = 41;
-const CHANNEL_ROW_HEIGHT = 37;
+// Grew from 37 to fit the channel logo icon added below (22px icon + the
+// row's existing vertical padding/border).
+const CHANNEL_ROW_HEIGHT = 43;
 
 type Props = {
   channels: M3uChannel[];
@@ -224,6 +227,11 @@ const ChannelRow = memo(function ChannelRow({
       onPress={() => onPress(item)}
       onLongPress={onLongPress ? () => onLongPress(item) : undefined}
     >
+      {item.logo ? (
+        <Image source={{ uri: item.logo }} style={styles.channelLogo} resizeMode="contain" />
+      ) : (
+        <View style={styles.channelLogoPlaceholder} />
+      )}
       <ThemedText style={styles.channelName} numberOfLines={1}>
         {item.name}
       </ThemedText>
@@ -888,6 +896,17 @@ const styles = StyleSheet.create({
   channelRowFocused: {
     borderLeftColor: '#4dd6ff',
     backgroundColor: '#132a4d',
+  },
+  channelLogo: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+  },
+  channelLogoPlaceholder: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
   },
   channelName: {
     fontSize: 13,
