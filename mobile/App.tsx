@@ -23,7 +23,7 @@ import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
-import { loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
+import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
 import type { SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
 import { popBackAction, useBackStackEntry } from './src/utils/back-stack';
@@ -168,10 +168,24 @@ function AppContent() {
     // are alive in memory at once, which is enough to OOM-kill the app on
     // low-RAM Android TV boxes when switching between large playlists.
     setChannels([]);
-    const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await loadPlaylist(playlist.url, mac);
-    const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
     setActivePlaylistId(playlist.id);
-    setChannels(freshChannels);
+
+    // loadFastCatalog (TV ao Vivo/Filmes straight from the Xtream API, a
+    // couple of small JSON calls) and loadPlaylist (the M3U download+parse,
+    // still needed for Séries and for persisting the file boot reads back)
+    // run concurrently. Whichever finishes first — normally the fast
+    // catalog, since it doesn't scale with playlist size — puts the user on
+    // Home able to watch immediately, instead of making Live/Filmes wait on
+    // however long the M3U takes.
+    const fullPromise = loadPlaylist(playlist.url, mac);
+    const fast = await loadFastCatalog(playlist.url).catch(() => null);
+    if (fast) {
+      setChannels([...fast.tv, ...fast.filmes]);
+      setCurrentScreen('home');
+    }
+
+    const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await fullPromise;
+    setChannels([...(fast?.tv ?? tv), ...(fast?.filmes ?? filmes), ...series]);
     setCurrentScreen('home');
     if (freshSeriesMeta) {
       setSeriesMetaByShowName(freshSeriesMeta);
@@ -190,13 +204,15 @@ function AppContent() {
       // MAC to a lista now happens on the painel side (reseller does it),
       // and the app only asks "what's assigned to this MAC?" when the user
       // explicitly presses "Recarregar Lista" on the activation screen (see
-      // handleReloadPlaylist below). Boot just restores whatever the last
+      // handleReloadPlaylist below). Boot restores whatever the last
       // successful manual fetch left behind: which playlist was active
-      // (cached metadata, see playlist-cache.ts) and its channels (read back
-      // from the per-device file on disk, see loadPlaylistFromDisk) — no
-      // network round trip either way, and no size cap on the playlist.
+      // (cached metadata, see playlist-cache.ts), TV ao Vivo/Filmes from the
+      // Xtream API (fast, no size cap), and Séries read back from the
+      // per-device M3U file on disk (see loadPlaylistFromDisk) — no size cap
+      // there either, unlike the old AsyncStorage-JSON cache this replaced.
       const cached = await getCachedPlaylistState(mac);
-      const disk = cached && cached.panelPlaylists.length > 0 ? await loadPlaylistFromDisk(mac) : null;
+      const activePlaylist = cached?.panelPlaylists.find((p) => p.id === cached.activePlaylistId);
+      const disk = activePlaylist ? await loadPlaylistFromDisk(activePlaylist.url, mac) : null;
 
       if (cached && disk) {
         setPlaylists(cached.panelPlaylists);

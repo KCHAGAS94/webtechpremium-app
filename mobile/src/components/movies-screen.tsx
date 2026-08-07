@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Image, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Dimensions, FlatList, Image, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvent } from 'expo';
 import { useVideoPlayer } from 'expo-video';
@@ -32,6 +32,24 @@ const FAVORITES_CATEGORY_ID = 'favorites';
 const CONTINUE_WATCHING_CATEGORY_ID = 'continue';
 const SEARCH_DEBOUNCE_MS = 200;
 const NUM_COLUMNS = 5;
+
+// Without a precomputed row height, FlatList has to measure each grid row's
+// layout as it scrolls/focuses into view instead of jumping straight to it —
+// on a 25k+ item catalog that's what made the D-pad feel like it took a
+// moment to catch up after every arrow press. These mirror the `card`/
+// `poster`/`cardTitle` styles below exactly, so keep them in sync if those
+// change.
+const CATEGORIES_COLUMN_WIDTH = 221; // styles.categoriesColumn width (220) + its 1px border
+const GRID_HORIZONTAL_PADDING = 24; // styles.gridContent paddingHorizontal (12) * 2
+const CARD_PADDING = 16; // styles.card padding (8) * 2
+const CARD_GAP = 6; // styles.card gap
+const CARD_TITLE_HEIGHT = 32; // styles.cardTitle: 2 lines at fontSize 12
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_WIDTH = (SCREEN_WIDTH - CATEGORIES_COLUMN_WIDTH - GRID_HORIZONTAL_PADDING) / NUM_COLUMNS;
+// styles.poster: aspectRatio 2/3 (width/height), width is the card's content
+// box (card width minus its own horizontal padding).
+const POSTER_HEIGHT = ((CARD_WIDTH - CARD_PADDING) * 3) / 2;
+const GRID_ROW_HEIGHT = CARD_PADDING + POSTER_HEIGHT + CARD_GAP + CARD_TITLE_HEIGHT;
 
 type Category = {
   id: string;
@@ -399,6 +417,11 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
   const channelKeyExtractor = useCallback((item: M3uChannel) => item.id, []);
 
+  const getGridItemLayout = useCallback((_: unknown, index: number) => {
+    const row = Math.floor(index / NUM_COLUMNS);
+    return { length: GRID_ROW_HEIGHT, offset: GRID_ROW_HEIGHT * row, index };
+  }, []);
+
   if (viewingMovie) {
     return (
       <>
@@ -501,6 +524,7 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
               extraData={favorites}
+              getItemLayout={getGridItemLayout}
               initialNumToRender={20}
               maxToRenderPerBatch={20}
               windowSize={7}

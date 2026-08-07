@@ -1,6 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
-import { fetchLiveGenreByName, fetchSeriesMetaByName, fetchVodMetaByName, parseXtreamCredentials, type SeriesMeta } from './xtream-api';
+import { IncrementalM3uParser, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
+import { fetchLiveChannels, fetchSeriesMetaByName, fetchVodMovies, parseXtreamCredentials, type SeriesMeta } from './xtream-api';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
@@ -14,10 +14,25 @@ export type ClassifiedPlaylist = {
   seriesMetaByShowName: Map<string, SeriesMeta> | null;
 };
 
+export type FastCatalog = Pick<ClassifiedPlaylist, 'tv' | 'filmes'>;
+
 // Bucketing an already-parsed list is O(n) over plain objects (cheap even at
 // tens of thousands of entries), but we still yield periodically so it never
 // adds a second long synchronous stretch on top of the parse itself.
 const GROUP_CHUNK_SIZE = 5000;
+
+// Read size for parseM3uFile below. Large enough to keep the number of
+// synchronous native readBytes() round-trips (and RN bridge crossings) low
+// on multi-hundred-MB playlists, but still tiny next to available heap —
+// nowhere close to the single whole-file allocation that OOM-killed the app
+// via File.text()/File.bytes().
+const READ_CHUNK_BYTES = 4 * 1024 * 1024;
+// setTimeout(0) yields are clamped to a handful of ms by Android's timer
+// throttling, so yielding too often (the original 2000) adds up to real
+// wall-clock time on playlists with hundreds of thousands of lines. Yielding
+// less often trades a bit of responsiveness for a lot of speed — still well
+// under the ANR watchdog's ~5s budget between yields.
+const LINES_PER_YIELD = 20000;
 
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
@@ -58,24 +73,99 @@ async function classify(channels: M3uChannel[]): Promise<Pick<ClassifiedPlaylist
 }
 
 /**
- * Downloads an Xtream/M3U playlist from `url`, parses it, and splits the
- * result into TV ao Vivo / Filmes / Séries — the three buckets the rest of
- * the app needs — in one pass. This is the app's single entry point for
- * loading a playlist: the caller awaits one promise and updates state
- * exactly once with the finished `{ tv, filmes, series }` object, instead of
- * juggling partial updates while a multi-hundred-thousand-line list streams
- * in.
+ * Parses an M3U file straight off disk, reading it in small fixed-size byte
+ * chunks (via File.open()'s FileHandle) instead of File.text()/bytes(),
+ * which pull the *entire* file into one JS string/array before returning.
+ * For a large real-world playlist that single allocation is enough to OOM
+ * the app on Android TV's tight heap — this keeps peak memory bounded to
+ * roughly one chunk + the growing (much smaller, structured) channel list,
+ * no matter how big the file on disk is.
+ */
+async function parseM3uFile(file: File, onProgress?: (progress: ParseM3uProgress) => void): Promise<M3uChannel[]> {
+  const handle = file.open();
+  const decoder = new TextDecoder('utf-8');
+  const parser = new IncrementalM3uParser();
+  const totalBytes = handle.size ?? 0;
+
+  let carry = '';
+  let processedBytes = 0;
+  let linesSinceYield = 0;
+
+  try {
+    while (true) {
+      const chunk = handle.readBytes(READ_CHUNK_BYTES);
+      if (!chunk || chunk.length === 0) break;
+      processedBytes += chunk.length;
+
+      const text = carry + decoder.decode(chunk, { stream: true });
+      let start = 0;
+      let newlineIndex: number;
+      while ((newlineIndex = text.indexOf('\n', start)) !== -1) {
+        parser.pushLine(text.slice(start, newlineIndex));
+        start = newlineIndex + 1;
+        linesSinceYield += 1;
+
+        if (linesSinceYield >= LINES_PER_YIELD) {
+          linesSinceYield = 0;
+          onProgress?.({ processedLines: processedBytes, totalLines: totalBytes || processedBytes });
+          await yieldToEventLoop();
+        }
+      }
+      carry = text.slice(start);
+    }
+
+    // Flush whatever the decoder buffered internally for a trailing
+    // multi-byte sequence, plus any partial last line with no closing '\n'.
+    const trailing = carry + decoder.decode();
+    if (trailing) parser.pushLine(trailing);
+  } finally {
+    handle.close();
+  }
+
+  onProgress?.({ processedLines: processedBytes, totalLines: totalBytes || processedBytes });
+  return parser.channels;
+}
+
+/**
+ * Builds TV ao Vivo + Filmes straight from the Xtream JSON API (see
+ * xtream-api.ts) — a couple of small requests, independent of how big the
+ * playlist's M3U file is. This is what lets the app show something watchable
+ * within a second or two of activation/boot instead of waiting on the full
+ * M3U download + parse (which loadPlaylist below still does, but only for
+ * Séries now). Returns null for non-Xtream M3U-only sources, where the
+ * caller has no choice but to wait for the full parse.
+ */
+export async function loadFastCatalog(url: string): Promise<FastCatalog | null> {
+  const credentials = parseXtreamCredentials(url);
+  if (!credentials) return null;
+
+  const [liveResult, vodResult] = await Promise.allSettled([
+    fetchLiveChannels(credentials),
+    fetchVodMovies(credentials),
+  ]);
+  if (liveResult.status === 'rejected' && vodResult.status === 'rejected') return null;
+
+  return {
+    tv: liveResult.status === 'fulfilled' ? liveResult.value : [],
+    filmes: vodResult.status === 'fulfilled' ? vodResult.value : [],
+  };
+}
+
+/**
+ * Downloads an Xtream/M3U playlist from `url` and parses it. This is now
+ * only the *complete* source of truth for a non-Xtream (plain M3U) playlist;
+ * for an Xtream source, callers get TV ao Vivo/Filmes near-instantly from
+ * loadFastCatalog instead, and this function's tv/filmes results exist only
+ * as the offline/no-network fallback — its real job for Xtream sources is
+ * parsing out Séries (which still needs the M3U: listing a show's episodes
+ * from the Xtream API would take one get_series_info call *per show*, far
+ * more round-trips than one M3U parse) and persisting the file for
+ * loadPlaylistFromDisk's cold-boot restore.
  *
- * Both the download and the classification are async and chunked
- * (parseM3u yields every CHUNK_LINES lines while walking the raw text;
- * grouping yields every GROUP_CHUNK_SIZE parsed channels) so the JS thread
- * never blocks long enough to freeze the UI or trip Android's ANR watchdog,
- * no matter how large the playlist is.
- *
- * `mac` also doubles as the persistence key: the downloaded file lands at
- * its permanent, per-device path (see persistedPlaylistFile) instead of a
- * throwaway temp file, so loadPlaylistFromDisk can restore this exact
- * playlist on a later cold boot without any network call.
+ * The M3U download+parse (chunked, see parseM3uFile) and, for Xtream
+ * sources, loadFastCatalog's two API calls, run concurrently — call them
+ * both and race loadFastCatalog if you want TV/Filmes on screen without
+ * waiting for this to finish (see App.tsx's activatePlaylist).
  */
 export async function loadPlaylist(
   url: string,
@@ -96,96 +186,59 @@ export async function loadPlaylist(
   // never happens — the same approach production IPTV apps use for large
   // M3U/Xtream lists.
   const persisted = persistedPlaylistFile(mac);
-
-  let channels: M3uChannel[];
-  const downloaded = await File.downloadFileAsync(url, persisted, {
+  await File.downloadFileAsync(url, persisted, {
     headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
     idempotent: true,
   });
 
-  // Scoped so the raw text (tens of MB on large playlists) is eligible for
-  // GC as soon as parsing is done, instead of staying referenced for the
-  // rest of this function while the enrichment fetches below run — that
-  // would otherwise stack a second memory-heavy phase on top of it right at
-  // the peak.
-  {
-    const raw = await downloaded.text();
-    channels = await parseM3u(raw, onProgress);
-  }
-
+  const channels = await parseM3uFile(persisted, onProgress);
   const { tv, filmes, series } = await classify(channels);
 
-  // The M3U tags every movie/channel with a broad flat/technical group
-  // ("FILMES", "CANAIS 4K") — no real category. If this is an Xtream
-  // playlist, enrich groupTitle with the real one from the JSON API (matched
-  // by exact name). Best-effort: a slow/failed request just leaves the flat
-  // grouping in place instead of breaking the load.
+  // Séries still needs the real genre from the Xtream API — the M3U only
+  // tags every episode with one flat group-title. Best-effort: a failed
+  // request just leaves the flat grouping in place.
   let seriesMetaByShowName: Map<string, SeriesMeta> | null = null;
   const credentials = parseXtreamCredentials(url);
   if (credentials) {
-    // These three calls are independent (different endpoints, different
-    // buckets) so they run concurrently instead of one after another —
-    // roughly a 3x cut of this section's wall-clock time. Each is still
-    // best-effort: a failure only leaves that bucket's flat grouping in
-    // place instead of breaking the whole load.
-    const [vodResult, seriesResult, liveResult] = await Promise.allSettled([
-      fetchVodMetaByName(credentials),
-      fetchSeriesMetaByName(credentials),
-      fetchLiveGenreByName(credentials),
-    ]);
-
-    if (vodResult.status === 'fulfilled') {
-      for (const movie of filmes) {
-        const meta = vodResult.value.get(movie.name);
-        if (!meta) continue;
-        if (meta.genre) movie.groupTitle = meta.genre;
-        movie.vodId = meta.vodId;
-        if (meta.addedAt) movie.addedAt = meta.addedAt;
-      }
-    }
-
-    if (seriesResult.status === 'fulfilled') {
-      seriesMetaByShowName = seriesResult.value;
-    }
-
-    if (liveResult.status === 'fulfilled') {
-      for (const channel of tv) {
-        const genre = liveResult.value.get(channel.name);
-        if (genre) channel.groupTitle = genre;
-      }
-    }
+    const seriesResult = await fetchSeriesMetaByName(credentials).catch(() => null);
+    if (seriesResult) seriesMetaByShowName = seriesResult;
   }
 
   return { tv, filmes, series, seriesMetaByShowName };
 }
 
 /**
- * Restores the last playlist activated for `mac` straight from the file
- * loadPlaylist persisted, with no network call at all — this is what lets
- * cold boot skip both the "MAC não ativado" and "Minhas listas" screens and
- * land directly on Home once a device has activated a playlist at least
- * once, regardless of how large that playlist is (unlike the old
- * AsyncStorage-JSON cache, there's no channel-count cap here: the file is
- * already on disk, not held as one big JS string/array).
- *
- * Xtream enrichment (real genre grouping, vodId) is intentionally skipped
- * here — it needs network round-trips this path exists to avoid. It's
- * re-applied the next time the user does a manual "Recarregar" reload.
- * Returns null if this device never activated a playlist, or the persisted
- * file is missing/unreadable.
+ * Restores the last playlist activated for `mac`. TV ao Vivo/Filmes come
+ * from loadFastCatalog (network, but just two small JSON calls — no size
+ * dependency on the playlist); Séries is read back from the file
+ * loadPlaylist persisted, with no network call, so cold boot can still land
+ * on Home even if the panel/Xtream API is briefly unreachable (Séries just
+ * arrives empty until the next successful reload in that case). Returns
+ * null only if this device never activated a playlist at all.
  */
 export async function loadPlaylistFromDisk(
+  url: string,
   mac: string,
   onProgress?: (progress: ParseM3uProgress) => void
-): Promise<Omit<ClassifiedPlaylist, 'seriesMetaByShowName'> | null> {
+): Promise<ClassifiedPlaylist | null> {
   const persisted = persistedPlaylistFile(mac);
   if (!persisted.exists) return null;
 
-  try {
-    const raw = await persisted.text();
-    const channels = await parseM3u(raw, onProgress);
-    return classify(channels);
-  } catch {
-    return null;
-  }
+  // The M3U is parsed once regardless (Séries always needs it); its tv/filmes
+  // buckets are only actually used if loadFastCatalog fails (no network /
+  // Xtream API unreachable at boot), so boot still shows something instead
+  // of an empty Home in that case.
+  const [fast, local] = await Promise.all([
+    loadFastCatalog(url).catch(() => null),
+    parseM3uFile(persisted, onProgress)
+      .then(classify)
+      .catch(() => ({ tv: [], filmes: [], series: [] }) as Awaited<ReturnType<typeof classify>>),
+  ]);
+
+  return {
+    tv: fast?.tv ?? local.tv,
+    filmes: fast?.filmes ?? local.filmes,
+    series: local.series,
+    seriesMetaByShowName: null,
+  };
 }

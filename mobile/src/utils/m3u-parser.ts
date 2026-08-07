@@ -46,6 +46,59 @@ function countLines(text: string): number {
 }
 
 /**
+ * Holds the #EXTINF-line state machine and the growing channel list, one
+ * `pushLine` call at a time. Extracted out of parseM3u so playlist-loader.ts
+ * can feed it lines read off disk in small chunks (see parseM3uFile there)
+ * instead of ever needing the playlist's full raw text as one JS string —
+ * that single-string requirement is what OOMs on very large (100k+ line)
+ * playlists even when the *file* itself was streamed to disk fine.
+ */
+export class IncrementalM3uParser {
+  readonly channels: M3uChannel[] = [];
+  private pendingName = '';
+  private pendingLogo = '';
+  private pendingGroup = '';
+  private index = 0;
+
+  pushLine(rawLine: string): void {
+    const trimmed = rawLine.trim();
+    if (!trimmed) return;
+
+    if (trimmed.startsWith('#EXTINF')) {
+      this.pendingLogo = '';
+      this.pendingGroup = '';
+
+      ATTR_REGEX.lastIndex = 0;
+      let attrMatch: RegExpExecArray | null;
+      while ((attrMatch = ATTR_REGEX.exec(trimmed))) {
+        const key = attrMatch[1];
+        if (key === 'tvg-logo') this.pendingLogo = attrMatch[2];
+        else if (key === 'group-title') this.pendingGroup = attrMatch[2];
+      }
+
+      const commaIndex = trimmed.lastIndexOf(',');
+      this.pendingName = commaIndex >= 0 ? trimmed.slice(commaIndex + 1).trim() : 'Canal';
+    } else if (!trimmed.startsWith('#')) {
+      // Any non-comment, non-empty line after an #EXTINF is the stream URL.
+      this.index += 1;
+      const groupTitle = this.pendingGroup || 'Geral';
+      const name = this.pendingName || `Canal ${this.index}`;
+      this.channels.push({
+        id: String(this.index),
+        name,
+        logo: this.pendingLogo,
+        groupTitle,
+        url: trimmed,
+        category: categorizeGroup(groupTitle, name),
+      });
+      this.pendingName = '';
+      this.pendingLogo = '';
+      this.pendingGroup = '';
+    }
+  }
+}
+
+/**
  * Parses Xtream-style extended M3U playlists (#EXTM3U / #EXTINF lines
  * followed by a stream URL) into a flat channel list.
  *
@@ -54,18 +107,18 @@ function countLines(text: string): number {
  * copies of itself in memory at once. Processing runs in bursts of
  * `CHUNK_LINES`, yielding to the event loop between them, so the JS thread
  * never blocks long enough to freeze the UI or get killed by the OS watchdog.
+ *
+ * Requires the whole playlist already in memory as `raw` — for playlists
+ * read off disk, prefer parseM3uFile (playlist-loader.ts), which streams the
+ * file in small chunks through the same IncrementalM3uParser instead.
  */
 export async function parseM3u(
   raw: string,
   onProgress?: (progress: ParseM3uProgress) => void
 ): Promise<M3uChannel[]> {
   const totalLines = countLines(raw);
-  const channels: M3uChannel[] = [];
+  const parser = new IncrementalM3uParser();
 
-  let pendingName = '';
-  let pendingLogo = '';
-  let pendingGroup = '';
-  let index = 0;
   let pos = 0;
   let lineNumber = 0;
   let linesSinceYield = 0;
@@ -74,44 +127,10 @@ export async function parseM3u(
   while (pos <= rawLength) {
     let newlineIndex = raw.indexOf('\n', pos);
     if (newlineIndex === -1) newlineIndex = rawLength;
-    const trimmed = raw.slice(pos, newlineIndex).trim();
+    parser.pushLine(raw.slice(pos, newlineIndex));
     pos = newlineIndex + 1;
     lineNumber += 1;
     linesSinceYield += 1;
-
-    if (trimmed) {
-      if (trimmed.startsWith('#EXTINF')) {
-        pendingLogo = '';
-        pendingGroup = '';
-
-        ATTR_REGEX.lastIndex = 0;
-        let attrMatch: RegExpExecArray | null;
-        while ((attrMatch = ATTR_REGEX.exec(trimmed))) {
-          const key = attrMatch[1];
-          if (key === 'tvg-logo') pendingLogo = attrMatch[2];
-          else if (key === 'group-title') pendingGroup = attrMatch[2];
-        }
-
-        const commaIndex = trimmed.lastIndexOf(',');
-        pendingName = commaIndex >= 0 ? trimmed.slice(commaIndex + 1).trim() : 'Canal';
-      } else if (!trimmed.startsWith('#')) {
-        // Any non-comment, non-empty line after an #EXTINF is the stream URL.
-        index += 1;
-        const groupTitle = pendingGroup || 'Geral';
-        const name = pendingName || `Canal ${index}`;
-        channels.push({
-          id: String(index),
-          name,
-          logo: pendingLogo,
-          groupTitle,
-          url: trimmed,
-          category: categorizeGroup(groupTitle, name),
-        });
-        pendingName = '';
-        pendingLogo = '';
-        pendingGroup = '';
-      }
-    }
 
     if (linesSinceYield >= CHUNK_LINES || newlineIndex >= rawLength) {
       onProgress?.({ processedLines: lineNumber, totalLines });
@@ -120,5 +139,5 @@ export async function parseM3u(
     }
   }
 
-  return channels;
+  return parser.channels;
 }

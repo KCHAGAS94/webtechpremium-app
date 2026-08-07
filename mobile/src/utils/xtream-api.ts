@@ -1,12 +1,20 @@
-// Enriches movies with real genre categories from the Xtream `player_api.php`
-// JSON API. The playlist's M3U itself only tags every movie with one flat
-// "FILMES" group-title (no genre), but Xtream's `get_vod_categories` /
-// `get_vod_streams` endpoints expose the same catalog split by genre
-// ("Filmes | Ação", "Filmes | Terror", ...). We can't use that API's
-// stream_id to build a playback URL though — this provider's actual movie
-// CDN (found in the M3U) uses an opaque UUID per title, not the numeric
-// stream_id, so playback still goes through the M3U-parsed url; only the
-// group-title gets replaced, matched by exact movie name.
+import type { M3uChannel } from './m3u-parser';
+
+// Talks to the Xtream `player_api.php` JSON API, used two ways:
+//  1. fetchLiveChannels/fetchVodMovies (below) build the whole TV ao Vivo /
+//     Filmes catalog straight from this API instead of parsing the M3U —
+//     confirmed against a real provider that requesting
+//     `{baseUrl}/live|movie/{user}/{pass}/{stream_id}.{ext}` (the standard
+//     Xtream URL pattern, built from fields this API already returns) 302s to
+//     the exact same CDN file the M3U lists directly. JSON.parse over this
+//     compact per-stream list (no per-item URL/logo/attribute text to scan)
+//     is far cheaper than regex-parsing the equivalent M3U block, which is
+//     what made cold boot/reload slow on large catalogs.
+//  2. The fetch*MetaByName functions enrich series (still M3U-sourced, since
+//     listing a show's episodes needs one get_series_info call *per show* —
+//     fine for a handful of enrichment lookups, too many round-trips to be
+//     the primary source for a whole large catalog) with the real genre
+//     Xtream exposes, matched by exact name against the M3U-parsed catalog.
 export type XtreamCredentials = {
   baseUrl: string;
   username: string;
@@ -23,6 +31,18 @@ type VodStream = {
   category_id: string;
   stream_id: number;
   added?: string;
+};
+
+type VodStreamFull = VodStream & {
+  stream_icon?: string;
+  container_extension?: string;
+};
+
+type LiveStreamFull = {
+  name: string;
+  category_id: string;
+  stream_id: number;
+  stream_icon?: string;
 };
 
 export type VodMeta = {
@@ -236,6 +256,60 @@ export async function getSeriesInfo(creds: XtreamCredentials, seriesId: string):
  * Rede Record", ...), matched by exact channel name (no per-episode parsing
  * needed here — live channels have no season/episode structure).
  */
+// Standard Xtream playback URL pattern — confirmed against a real provider
+// (see the module comment above) that this redirects to the same file the
+// M3U lists directly for all three stream kinds.
+function buildStreamUrl(creds: XtreamCredentials, kind: 'live' | 'movie' | 'series', streamId: number, ext: string) {
+  return `${creds.baseUrl}/${kind}/${creds.username}/${creds.password}/${streamId}.${ext}`;
+}
+
+/**
+ * Builds the whole "TV ao Vivo" catalog straight from the Xtream API —
+ * categories + streams, two small JSON requests total — instead of parsing
+ * the M3U's live-channel lines. This is playlist-loader.ts's primary source
+ * for `tv` now; the M3U is only still parsed for `series` (see module
+ * comment above for why).
+ */
+export async function fetchLiveChannels(creds: XtreamCredentials): Promise<M3uChannel[]> {
+  const [categories, streams] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_live_categories'),
+    fetchXtream<LiveStreamFull[]>(creds, 'get_live_streams'),
+  ]);
+  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
+  return streams.map((stream) => ({
+    id: `live-${stream.stream_id}`,
+    name: stream.name,
+    logo: stream.stream_icon ?? '',
+    groupTitle: categoryNameById.get(stream.category_id) ?? 'Geral',
+    url: buildStreamUrl(creds, 'live', stream.stream_id, 'ts'),
+    category: 'live' as const,
+  }));
+}
+
+/**
+ * Same idea as fetchLiveChannels, for "Filmes" — categories + get_vod_streams
+ * (which already carries the real genre via category_id, the numeric id
+ * needed for getVodInfo, and the add date, so no separate enrichment pass is
+ * needed the way the old M3U-sourced path required).
+ */
+export async function fetchVodMovies(creds: XtreamCredentials): Promise<M3uChannel[]> {
+  const [categories, streams] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_vod_categories'),
+    fetchXtream<VodStreamFull[]>(creds, 'get_vod_streams'),
+  ]);
+  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
+  return streams.map((stream) => ({
+    id: `vod-${stream.stream_id}`,
+    name: stream.name,
+    logo: stream.stream_icon ?? '',
+    groupTitle: categoryNameById.get(stream.category_id) ?? 'Geral',
+    url: buildStreamUrl(creds, 'movie', stream.stream_id, stream.container_extension || 'mp4'),
+    category: 'movies' as const,
+    vodId: String(stream.stream_id),
+    addedAt: stream.added,
+  }));
+}
+
 export async function fetchLiveGenreByName(creds: XtreamCredentials): Promise<Map<string, string>> {
   const [categories, streams] = await Promise.all([
     fetchXtream<VodCategory[]>(creds, 'get_live_categories'),
