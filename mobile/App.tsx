@@ -4,6 +4,7 @@ import {
   AppState,
   BackHandler,
   Modal,
+  Platform,
   Pressable,
   View,
   Text,
@@ -41,12 +42,19 @@ const CONTENT_SCREENS: Partial<Record<string, ContentCategory>> = {
   series: 'series',
 };
 
+// Two fixed layouts, not a continuously-scaled one: Platform.isTV is a
+// build-time-fixed flag (true only on actual Android TV/tvOS runtimes), so
+// this picks one of exactly two dp presets — same idea as the "fixed dp
+// instead of percentage" reasoning below, just extended to a second device
+// class instead of interpolating between them.
+const IS_TV = Platform.isTV;
+
 // Fixed dp sizes for the Home menu icons — matches the old emoji fontSize
 // values (64/40/28) that styles.tvIcon/midIcon/sideMenuIcon used, kept as
 // plain numbers here since Ionicons takes `size` as a prop, not a style.
-const ICON_SIZE_LARGE = 64;
-const ICON_SIZE_MEDIUM = 40;
-const ICON_SIZE_SMALL = 28;
+const ICON_SIZE_LARGE = IS_TV ? 64 : 40;
+const ICON_SIZE_MEDIUM = IS_TV ? 40 : 26;
+const ICON_SIZE_SMALL = IS_TV ? 28 : 20;
 
 // Set right before BackHandler.exitApp() (see handleConfirmExit), checked on
 // the next resume (see the AppState effect) — survives even a real process
@@ -469,71 +477,71 @@ function AppContent() {
       <SafeAreaView style={styles.container}>
         <View style={styles.mainContent}>
           <View style={styles.contentArea}>
-            <View style={styles.layoutRow}>
+            <View style={[styles.layoutRow, !IS_TV && mobileStyles.layoutRow]}>
               <FocusableCard
                 key={tvItem.id}
-                style={styles.tvCard}
+                style={[styles.tvCard, !IS_TV && mobileStyles.tvCard]}
                 focusedStyle={styles.tvCardFocused}
                 onPress={() => handleMenuPress(tvItem.screen)}
                 autoFocus
               >
                 <Ionicons name={tvItem.icon} size={ICON_SIZE_LARGE} color="#ffffff" style={styles.tvIcon} />
-                <Text allowFontScaling={false} style={styles.tvLabel}>{t(tvItem.label)}</Text>
+                <Text allowFontScaling={false} style={[styles.tvLabel, !IS_TV && mobileStyles.tvLabel]}>{t(tvItem.label)}</Text>
               </FocusableCard>
 
               <View style={styles.midColumn}>
                 <FocusableCard
                   key={centerTop.id}
-                  style={styles.midCard}
+                  style={[styles.midCard, !IS_TV && mobileStyles.midCard]}
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(centerTop.screen)}
                 >
                   <Ionicons name={centerTop.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
-                  <Text allowFontScaling={false} style={styles.midLabel}>{t(centerTop.label)}</Text>
+                  <Text allowFontScaling={false} style={[styles.midLabel, !IS_TV && mobileStyles.midLabel]}>{t(centerTop.label)}</Text>
                 </FocusableCard>
 
                 <FocusableCard
                   key={centerBottom.id}
-                  style={styles.midCard}
+                  style={[styles.midCard, !IS_TV && mobileStyles.midCard]}
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(centerBottom.screen)}
                 >
                   <Ionicons name={centerBottom.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
-                  <Text allowFontScaling={false} style={styles.midLabel}>{t(centerBottom.label)}</Text>
+                  <Text allowFontScaling={false} style={[styles.midLabel, !IS_TV && mobileStyles.midLabel]}>{t(centerBottom.label)}</Text>
                 </FocusableCard>
               </View>
 
               <View style={styles.midColumn}>
                 <FocusableCard
                   key={rightTop.id}
-                  style={styles.midCard}
+                  style={[styles.midCard, !IS_TV && mobileStyles.midCard]}
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(rightTop.screen)}
                 >
                   <Ionicons name={rightTop.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
-                  <Text allowFontScaling={false} style={styles.midLabel}>{t(rightTop.label)}</Text>
+                  <Text allowFontScaling={false} style={[styles.midLabel, !IS_TV && mobileStyles.midLabel]}>{t(rightTop.label)}</Text>
                 </FocusableCard>
 
                 <FocusableCard
                   key={rightBottom.id}
-                  style={styles.midCard}
+                  style={[styles.midCard, !IS_TV && mobileStyles.midCard]}
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(rightBottom.screen)}
                 >
                   <Ionicons name={rightBottom.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
-                  <Text allowFontScaling={false} style={styles.midLabel}>{t(rightBottom.label)}</Text>
+                  <Text allowFontScaling={false} style={[styles.midLabel, !IS_TV && mobileStyles.midLabel]}>{t(rightBottom.label)}</Text>
                 </FocusableCard>
               </View>
 
-              <View style={styles.sideMenu}>
+              <View style={[styles.sideMenu, !IS_TV && mobileStyles.sideMenu]}>
                 <FocusableCard
                   key={settingsItem.id}
-                  style={styles.sideMenuItem}
+                  style={[styles.sideMenuItem, !IS_TV && mobileStyles.sideMenuItem]}
                   focusedStyle={styles.sideMenuItemFocused}
                   onPress={() => handleMenuPress(settingsItem.screen)}
                 >
                   <Ionicons name={settingsItem.icon} size={ICON_SIZE_SMALL} color="#ffffff" style={styles.sideMenuIcon} />
-                  <Text allowFontScaling={false} style={styles.sideMenuLabel}>{t(settingsItem.label)}</Text>
+                  <Text allowFontScaling={false} style={[styles.sideMenuLabel, !IS_TV && mobileStyles.sideMenuLabel]}>{t(settingsItem.label)}</Text>
                 </FocusableCard>
 
                 {sideMenuItems.map((item) => {
@@ -541,7 +549,7 @@ function AppContent() {
                   return (
                     <FocusableCard
                       key={item.id}
-                      style={styles.sideMenuItem}
+                      style={[styles.sideMenuItem, !IS_TV && mobileStyles.sideMenuItem]}
                       focusedStyle={styles.sideMenuItemFocused}
                       onPress={() => handleMenuPress(item.screen)}
                     >
@@ -550,7 +558,7 @@ function AppContent() {
                       ) : (
                         <Ionicons name={item.icon} size={ICON_SIZE_SMALL} color="#ffffff" style={styles.sideMenuIcon} />
                       )}
-                      <Text allowFontScaling={false} style={styles.sideMenuLabel}>
+                      <Text allowFontScaling={false} style={[styles.sideMenuLabel, !IS_TV && mobileStyles.sideMenuLabel]}>
                         {isReloadItem && reloadingChannels ? t('nav_reloading') : t(item.label)}
                       </Text>
                     </FocusableCard>
@@ -920,5 +928,45 @@ const styles = StyleSheet.create({
     borderColor: '#4dd6ff',
     borderWidth: 3,
     backgroundColor: '#1f0d8a',
+  },
+});
+
+// Fixed dp overrides applied on top of `styles` whenever IS_TV is false —
+// a second fixed preset, not a computed scale off window width, for the
+// same reason `styles.layoutRow.width: 900` is a fixed dp value rather than
+// a percentage (see that comment above): phone screens vary too, and we
+// want the same result on all of them, not a different one per device.
+const mobileStyles = StyleSheet.create({
+  layoutRow: {
+    width: 620,
+    maxHeight: 200,
+  },
+  tvCard: {
+    width: 150,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+  },
+  tvLabel: {
+    fontSize: 13,
+    lineHeight: 16,
+  },
+  midCard: {
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  midLabel: {
+    fontSize: 11,
+    lineHeight: 13,
+  },
+  sideMenu: {
+    width: 130,
+  },
+  sideMenuItem: {
+    paddingHorizontal: 6,
+    gap: 8,
+  },
+  sideMenuLabel: {
+    fontSize: 10,
+    lineHeight: 13,
   },
 });
