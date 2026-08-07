@@ -5,6 +5,12 @@ export type PanelPlaylist = {
   name: string;
   url: string;
   expiracaoData: string | null;
+  /** ANUAL | VITALICIO | null — drives the tela "Conta"'s validity label
+   * ("Vitalício" instead of a date). Absent/null for lists added by the user
+   * themselves rather than activated through the painel. */
+  tipo?: 'ANUAL' | 'VITALICIO' | null;
+  /** Same source of truth as the painel's own "Expirado" column. */
+  expirado?: boolean;
 };
 
 // Panel-managed playlists for a device: the reseller links M3U lists to a

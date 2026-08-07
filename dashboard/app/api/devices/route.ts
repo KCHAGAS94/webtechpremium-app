@@ -68,6 +68,13 @@ export async function GET(request: NextRequest) {
       name: lista.nome,
       url: lista.url,
       expiracaoData: lista.dataExpiracao ? lista.dataExpiracao.toISOString().slice(0, 10) : null,
+      // Surfaced so the app's tela "Conta" can show the real plan/status
+      // instead of a hardcoded placeholder — tipo drives "Vitalício" vs a
+      // date, expirado drives "Ativo"/"Expirado". Always false here since
+      // the filter above already drops expired listas; kept in the response
+      // anyway so the app's display logic doesn't have to assume that.
+      tipo: lista.tipo,
+      expirado: isExpirado(lista.dataExpiracao),
     }));
 
   return NextResponse.json(playlists, { status: 200 });

@@ -145,7 +145,16 @@ function AppContent() {
   const rightBottom = menuItems[4];
   const settingsItem = menuItems[5];
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
-  const playlistExpiration = activePlaylist?.expiracaoData;
+  // "Vitalício" has no expiration date at all (dataExpiracao is null in the
+  // painel for that tipo) — showing "Não informada" for those was misleading,
+  // so tipo takes priority over the raw date when it says VITALICIO.
+  const playlistValidity =
+    activePlaylist?.tipo === 'VITALICIO' ? 'Vitalício' : activePlaylist?.expiracaoData;
+  // Same source of truth as the painel's own "Expirado" column (see
+  // /api/devices) — undefined only for playlists the user added themselves
+  // rather than activated through the painel, which have no such status.
+  const accountStatus =
+    activePlaylist?.expirado === undefined ? null : activePlaylist.expirado ? 'Expirado' : 'Ativo';
 
   useEffect(() => {
     if (!reloadBlockedMessage) return;
@@ -556,12 +565,12 @@ function AppContent() {
             </View>
             <View style={styles.accountRow}>
               <Text allowFontScaling={false} style={styles.accountRowLabel}>Estado da conta</Text>
-              <Text allowFontScaling={false} style={styles.accountRowValue}>Free Trial</Text>
+              <Text allowFontScaling={false} style={styles.accountRowValue}>{accountStatus ?? 'Não informado'}</Text>
             </View>
             <View style={styles.accountRow}>
               <Text allowFontScaling={false} style={styles.accountRowLabel}>Data de validade</Text>
               <Text allowFontScaling={false} style={styles.accountRowValue}>
-                {playlistExpiration || 'Não informada'}
+                {playlistValidity || 'Não informada'}
               </Text>
             </View>
             <Text allowFontScaling={false} style={styles.accountRenewHint}>
