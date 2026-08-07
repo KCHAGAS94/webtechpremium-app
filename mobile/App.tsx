@@ -23,7 +23,7 @@ import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
-import { loadPlaylist } from './src/utils/playlist-loader';
+import { loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
 import type { SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
 import { popBackAction, useBackStackEntry } from './src/utils/back-stack';
@@ -168,7 +168,7 @@ function AppContent() {
     // are alive in memory at once, which is enough to OOM-kill the app on
     // low-RAM Android TV boxes when switching between large playlists.
     setChannels([]);
-    const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await loadPlaylist(playlist.url);
+    const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await loadPlaylist(playlist.url, mac);
     const freshChannels: M3uChannel[] = [...tv, ...filmes, ...series];
     setActivePlaylistId(playlist.id);
     setChannels(freshChannels);
@@ -177,14 +177,7 @@ function AppContent() {
       setSeriesMetaByShowName(freshSeriesMeta);
     }
     if (mac) {
-      setCachedPlaylistState(mac, {
-        panelPlaylists,
-        activePlaylistId: playlist.id,
-        tv,
-        filmes,
-        series,
-        seriesMetaByShowName: freshSeriesMeta ? Array.from(freshSeriesMeta.entries()) : [],
-      });
+      setCachedPlaylistState(mac, { panelPlaylists, activePlaylistId: playlist.id });
     }
   };
 
@@ -197,17 +190,18 @@ function AppContent() {
       // MAC to a lista now happens on the painel side (reseller does it),
       // and the app only asks "what's assigned to this MAC?" when the user
       // explicitly presses "Recarregar Lista" on the activation screen (see
-      // handleReloadPlaylist below). Boot just restores whatever was cached
-      // locally from the last successful manual fetch.
+      // handleReloadPlaylist below). Boot just restores whatever the last
+      // successful manual fetch left behind: which playlist was active
+      // (cached metadata, see playlist-cache.ts) and its channels (read back
+      // from the per-device file on disk, see loadPlaylistFromDisk) — no
+      // network round trip either way, and no size cap on the playlist.
       const cached = await getCachedPlaylistState(mac);
-      if (cached) {
+      const disk = cached && cached.panelPlaylists.length > 0 ? await loadPlaylistFromDisk(mac) : null;
+
+      if (cached && disk) {
         setPlaylists(cached.panelPlaylists);
         setActivePlaylistId(cached.activePlaylistId);
-        setChannels([...cached.tv, ...cached.filmes, ...cached.series]);
-        setSeriesMetaByShowName(new Map(cached.seriesMetaByShowName));
-        if (cached.panelPlaylists.length === 0) {
-          setCurrentScreen('playlist');
-        }
+        setChannels([...disk.tv, ...disk.filmes, ...disk.series]);
       } else {
         setCurrentScreen('playlist');
       }
