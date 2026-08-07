@@ -72,6 +72,18 @@ const sideMenuItems: MenuItem[] = [
   { id: '8', label: 'nav_exit', icon: 'exit-outline', screen: 'exit' },
 ];
 
+// playlistValidity is either 'Vitalício' (see its computation below) or the
+// painel's raw `expiracaoData` string (YYYY-MM-DD, from a Date's
+// toISOString().slice(0,10) — see dashboard's /api/devices) — reformatted
+// here to the DD/MM/YYYY Brazilian users expect, same as the painel itself
+// shows it.
+function formatPlaylistValidity(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
 // Highlights whichever card currently has TV-remote (D-pad) focus, so the
 // Casa/home screen shows where the selection is, matching the focus rings
 // added to the browser screens' headers/lists.
@@ -506,6 +518,12 @@ function AppContent() {
             </View>
           </View>
 
+          {!!playlistValidity && (
+            <Text allowFontScaling={false} style={styles.playlistExpirationLabel}>
+              Data expira lista: {formatPlaylistValidity(playlistValidity)}
+            </Text>
+          )}
+
           {!!(reloadBlockedMessage || reloadChannelsError) && (
             <View style={styles.reloadErrorBanner}>
               <Text allowFontScaling={false} style={styles.reloadErrorText}>
@@ -721,6 +739,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 16,
     textAlign: 'left',
+  },
+  playlistExpirationLabel: {
+    textAlign: 'center',
+    color: '#8888aa',
+    fontSize: 13,
+    marginBottom: 12,
   },
   reloadErrorBanner: {
     position: 'absolute',
