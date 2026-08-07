@@ -1,6 +1,19 @@
 import { useEffect, useRef } from 'react';
+import { NativeModules } from 'react-native';
 import type { VideoPlayer } from 'expo-video';
 import { MediaStreamType, useCastState, useRemoteMediaClient, CastState } from 'react-native-google-cast';
+
+// Same reasoning as CAST_BUTTON_SUPPORTED in cast-button.tsx: some Android TV
+// boxes (and this project's own TV emulator) don't have Google Play
+// Services/the Cast framework available, which leaves the `RNGCSessionManager`
+// native module unregistered. useCastState/useRemoteMediaClient below read
+// constants (e.g. `SESSION_STARTED`) straight off that module with no null
+// check, so calling them on an unsupported device throws "Cannot read
+// property 'SESSION_STARTED' of null" the moment the player mounts — not
+// caught by an error boundary since it happens inside a hook's own effect
+// setup. Checking the native module's presence here, once, lets an
+// unsupported device just skip casting instead of crashing the whole player.
+const CAST_SUPPORTED = !!NativeModules.RNGCSessionManager;
 
 type Options = {
   /** Direct stream URL — same one handed to expo-video locally. */
@@ -21,8 +34,22 @@ type Options = {
  * itself). While a cast session is connected, local playback is paused so
  * the same audio doesn't play from both places at once; it resumes local
  * playback automatically when the cast session ends.
+ *
+ * Just a CAST_SUPPORTED switch to useCastStreamUnsupported below on a device
+ * without the Cast native module — not a runtime toggle, so it never changes
+ * across renders for a given app run, which keeps this a safe use of a
+ * condition around hook calls (same branch every time, same as gating a
+ * whole hook on `Platform.OS`).
  */
-export function useCastStream({ url, contentType, title, isLive, player }: Options) {
+export function useCastStream(options: Options): { isCasting: boolean; castState: CastState } {
+  return CAST_SUPPORTED ? useCastStreamSupported(options) : useCastStreamUnsupported();
+}
+
+function useCastStreamUnsupported(): { isCasting: boolean; castState: CastState } {
+  return { isCasting: false, castState: CastState.NO_DEVICES_AVAILABLE };
+}
+
+function useCastStreamSupported({ url, contentType, title, isLive, player }: Options) {
   const client = useRemoteMediaClient();
   const castState = useCastState();
   const isCasting = !!client;

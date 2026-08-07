@@ -10,6 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BootLoadingScreen } from './src/components/boot-loading-screen';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
 import { DeviceActivationScreen } from './src/components/device-activation-screen';
@@ -97,9 +98,11 @@ function FocusableCard({
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AppContent />
-    </LanguageProvider>
+    <SafeAreaProvider>
+      <LanguageProvider>
+        <AppContent />
+      </LanguageProvider>
+    </SafeAreaProvider>
   );
 }
 
