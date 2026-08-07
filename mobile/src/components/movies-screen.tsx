@@ -110,17 +110,20 @@ const CategoryRow = memo(function CategoryRow({
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
+  hasTVPreferredFocus,
 }: {
   item: M3uChannel;
   onPress: (movie: M3uChannel) => void;
+  hasTVPreferredFocus?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
       style={[styles.card, focused && styles.cardFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item)}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       {item.logo ? (
         <Image source={{ uri: item.logo }} style={styles.poster} resizeMode="cover" />
@@ -291,6 +294,11 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   const [playingMovie, setPlayingMovie] = useState<M3uChannel | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [searchCursor, setSearchCursor] = useState(0);
+  // Remembers which movie was last opened so the grid can restore focus/
+  // scroll to it on the way back instead of resetting to the top — see the
+  // identical pattern (and fuller explanation) in series-screen.tsx.
+  const gridListRef = useRef<FlatList<M3uChannel>>(null);
+  const [lastOpenedMovieId, setLastOpenedMovieId] = useState<string | null>(null);
 
   // Favorites/history live on disk (see favorites-storage.ts,
   // watch-history-storage.ts), keyed by movie title — not M3uChannel.id,
@@ -347,12 +355,30 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   }, [categoryChannels, debouncedSearch]);
 
   const handleOpenDetails = useCallback((movie: M3uChannel) => {
+    setLastOpenedMovieId(movie.id);
     setViewingMovie(movie);
   }, []);
 
   const handleCloseDetails = useCallback(() => {
     setViewingMovie(null);
   }, []);
+
+  // Runs after the grid remounts (the whole screen, including this FlatList,
+  // unmounts while a movie's details are open and mounts fresh once closed —
+  // see the early `if (viewingMovie)` return below) to scroll the
+  // last-opened movie back into view. hasTVPreferredFocus on its PosterCard
+  // (see renderCard) handles the focus half; scrollToIndex handles actually
+  // being visible on screen, since a freshly mounted FlatList always starts
+  // at the top regardless of what has focus.
+  useEffect(() => {
+    if (viewingMovie || !lastOpenedMovieId) return;
+    const index = filteredChannels.findIndex((c) => c.id === lastOpenedMovieId);
+    if (index === -1) return;
+    const timer = setTimeout(() => {
+      gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [viewingMovie, lastOpenedMovieId, filteredChannels]);
 
   const handlePlay = useCallback(() => {
     if (viewingMovie) setPlayingMovie(viewingMovie);
@@ -410,8 +436,10 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   );
 
   const renderCard = useCallback(
-    ({ item }: { item: M3uChannel }) => <PosterCard item={item} onPress={handleOpenDetails} />,
-    [handleOpenDetails]
+    ({ item }: { item: M3uChannel }) => (
+      <PosterCard item={item} onPress={handleOpenDetails} hasTVPreferredFocus={item.id === lastOpenedMovieId} />
+    ),
+    [handleOpenDetails, lastOpenedMovieId]
   );
 
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
@@ -519,12 +547,16 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
             </View>
 
             <FlatList
+              ref={gridListRef}
               data={filteredChannels}
               keyExtractor={channelKeyExtractor}
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
-              extraData={favorites}
+              extraData={[favorites, lastOpenedMovieId]}
               getItemLayout={getGridItemLayout}
+              onScrollToIndexFailed={({ index }) =>
+                setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
+              }
               initialNumToRender={20}
               maxToRenderPerBatch={20}
               windowSize={7}

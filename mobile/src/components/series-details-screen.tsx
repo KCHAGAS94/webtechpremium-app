@@ -65,20 +65,23 @@ const EpisodeRow = memo(function EpisodeRow({
   episode,
   progress,
   onPress,
+  hasTVPreferredFocus,
 }: {
   show: SeriesShow;
   episode: SeriesEpisode;
   /** 0-1, or null to show no progress bar at all. */
   progress: number | null;
   onPress: (episode: SeriesEpisode) => void;
+  hasTVPreferredFocus?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
       style={[styles.episodeRow, focused && styles.episodeRowFocused]}
       onPress={() => onPress(episode)}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       <View style={styles.episodeThumbWrap}>
         {episode.channel.logo ? (
@@ -198,13 +201,14 @@ export function SeriesDetailsScreen({
           </ScrollView>
 
           <View style={styles.episodeList}>
-            {episodes.map((episode) => (
+            {episodes.map((episode, index) => (
               <EpisodeRow
                 key={episode.channel.id}
                 show={show}
                 episode={episode}
                 progress={watchedFraction(history.get(episodeHistoryKey(show.id, episode.season, episode.episode)))}
                 onPress={onPlayEpisode}
+                hasTVPreferredFocus={index === 0}
               />
             ))}
           </View>

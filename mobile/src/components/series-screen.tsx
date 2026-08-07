@@ -120,18 +120,21 @@ const PosterCard = memo(function PosterCard({
   item,
   onPress,
   loading,
+  hasTVPreferredFocus,
 }: {
   item: SeriesShow;
   onPress: (show: SeriesShow) => void;
   loading?: boolean;
+  hasTVPreferredFocus?: boolean;
 }) {
-  const [focused, setFocused] = useState(false);
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
       style={[styles.card, focused && styles.cardFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item)}
+      hasTVPreferredFocus={hasTVPreferredFocus}
     >
       {item.logo ? (
         <Image source={{ uri: item.logo }} style={styles.poster} resizeMode="cover" />
@@ -283,6 +286,13 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   const [playingEpisode, setPlayingEpisode] = useState<SeriesEpisode | null>(null);
   const [allShows, setAllShows] = useState<SeriesShow[]>([]);
   const [isGrouping, setIsGrouping] = useState(true);
+  // Remembers which show was last opened so the grid can restore focus/scroll
+  // to it on the way back, instead of resetting to the top — the grid screen
+  // fully unmounts while `viewingShow` is set (see the early `if (viewingShow)`
+  // return below) and remounts from scratch when it closes, so this can't be
+  // read back from the FlatList's own scroll state; it has to be kept here.
+  const gridListRef = useRef<FlatList<SeriesShow>>(null);
+  const [lastOpenedShowId, setLastOpenedShowId] = useState<string | null>(null);
   // Show id currently fetching its episodes on-demand (see handleOpenShow) —
   // drives a small loading affordance on that one PosterCard so tapping a
   // show doesn't look like nothing happened while get_series_info resolves.
@@ -420,6 +430,8 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   // those (seasons.length > 0).
   const handleOpenShow = useCallback(
     async (show: SeriesShow) => {
+      setLastOpenedShowId(show.id);
+
       if (show.seasons.length > 0 || !show.seriesId) {
         setViewingShow(show);
         return;
@@ -447,6 +459,25 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     },
     [playlistUrl]
   );
+
+  // Runs after the grid remounts (see the `if (viewingShow)` early return
+  // below — the whole screen, including this FlatList, unmounts while a show
+  // is open and mounts fresh when it closes) to scroll the last-opened show
+  // back into view. hasTVPreferredFocus on its PosterCard (see renderCard)
+  // handles the focus half; scrollToIndex handles the "actually visible on
+  // screen" half, since a freshly mounted FlatList always starts at the top
+  // regardless of what has focus.
+  useEffect(() => {
+    if (viewingShow || !lastOpenedShowId) return;
+    const index = filteredShows.findIndex((s) => s.id === lastOpenedShowId);
+    if (index === -1) return;
+    // A frame late so the FlatList has laid out at least once — calling this
+    // in the same tick as mount can miss on some devices.
+    const timer = setTimeout(() => {
+      gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [viewingShow, lastOpenedShowId, filteredShows]);
 
   const handleCloseShow = useCallback(() => {
     setViewingShow(null);
@@ -496,9 +527,14 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
 
   const renderCard = useCallback(
     ({ item }: { item: SeriesShow }) => (
-      <PosterCard item={item} onPress={handleOpenShow} loading={item.id === loadingShowId} />
+      <PosterCard
+        item={item}
+        onPress={handleOpenShow}
+        loading={item.id === loadingShowId}
+        hasTVPreferredFocus={item.id === lastOpenedShowId}
+      />
     ),
-    [handleOpenShow, loadingShowId]
+    [handleOpenShow, loadingShowId, lastOpenedShowId]
   );
 
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
@@ -616,12 +652,16 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               </View>
             ) : (
               <FlatList
+                ref={gridListRef}
                 data={filteredShows}
                 keyExtractor={showKeyExtractor}
                 renderItem={renderCard}
                 numColumns={NUM_COLUMNS}
-                extraData={[favorites, loadingShowId]}
+                extraData={[favorites, loadingShowId, lastOpenedShowId]}
                 getItemLayout={getGridItemLayout}
+                onScrollToIndexFailed={({ index }) =>
+                  setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
+                }
                 initialNumToRender={20}
                 maxToRenderPerBatch={20}
                 windowSize={7}
