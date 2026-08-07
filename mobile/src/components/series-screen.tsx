@@ -59,6 +59,20 @@ type Category = {
   count: number;
 };
 
+type SortMode = 'added' | 'az' | 'za';
+
+const SORT_LABEL: Record<SortMode, string> = {
+  added: 'Ordenar por Adicionado',
+  az: 'Ordenar A-Z',
+  za: 'Ordenar Z-A',
+};
+
+const NEXT_SORT_MODE: Record<SortMode, SortMode> = {
+  added: 'az',
+  az: 'za',
+  za: 'added',
+};
+
 // Grouping is the expensive part of opening this screen (a regex per
 // episode across a potentially huge playlist). `channels` is owned by
 // App.tsx and keeps the same array reference across Home <-> Séries
@@ -293,6 +307,10 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   // read back from the FlatList's own scroll state; it has to be kept here.
   const gridListRef = useRef<FlatList<SeriesShow>>(null);
   const [lastOpenedShowId, setLastOpenedShowId] = useState<string | null>(null);
+  // Cycles Adicionado → A-Z → Z-A → Adicionado on each tap of the sort
+  // button (see handleToggleSort/SORT_LABEL below).
+  const [sortMode, setSortMode] = useState<SortMode>('added');
+  const [sortFocused, setSortFocused] = useState(false);
   // Show id currently fetching its episodes on-demand (see handleOpenShow) —
   // drives a small loading affordance on that one PosterCard so tapping a
   // show doesn't look like nothing happened while get_series_info resolves.
@@ -423,6 +441,26 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     return categoryShows.filter((s) => normalizeSearchText(s.name).includes(q));
   }, [categoryShows, debouncedSearch]);
 
+  // 'added' keeps whatever order the category/search step above already
+  // produced — az/za only kick in once the user taps the sort button.
+  //
+  // localeCompare is locale-aware but very slow per call — sorting a huge
+  // catalog with it can freeze the app for several seconds (see the same fix
+  // in movies-screen.tsx). Comparing precomputed normalizeSearchText keys
+  // (already used for search) instead avoids that cost.
+  const sortedShows = useMemo(() => {
+    if (sortMode === 'added') return filteredShows;
+    const keyed = filteredShows.map((show) => ({ show, key: normalizeSearchText(show.name) }));
+    keyed.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    const sorted = keyed.map((entry) => entry.show);
+    if (sortMode === 'za') sorted.reverse();
+    return sorted;
+  }, [filteredShows, sortMode]);
+
+  const handleToggleSort = useCallback(() => {
+    setSortMode((prev) => NEXT_SORT_MODE[prev]);
+  }, []);
+
   // Shows from fetchSeriesShows arrive with empty seasons/episodesBySeason —
   // filled in here, on demand, the first time this specific show is opened
   // (get_series_info is one small call per show, not per catalog). Shows
@@ -469,7 +507,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   // regardless of what has focus.
   useEffect(() => {
     if (viewingShow || !lastOpenedShowId) return;
-    const index = filteredShows.findIndex((s) => s.id === lastOpenedShowId);
+    const index = sortedShows.findIndex((s) => s.id === lastOpenedShowId);
     if (index === -1) return;
     // A frame late so the FlatList has laid out at least once — calling this
     // in the same tick as mount can miss on some devices.
@@ -477,7 +515,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
       gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
     }, 0);
     return () => clearTimeout(timer);
-  }, [viewingShow, lastOpenedShowId, filteredShows]);
+  }, [viewingShow, lastOpenedShowId, sortedShows]);
 
   const handleCloseShow = useCallback(() => {
     setViewingShow(null);
@@ -639,7 +677,14 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
 
           <View style={styles.gridColumn}>
             <View style={styles.gridToolbar}>
-              <ThemedText style={styles.sortLabel}>Ordenar por Adicionado </ThemedText>
+              <Pressable
+                style={[styles.sortButton, sortFocused && styles.sortButtonFocused]}
+                onPress={handleToggleSort}
+                onFocus={() => setSortFocused(true)}
+                onBlur={() => setSortFocused(false)}
+              >
+                <ThemedText style={styles.sortLabel}>{SORT_LABEL[sortMode]}</ThemedText>
+              </Pressable>
               <ThemedText style={styles.totalLabel}>
                 {categoryList.find((c) => c.id === selectedCategory)?.title ?? 'Tudo'}(
                 {filteredShows.length})
@@ -653,7 +698,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
             ) : (
               <FlatList
                 ref={gridListRef}
-                data={filteredShows}
+                data={sortedShows}
                 keyExtractor={showKeyExtractor}
                 renderItem={renderCard}
                 numColumns={NUM_COLUMNS}
@@ -784,13 +829,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  sortLabel: {
-    fontSize: 13,
-    color: '#c7c7e6',
+  sortButton: {
     backgroundColor: '#1a1a45',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  sortButtonFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
+  },
+  sortLabel: {
+    fontSize: 13,
+    color: '#c7c7e6',
   },
   totalLabel: {
     fontSize: 14,

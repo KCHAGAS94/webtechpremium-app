@@ -57,6 +57,20 @@ type Category = {
   count: number;
 };
 
+type SortMode = 'added' | 'az' | 'za';
+
+const SORT_LABEL: Record<SortMode, string> = {
+  added: 'Ordenar por Adicionado',
+  az: 'Ordenar A-Z',
+  za: 'Ordenar Z-A',
+};
+
+const NEXT_SORT_MODE: Record<SortMode, SortMode> = {
+  added: 'az',
+  az: 'za',
+  za: 'added',
+};
+
 const HeaderNavItem = memo(function HeaderNavItem({
   active,
   label,
@@ -299,6 +313,10 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   // identical pattern (and fuller explanation) in series-screen.tsx.
   const gridListRef = useRef<FlatList<M3uChannel>>(null);
   const [lastOpenedMovieId, setLastOpenedMovieId] = useState<string | null>(null);
+  // Cycles Adicionado → A-Z → Z-A → Adicionado on each tap of the sort
+  // button (see handleToggleSort/sortLabelText below).
+  const [sortMode, setSortMode] = useState<SortMode>('added');
+  const [sortFocused, setSortFocused] = useState(false);
 
   // Favorites/history live on disk (see favorites-storage.ts,
   // watch-history-storage.ts), keyed by movie title — not M3uChannel.id,
@@ -354,6 +372,29 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
     return categoryChannels.filter((c) => normalizeSearchText(c.name).includes(q));
   }, [categoryChannels, debouncedSearch]);
 
+  // 'added' keeps whatever order the category/search step above already
+  // produced (the catalog's own order, closest thing to "recently added"
+  // this data has) — az/za only kick in once the user taps the sort button.
+  //
+  // localeCompare is locale-aware (accents/case sorted "correctly") but very
+  // slow per call — sorting a 25k-item catalog with it froze the app for
+  // several seconds. Comparing precomputed normalizeSearchText keys (already
+  // used for search, cheap ASCII-folded lowercase strings) instead does the
+  // same "É"-sorts-next-to-"E" ordering without the per-comparison cost, and
+  // normalizes each name once instead of twice per comparison.
+  const sortedChannels = useMemo(() => {
+    if (sortMode === 'added') return filteredChannels;
+    const keyed = filteredChannels.map((channel) => ({ channel, key: normalizeSearchText(channel.name) }));
+    keyed.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+    const sorted = keyed.map((entry) => entry.channel);
+    if (sortMode === 'za') sorted.reverse();
+    return sorted;
+  }, [filteredChannels, sortMode]);
+
+  const handleToggleSort = useCallback(() => {
+    setSortMode((prev) => NEXT_SORT_MODE[prev]);
+  }, []);
+
   const handleOpenDetails = useCallback((movie: M3uChannel) => {
     setLastOpenedMovieId(movie.id);
     setViewingMovie(movie);
@@ -372,13 +413,13 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   // at the top regardless of what has focus.
   useEffect(() => {
     if (viewingMovie || !lastOpenedMovieId) return;
-    const index = filteredChannels.findIndex((c) => c.id === lastOpenedMovieId);
+    const index = sortedChannels.findIndex((c) => c.id === lastOpenedMovieId);
     if (index === -1) return;
     const timer = setTimeout(() => {
       gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
     }, 0);
     return () => clearTimeout(timer);
-  }, [viewingMovie, lastOpenedMovieId, filteredChannels]);
+  }, [viewingMovie, lastOpenedMovieId, sortedChannels]);
 
   const handlePlay = useCallback(() => {
     if (viewingMovie) setPlayingMovie(viewingMovie);
@@ -539,7 +580,14 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
 
           <View style={styles.gridColumn}>
             <View style={styles.gridToolbar}>
-              <ThemedText style={styles.sortLabel}>Ordenar por Adicionado </ThemedText>
+              <Pressable
+                style={[styles.sortButton, sortFocused && styles.sortButtonFocused]}
+                onPress={handleToggleSort}
+                onFocus={() => setSortFocused(true)}
+                onBlur={() => setSortFocused(false)}
+              >
+                <ThemedText style={styles.sortLabel}>{SORT_LABEL[sortMode]}</ThemedText>
+              </Pressable>
               <ThemedText style={styles.totalLabel}>
                 {categoryList.find((c) => c.id === selectedCategory)?.title ?? 'Tudo'}(
                 {filteredChannels.length})
@@ -548,7 +596,7 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
 
             <FlatList
               ref={gridListRef}
-              data={filteredChannels}
+              data={sortedChannels}
               keyExtractor={channelKeyExtractor}
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
@@ -678,13 +726,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
-  sortLabel: {
-    fontSize: 13,
-    color: '#c7c7e6',
+  sortButton: {
     backgroundColor: '#1a1a45',
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  sortButtonFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
+  },
+  sortLabel: {
+    fontSize: 13,
+    color: '#c7c7e6',
   },
   totalLabel: {
     fontSize: 14,
