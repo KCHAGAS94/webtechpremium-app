@@ -938,11 +938,11 @@ const styles = StyleSheet.create({
 // want the same result on all of them, not a different one per device.
 const mobileStyles = StyleSheet.create({
   layoutRow: {
-    width: 620,
+    width: 630,
     maxHeight: 200,
   },
   tvCard: {
-    width: 150,
+    width: 170,
     paddingHorizontal: 8,
     paddingVertical: 8,
   },
