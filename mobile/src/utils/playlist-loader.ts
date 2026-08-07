@@ -1,6 +1,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import { IncrementalM3uParser, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
 import { fetchLiveChannels, fetchSeriesMetaByName, fetchVodMovies, parseXtreamCredentials, type SeriesMeta } from './xtream-api';
+import type { ContentCategory } from './content-classifier';
 
 export type ClassifiedPlaylist = {
   tv: M3uChannel[];
@@ -131,10 +132,14 @@ async function classify(channels: M3uChannel[]): Promise<Pick<ClassifiedPlaylist
  * roughly one chunk + the growing (much smaller, structured) channel list,
  * no matter how big the file on disk is.
  */
-async function parseM3uFile(file: File, onProgress?: (progress: ParseM3uProgress) => void): Promise<M3uChannel[]> {
+async function parseM3uFile(
+  file: File,
+  onProgress?: (progress: ParseM3uProgress) => void,
+  onlyCategory?: ContentCategory
+): Promise<M3uChannel[]> {
   const handle = file.open();
   const decoder = new TextDecoder('utf-8');
-  const parser = new IncrementalM3uParser();
+  const parser = new IncrementalM3uParser(onlyCategory);
   const totalBytes = handle.size ?? 0;
 
   let carry = '';
@@ -257,11 +262,20 @@ export async function loadPlaylist(
 /**
  * Restores the last playlist activated for `mac`. TV ao Vivo/Filmes come
  * from loadFastCatalog (network, but just two small JSON calls — no size
- * dependency on the playlist); Séries is read back from the file
- * loadPlaylist persisted, with no network call, so cold boot can still land
- * on Home even if the panel/Xtream API is briefly unreachable (Séries just
- * arrives empty until the next successful reload in that case). Returns
- * null only if this device never activated a playlist at all.
+ * dependency on the playlist). Séries isn't touched here at all anymore for
+ * an Xtream source: series-screen.tsx now loads its show list from
+ * get_series directly (and each show's episodes lazily, on open) instead of
+ * depending on `channels`, the same reliability upgrade as TV ao Vivo/Filmes.
+ *
+ * The persisted M3U file only still matters as the *offline* fallback below
+ * (loadFastCatalog unreachable — no network, or a non-Xtream M3U-only
+ * source, which has nowhere else to get any of the three buckets from). This
+ * used to always parse the whole file at boot just to extract Séries, which
+ * is what made a real boot take 110s: TV ao Vivo/Filmes are typically most
+ * of a catalog's line count, and building ~200k+ throwaway channel objects
+ * (plus the GC pressure from it) for data nothing even reads anymore dwarfed
+ * the couple of small Xtream API calls that actually mattered. Returns null
+ * only if this device never activated a playlist at all.
  */
 export async function loadPlaylistFromDisk(
   url: string,
@@ -271,21 +285,22 @@ export async function loadPlaylistFromDisk(
   const persisted = persistedPlaylistFile(mac);
   if (!persisted.exists) return null;
 
-  // The M3U is parsed once regardless (Séries always needs it); its tv/filmes
-  // buckets are only actually used if loadFastCatalog fails (no network /
-  // Xtream API unreachable at boot), so boot still shows something instead
-  // of an empty Home in that case.
-  const [fast, local] = await Promise.all([
-    loadFastCatalog(url).catch(() => null),
-    parseM3uFile(persisted, onProgress)
-      .then(classify)
-      .catch(() => ({ tv: [], filmes: [], series: [] }) as Awaited<ReturnType<typeof classify>>),
-  ]);
+  const fast = await loadFastCatalog(url).catch(() => null);
+  if (fast) {
+    return { tv: fast.tv, filmes: fast.filmes, series: [], seriesMetaByShowName: null };
+  }
 
-  return {
-    tv: fast?.tv ?? local.tv,
-    filmes: fast?.filmes ?? local.filmes,
-    series: local.series,
-    seriesMetaByShowName: null,
-  };
+  // No network / Xtream API unreachable, or a non-Xtream M3U-only source —
+  // the M3U is the only place left to get anything from, so it's worth
+  // paying to verify it before trusting it (see downloadPlaylistVerified's
+  // doc comment: this endpoint has been observed streaming a truncated
+  // response that still ends on a well-formed line).
+  if (!looksComplete(persisted)) {
+    await downloadPlaylistVerified(url, persisted).catch(() => null);
+  }
+  const local = await parseM3uFile(persisted, onProgress)
+    .then(classify)
+    .catch(() => ({ tv: [], filmes: [], series: [] }) as Awaited<ReturnType<typeof classify>>);
+
+  return { tv: local.tv, filmes: local.filmes, series: local.series, seriesMetaByShowName: null };
 }

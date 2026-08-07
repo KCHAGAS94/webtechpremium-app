@@ -59,6 +59,17 @@ export class IncrementalM3uParser {
   private pendingLogo = '';
   private pendingGroup = '';
   private index = 0;
+  // When set, lines classifying into any other category are parsed just far
+  // enough to know that (cheap: the EXTINF attrs are already extracted) and
+  // then dropped instead of allocated/pushed. playlist-loader.ts uses this to
+  // restore only Séries from the on-disk M3U once TV ao Vivo/Filmes already
+  // came from the Xtream API — without it, boot was paying the cost (CPU +
+  // GC) of building ~200k+ channel objects it was just going to discard.
+  private readonly onlyCategory?: ContentCategory;
+
+  constructor(onlyCategory?: ContentCategory) {
+    this.onlyCategory = onlyCategory;
+  }
 
   pushLine(rawLine: string): void {
     const trimmed = rawLine.trim();
@@ -80,16 +91,25 @@ export class IncrementalM3uParser {
       this.pendingName = commaIndex >= 0 ? trimmed.slice(commaIndex + 1).trim() : 'Canal';
     } else if (!trimmed.startsWith('#')) {
       // Any non-comment, non-empty line after an #EXTINF is the stream URL.
-      this.index += 1;
       const groupTitle = this.pendingGroup || 'Geral';
-      const name = this.pendingName || `Canal ${this.index}`;
+      const name = this.pendingName || `Canal ${this.index + 1}`;
+      const category = categorizeGroup(groupTitle, name);
+
+      if (this.onlyCategory && category !== this.onlyCategory) {
+        this.pendingName = '';
+        this.pendingLogo = '';
+        this.pendingGroup = '';
+        return;
+      }
+
+      this.index += 1;
       this.channels.push({
         id: String(this.index),
         name,
         logo: this.pendingLogo,
         groupTitle,
         url: trimmed,
-        category: categorizeGroup(groupTitle, name),
+        category,
       });
       this.pendingName = '';
       this.pendingLogo = '';

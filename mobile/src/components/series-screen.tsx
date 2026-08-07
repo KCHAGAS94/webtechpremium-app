@@ -13,7 +13,7 @@ import { ThemedView } from '@/components/themed-view';
 import type { NavKey } from '@/components/content-browser-screen';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/series-grouping';
-import type { SeriesMeta } from '@/utils/xtream-api';
+import { fetchSeriesEpisodes, fetchSeriesShows, parseXtreamCredentials, type SeriesMeta } from '@/utils/xtream-api';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
@@ -122,9 +122,11 @@ const CategoryRow = memo(function CategoryRow({
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
+  loading,
 }: {
   item: SeriesShow;
   onPress: (show: SeriesShow) => void;
+  loading?: boolean;
 }) {
   const [focused, setFocused] = useState(false);
   return (
@@ -139,6 +141,11 @@ const PosterCard = memo(function PosterCard({
       ) : (
         <View style={[styles.poster, styles.posterPlaceholder]}>
           <ThemedText style={styles.posterPlaceholderIcon}>📺</ThemedText>
+        </View>
+      )}
+      {loading && (
+        <View style={[styles.poster, styles.posterLoadingOverlay]}>
+          <ActivityIndicator color="#4dd6ff" />
         </View>
       )}
       <ThemedText style={styles.cardTitle} numberOfLines={2}>
@@ -279,6 +286,10 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   const [playingEpisode, setPlayingEpisode] = useState<SeriesEpisode | null>(null);
   const [allShows, setAllShows] = useState<SeriesShow[]>([]);
   const [isGrouping, setIsGrouping] = useState(true);
+  // Show id currently fetching its episodes on-demand (see handleOpenShow) —
+  // drives a small loading affordance on that one PosterCard so tapping a
+  // show doesn't look like nothing happened while get_series_info resolves.
+  const [loadingShowId, setLoadingShowId] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [searchCursor, setSearchCursor] = useState(0);
 
@@ -295,11 +306,41 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     return () => clearTimeout(handle);
   }, [search]);
 
-  // Grouping episodes into show "folders" runs a regex per item, which is
-  // cheap per episode but adds up over a huge playlist — doing it here
-  // (async, chunked in groupSeriesShows) instead of in a synchronous useMemo
-  // is what keeps navigating into this screen from stalling.
+  // Séries comes straight from the Xtream API when available — get_series is
+  // one small, reliable JSON call for the whole show list (episodes are
+  // loaded lazily per-show in handleOpenShow below). This replaced grouping
+  // episodes out of the M3U (still done via groupSeriesShows as a fallback
+  // for non-Xtream playlists) because that M3U endpoint turned out to be
+  // unreliable on its own: it streams a dynamically-generated response with
+  // no `Content-Length`, and two consecutive downloads of the "same"
+  // playlist came back with wildly different sizes — the source itself was
+  // inconsistent, not just the network.
   useEffect(() => {
+    const credentials = parseXtreamCredentials(playlistUrl);
+    if (credentials) {
+      let cancelled = false;
+      setIsGrouping(true);
+      fetchSeriesShows(credentials)
+        .then((shows) => {
+          if (!cancelled) {
+            setAllShows(shows);
+            setIsGrouping(false);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setIsGrouping(false);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    // Non-Xtream M3U-only playlist — no API to fall back on, so this is the
+    // only source of Séries. Grouping episodes into show "folders" runs a
+    // regex per item, cheap per episode but adds up over a huge playlist —
+    // doing it here (async, chunked in groupSeriesShows) instead of in a
+    // synchronous useMemo is what keeps navigating into this screen from
+    // stalling.
     const cached = seriesGroupCache.get(channels);
     if (cached) {
       setAllShows(cached);
@@ -327,7 +368,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     return () => {
       cancelled = true;
     };
-  }, [channels, bucketChannels, metaByShowName]);
+  }, [channels, bucketChannels, metaByShowName, playlistUrl]);
 
   // Hidden groups are matched against `show.groupTitle` (genre-enriched, see
   // groupSeriesShows), not the raw M3U channel `group-title` — most series
@@ -375,9 +416,40 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     return categoryShows.filter((s) => normalizeSearchText(s.name).includes(q));
   }, [categoryShows, debouncedSearch]);
 
-  const handleOpenShow = useCallback((show: SeriesShow) => {
-    setViewingShow(show);
-  }, []);
+  // Shows from fetchSeriesShows arrive with empty seasons/episodesBySeason —
+  // filled in here, on demand, the first time this specific show is opened
+  // (get_series_info is one small call per show, not per catalog). Shows
+  // from the M3U fallback path already have episodes, so this is a no-op for
+  // those (seasons.length > 0).
+  const handleOpenShow = useCallback(
+    async (show: SeriesShow) => {
+      if (show.seasons.length > 0 || !show.seriesId) {
+        setViewingShow(show);
+        return;
+      }
+
+      const credentials = parseXtreamCredentials(playlistUrl);
+      if (!credentials) {
+        setViewingShow(show);
+        return;
+      }
+
+      setLoadingShowId(show.id);
+      try {
+        const { seasons, episodesBySeason } = await fetchSeriesEpisodes(credentials, show.seriesId);
+        const updatedShow: SeriesShow = { ...show, seasons, episodesBySeason };
+        setAllShows((prev) => prev.map((s) => (s.id === show.id ? updatedShow : s)));
+        setViewingShow(updatedShow);
+      } catch {
+        // Best-effort — open anyway so the user sees the show page (with no
+        // episodes listed) instead of the tap silently doing nothing.
+        setViewingShow(show);
+      } finally {
+        setLoadingShowId(null);
+      }
+    },
+    [playlistUrl]
+  );
 
   const handleCloseShow = useCallback(() => {
     setViewingShow(null);
@@ -426,8 +498,10 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   );
 
   const renderCard = useCallback(
-    ({ item }: { item: SeriesShow }) => <PosterCard item={item} onPress={handleOpenShow} />,
-    [handleOpenShow]
+    ({ item }: { item: SeriesShow }) => (
+      <PosterCard item={item} onPress={handleOpenShow} loading={item.id === loadingShowId} />
+    ),
+    [handleOpenShow, loadingShowId]
   );
 
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
@@ -548,7 +622,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
                 keyExtractor={showKeyExtractor}
                 renderItem={renderCard}
                 numColumns={NUM_COLUMNS}
-                extraData={favorites}
+                extraData={[favorites, loadingShowId]}
                 getItemLayout={getGridItemLayout}
                 initialNumToRender={20}
                 maxToRenderPerBatch={20}
@@ -718,6 +792,14 @@ const styles = StyleSheet.create({
   },
   posterPlaceholderIcon: {
     fontSize: 28,
+  },
+  posterLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(10, 10, 46, 0.6)',
   },
   cardTitle: {
     fontSize: 12,

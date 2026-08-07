@@ -1,4 +1,5 @@
 import type { M3uChannel } from './m3u-parser';
+import type { SeriesEpisode, SeriesShow } from './series-grouping';
 
 // Talks to the Xtream `player_api.php` JSON API, used two ways:
 //  1. fetchLiveChannels/fetchVodMovies (below) build the whole TV ao Vivo /
@@ -246,6 +247,92 @@ export async function getSeriesInfo(creds: XtreamCredentials, seriesId: string):
     releaseDate: asString(info.releasedate ?? info.release_date),
     rating: asString(info.rating),
   };
+}
+
+type SeriesInfoEpisode = {
+  id: string;
+  episode_num: number;
+  title?: string;
+  container_extension?: string;
+};
+
+/**
+ * Builds the Séries grid straight from the Xtream API — categories +
+ * get_series, one small JSON call each, same as fetchLiveChannels/
+ * fetchVodMovies above. Shows come back with empty `seasons`/
+ * `episodesBySeason`: listing every show's episodes up front would mean one
+ * get_series_info call *per show* (thousands of round-trips for a large
+ * catalog) just for a grid the user hasn't opened yet. fetchSeriesEpisodes
+ * below fills a single show in on demand instead, when it's actually opened.
+ *
+ * Replaces the old M3U-parsed Séries source, which turned out to be
+ * unreliable on its own: this provider's playlist endpoint streams a
+ * dynamically-generated response with no `Content-Length` (chunked transfer
+ * encoding) through a CDN, and two consecutive downloads of the "same" M3U
+ * came back with wildly different sizes (546k vs 154k lines) — the source
+ * itself, not just the network, was inconsistent. get_series is the same
+ * small, consistent JSON call already proven reliable for Filmes.
+ */
+export async function fetchSeriesShows(creds: XtreamCredentials): Promise<SeriesShow[]> {
+  const [categories, series] = await Promise.all([
+    fetchXtream<VodCategory[]>(creds, 'get_series_categories'),
+    fetchXtream<SeriesEntry[]>(creds, 'get_series'),
+  ]);
+  const categoryNameById = new Map(categories.map((c) => [c.category_id, c.category_name]));
+  return series.map((entry) => ({
+    id: String(entry.series_id),
+    name: entry.name,
+    logo: entry.cover?.trim() || '',
+    groupTitle: categoryNameById.get(entry.category_id) ?? 'Geral',
+    seasons: [],
+    episodesBySeason: new Map(),
+    seriesId: String(entry.series_id),
+  }));
+}
+
+/**
+ * Lazily loads one show's episodes (grouped by season, with playable URLs
+ * built the same verified way as fetchLiveChannels/fetchVodMovies) — called
+ * when the user actually opens a show, not up front for the whole catalog.
+ */
+export async function fetchSeriesEpisodes(
+  creds: XtreamCredentials,
+  seriesId: string
+): Promise<Pick<SeriesShow, 'seasons' | 'episodesBySeason'>> {
+  const response = await fetchXtream<{ episodes?: Record<string, SeriesInfoEpisode[]> }>(
+    creds,
+    'get_series_info',
+    `&series_id=${encodeURIComponent(seriesId)}`
+  );
+
+  const episodesBySeason = new Map<number, SeriesEpisode[]>();
+  const seasons: number[] = [];
+
+  for (const [seasonKey, episodes] of Object.entries(response.episodes ?? {})) {
+    const season = Number(seasonKey);
+    if (!Number.isFinite(season) || !Array.isArray(episodes)) continue;
+
+    const list: SeriesEpisode[] = episodes
+      .map((ep) => {
+        const title = ep.title?.trim() || null;
+        const channel: M3uChannel = {
+          id: `ep-${ep.id}`,
+          name: title || `Episódio ${ep.episode_num}`,
+          logo: '',
+          groupTitle: '',
+          url: buildStreamUrl(creds, 'series', Number(ep.id), ep.container_extension || 'mp4'),
+          category: 'series',
+        };
+        return { channel, season, episode: ep.episode_num, episodeTitle: title };
+      })
+      .sort((a, b) => a.episode - b.episode);
+
+    episodesBySeason.set(season, list);
+    seasons.push(season);
+  }
+  seasons.sort((a, b) => a - b);
+
+  return { seasons, episodesBySeason };
 }
 
 /**
