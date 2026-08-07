@@ -21,7 +21,7 @@
       "permissions": [
         "android.permission.WRITE_SETTINGS"
       ],
-      "versionCode": 12
+      "versionCode": 13
     },
     "ios": {
       "bundleIdentifier": "com.webtechpremium.app"
@@ -55,7 +55,8 @@
         {
           "receiverAppId": "CC1AD845"
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "webtechpremium",
     "extra": {
