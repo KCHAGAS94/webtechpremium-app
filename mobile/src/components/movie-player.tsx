@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEvent } from 'expo';
 import { VideoView, type VideoPlayer } from 'expo-video';
@@ -30,6 +30,8 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleSettings = {
 
 const AUTO_HIDE_MS = 4000;
 const SKIP_SECONDS = 10;
+const MAX_PLAYBACK_RETRIES = 2;
+const PLAYBACK_RETRY_DELAY_MS = 1500;
 
 type Props = {
   player: VideoPlayer;
@@ -119,6 +121,37 @@ export function MoviePlayer({
     oldAvailableSubtitleTracks: undefined,
   });
   const duration = player.duration;
+
+  // Some of this provider's catalog entries fail with a transient error the
+  // first time (a 404 while the CDN's signed redirect token is still being
+  // generated, a momentary edge-cache miss, ...) but play fine a moment
+  // later — as opposed to genuinely dead/removed content, where every retry
+  // fails the same way. Silently retrying a couple of times before showing
+  // the error screen fixes the former without meaningfully delaying the
+  // latter (a real dead link just takes a few extra seconds to report as
+  // broken instead of failing instantly).
+  const retryCountRef = useRef(0);
+  const [retrying, setRetrying] = useState(false);
+  useEffect(() => {
+    if (status !== 'error') {
+      retryCountRef.current = 0;
+      setRetrying(false);
+      return;
+    }
+    if (retryCountRef.current >= MAX_PLAYBACK_RETRIES) {
+      setRetrying(false);
+      return;
+    }
+    retryCountRef.current += 1;
+    setRetrying(true);
+    const timer = setTimeout(() => {
+      player
+        .replaceAsync({ uri: streamUrl, headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } })
+        .then(() => player.play())
+        .catch(() => {});
+    }, PLAYBACK_RETRY_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [status, player, streamUrl]);
 
   useCastStream({ url: streamUrl, title, isLive: false, player });
 
@@ -302,7 +335,7 @@ export function MoviePlayer({
     >
       <StatusBar hidden />
       <View style={styles.container}>
-        {status !== 'error' && (
+        {(status !== 'error' || retrying) && (
           // focusable={false}: see fullscreen-player.tsx — a fullscreen
           // focusable view here would grab the TV remote's default D-pad
           // focus and block navigation to the actual control buttons.
@@ -311,20 +344,25 @@ export function MoviePlayer({
           </Pressable>
         )}
 
-        {status === 'loading' && (
+        {(status === 'loading' || retrying) && (
           <View style={styles.statusOverlay} pointerEvents="none">
             <ActivityIndicator color="#4dd6ff" size="large" />
           </View>
         )}
 
-        {status === 'error' && (
+        {status === 'error' && !retrying && (
           <View style={styles.statusOverlay}>
             <ThemedText style={styles.errorText}>
               Não foi possível carregar o filme{error?.message ? `: ${error.message}` : '.'}
             </ThemedText>
-            <TouchableOpacity onPress={onClose} style={styles.errorBackButton}>
+            <PlayerControlButton
+              onPress={onClose}
+              style={styles.errorBackButton}
+              focusedStyle={styles.errorBackButtonFocused}
+              autoFocus
+            >
               <ThemedText style={styles.errorBackButtonText}>Voltar</ThemedText>
-            </TouchableOpacity>
+            </PlayerControlButton>
           </View>
         )}
 
@@ -498,6 +536,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 20,
     paddingVertical: 10,
+  },
+  errorBackButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   errorBackButtonText: {
     fontSize: 14,
