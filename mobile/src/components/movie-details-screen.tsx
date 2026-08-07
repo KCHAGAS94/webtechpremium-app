@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PlayerControlButton } from '@/components/player-control-button';
@@ -29,6 +29,7 @@ function formatAddedAt(addedAt?: string): string | null {
 export function MovieDetailsScreen({ movie, playlistUrl, isFavorite, onToggleFavorite, onPlay, onBack }: Props) {
   const { title, year } = parseMovieTitle(movie.name);
   const [info, setInfo] = useState<VodInfo | null>(null);
+  const [backFocused, setBackFocused] = useState(false);
 
   useEffect(() => {
     setInfo(null);
@@ -57,9 +58,15 @@ export function MovieDetailsScreen({ movie, playlistUrl, isFavorite, onToggleFav
       <View style={styles.backdropScrim} />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <TouchableOpacity onPress={onBack} hitSlop={12} style={styles.backButton}>
+        <Pressable
+          onPress={onBack}
+          onFocus={() => setBackFocused(true)}
+          onBlur={() => setBackFocused(false)}
+          hitSlop={12}
+          style={[styles.backButton, backFocused && styles.backButtonFocused]}
+        >
           <ThemedText style={styles.backIcon}>‹</ThemedText>
-        </TouchableOpacity>
+        </Pressable>
 
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.mainRow}>
@@ -158,6 +165,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     marginLeft: 16,
     marginTop: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  backButtonFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   backIcon: {
     fontSize: 24,
