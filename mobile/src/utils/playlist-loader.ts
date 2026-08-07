@@ -1,3 +1,4 @@
+import { Directory, File, Paths } from 'expo-file-system';
 import { parseM3u, type M3uChannel, type ParseM3uProgress } from './m3u-parser';
 import { fetchLiveGenreByName, fetchSeriesMetaByName, fetchVodMetaByName, parseXtreamCredentials, type SeriesMeta } from './xtream-api';
 
@@ -45,20 +46,37 @@ export async function loadPlaylist(
   // React Native's default fetch User-Agent (returning a 403 challenge page
   // instead of the playlist) while accepting VLC's — see stream-format.ts's
   // header spoof for the same reason on individual channel/episode streams.
-  const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } });
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
-  }
+  //
+  // Deliberately not using fetch() here: RN's networking bridge reads the
+  // whole HTTP response into a native byte[] (and, past a size threshold,
+  // wraps it as a Blob) before JS ever sees it. A single big playlist
+  // response is exactly the kind of allocation that OOM-kills the app on
+  // Android TV boxes' tight heap limits. File.downloadFileAsync streams the
+  // response straight to disk on Android instead, so that peak allocation
+  // never happens — the same approach production IPTV apps use for large
+  // M3U/Xtream lists.
+  const dest = new Directory(Paths.cache, 'playlists');
+  dest.create({ intermediates: true, idempotent: true });
+  const tempFile = new File(dest, `playlist-${Date.now()}.m3u`);
 
-  // Scoped so the raw text (tens of MB on large playlists) is eligible for
-  // GC as soon as parsing is done, instead of staying referenced for the
-  // rest of this function while the enrichment fetches below run — that
-  // would otherwise stack a second memory-heavy phase on top of it right at
-  // the peak, which is what tips low-RAM Android TV boxes into an OOM kill.
   let channels: M3uChannel[];
-  {
-    const raw = await response.text();
-    channels = await parseM3u(raw, onProgress);
+  try {
+    const downloaded = await File.downloadFileAsync(url, tempFile, {
+      headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
+      idempotent: true,
+    });
+
+    // Scoped so the raw text (tens of MB on large playlists) is eligible for
+    // GC as soon as parsing is done, instead of staying referenced for the
+    // rest of this function while the enrichment fetches below run — that
+    // would otherwise stack a second memory-heavy phase on top of it right at
+    // the peak.
+    {
+      const raw = await downloaded.text();
+      channels = await parseM3u(raw, onProgress);
+    }
+  } finally {
+    if (tempFile.exists) tempFile.delete();
   }
 
   const tv: M3uChannel[] = [];
