@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+// Same fixed-preset-per-device-class approach as App.tsx's Home layout.
+const IS_TV = Platform.isTV;
 
 type CategoryOption = {
   id: string;
@@ -91,7 +94,7 @@ export function HideCategoriesModal({ visible, categories, initiallyHidden, onSa
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.overlay}>
-        <View style={styles.box}>
+        <View style={[styles.box, !IS_TV && mobileStyles.box]}>
           <View style={styles.header}>
             <Text allowFontScaling={false} style={styles.headerTitle}>
               selecione as categorias que deseja ocultar
@@ -99,7 +102,7 @@ export function HideCategoriesModal({ visible, categories, initiallyHidden, onSa
           </View>
 
           <View style={styles.body}>
-            <View style={styles.sideActions}>
+            <View style={[styles.sideActions, !IS_TV && mobileStyles.sideActions]}>
               <FocusableActionButton onPress={() => onSave(selected)}>
                 <Text allowFontScaling={false} style={styles.actionButtonText}>SIM</Text>
               </FocusableActionButton>
@@ -116,7 +119,7 @@ export function HideCategoriesModal({ visible, categories, initiallyHidden, onSa
             <FlatList
               data={categories}
               keyExtractor={(item) => item.id}
-              style={styles.list}
+              style={[styles.list, !IS_TV && mobileStyles.list]}
               renderItem={({ item, index }) => (
                 <FocusableRow onPress={() => toggle(item.id)} hasTVPreferredFocus={index === 0}>
                   <Text allowFontScaling={false} style={styles.rowLabel} numberOfLines={1}>
@@ -173,8 +176,14 @@ const styles = StyleSheet.create({
     borderRightColor: 'rgba(26, 162, 255, 0.25)',
   },
   list: {
-    flex: 1,
-    maxHeight: 360,
+    // Fixed height instead of flex:1 + maxHeight: `body`'s own height is
+    // otherwise ambiguous (neither `box` nor `body` has an explicit height,
+    // just box's maxHeight:'75%'), which left `sideActions`' three flex:1
+    // buttons fighting over an undefined cross-axis size — the last one
+    // (CANCELAR) could end up squeezed to ~0 height. A fixed height here
+    // gives `body` (and, via stretch, `sideActions`) an unambiguous size to
+    // lay out against.
+    height: 360,
   },
   row: {
     flexDirection: 'row',
@@ -238,5 +247,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textAlign: 'center',
     lineHeight: 18,
+  },
+});
+
+// Fixed mobile preset, same approach as App.tsx's mobileStyles — a smaller
+// box/list so the whole modal (header + 3 side buttons + list) reliably
+// fits phone screen heights in landscape, which are shorter than a TV's.
+const mobileStyles = StyleSheet.create({
+  box: {
+    width: 360,
+  },
+  sideActions: {
+    width: 120,
+    padding: 10,
+    gap: 8,
+  },
+  list: {
+    height: 220,
   },
 });

@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+
+// Same fixed-preset-per-device-class approach as App.tsx's mobileStyles.
+const IS_TV = Platform.isTV;
 
 export type WatchHistoryRow = {
   id: string;
@@ -96,7 +99,7 @@ export function WatchHistoryModal({ visible, title, entries, onClearAll, onClear
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.box}>
+        <View style={[styles.box, !IS_TV && mobileStyles.box]}>
           <View style={styles.header}>
             <Text allowFontScaling={false} style={styles.headerTitle}>
               {title}
@@ -118,7 +121,7 @@ export function WatchHistoryModal({ visible, title, entries, onClearAll, onClear
             </>
           ) : (
             <View style={styles.body}>
-              <View style={styles.sideActions}>
+              <View style={[styles.sideActions, !IS_TV && mobileStyles.sideActions]}>
                 <FocusableActionButton onPress={handleClearSelected} disabled={selected.size === 0}>
                   <Text allowFontScaling={false} style={styles.actionButtonText}>
                     {'LIMPAR\nSELECIONADOS'}{selected.size > 0 ? ` (${selected.size})` : ''}
@@ -135,7 +138,7 @@ export function WatchHistoryModal({ visible, title, entries, onClearAll, onClear
               <FlatList
                 data={entries}
                 keyExtractor={(item) => item.id}
-                style={styles.list}
+                style={[styles.list, !IS_TV && mobileStyles.list]}
                 renderItem={({ item, index }) => (
                   <FocusableRow onPress={() => toggle(item.id)} hasTVPreferredFocus={index === 0}>
                     <View style={styles.rowText}>
@@ -189,7 +192,6 @@ const styles = StyleSheet.create({
   },
   body: {
     flexDirection: 'row',
-    minHeight: 360,
   },
   sideActions: {
     width: 160,
@@ -213,9 +215,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(26, 162, 255, 0.25)',
   },
+  // Fixed height instead of flex:1 + maxHeight (same fix as
+  // hide-categories-modal.tsx's `list`): without it, `body`'s own height was
+  // ambiguous whenever the entry list had little content, which let
+  // `sideActions`' three flex:1 buttons balloon past their intended size and
+  // push the last one (FECHAR) off the bottom of the screen.
   list: {
-    flex: 1,
-    maxHeight: 360,
+    height: 360,
   },
   row: {
     flexDirection: 'row',
@@ -289,5 +295,21 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     textAlign: 'center',
     lineHeight: 18,
+  },
+});
+
+// Fixed mobile preset, same values as hide-categories-modal.tsx's — a
+// smaller box/list so the whole modal reliably fits phone screen heights.
+const mobileStyles = StyleSheet.create({
+  box: {
+    width: 360,
+  },
+  sideActions: {
+    width: 120,
+    padding: 10,
+    gap: 8,
+  },
+  list: {
+    height: 220,
   },
 });
