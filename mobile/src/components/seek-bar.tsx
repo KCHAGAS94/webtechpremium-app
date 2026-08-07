@@ -1,6 +1,11 @@
 import { useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 
+// Same reasoning as vertical-slider.tsx's `focused` state: this was a
+// drag-only touch target (plain View, not focusable), so a TV remote's D-pad
+// couldn't even land on it, let alone show that it had. `focusable` below
+// lets focus reach it at all; this highlight is what makes that visible.
+
 type Props = {
   progress: number; // 0-1
   onSeek: (fraction: number) => void;
@@ -16,6 +21,7 @@ type Props = {
  */
 export function SeekBar({ progress, onSeek, onScrubStart, onScrubEnd }: Props) {
   const [scrubFraction, setScrubFraction] = useState<number | null>(null);
+  const [focused, setFocused] = useState(false);
 
   const progressRef = useRef(progress);
   progressRef.current = progress;
@@ -59,11 +65,14 @@ export function SeekBar({ progress, onSeek, onScrubStart, onScrubEnd }: Props) {
       onLayout={(e) => {
         trackWidthRef.current = e.nativeEvent.layout.width;
       }}
+      focusable
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       {...panResponder.panHandlers}
     >
-      <View style={styles.trackBackground} />
+      <View style={[styles.trackBackground, focused && styles.trackBackgroundFocused]} />
       <View style={[styles.trackFill, { width: `${displayFraction * 100}%` }]} />
-      <View style={[styles.thumb, { left: `${displayFraction * 100}%` }]} />
+      <View style={[styles.thumb, { left: `${displayFraction * 100}%` }, focused && styles.thumbFocused]} />
     </View>
   );
 }
@@ -79,6 +88,10 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: 'rgba(255,255,255,0.25)',
   },
+  trackBackgroundFocused: {
+    height: 6,
+    backgroundColor: 'rgba(77,214,255,0.35)',
+  },
   trackFill: {
     position: 'absolute',
     height: 4,
@@ -92,5 +105,13 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     marginLeft: -7,
     backgroundColor: '#fff',
+  },
+  thumbFocused: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    marginLeft: -9,
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
   },
 });

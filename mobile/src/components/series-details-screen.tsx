@@ -1,14 +1,26 @@
-import { useEffect, useState } from 'react';
-import { Image, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { memo, useEffect, useState } from 'react';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { SeriesEpisode, SeriesShow } from '@/utils/series-grouping';
+import { episodeHistoryKey, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 import { getSeriesInfo, parseXtreamCredentials, type SeriesInfo } from '@/utils/xtream-api';
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
+}
+
+// Same "treat >=95% as finished" cutoff watch-history-storage.ts itself uses
+// when deciding whether to keep an entry at all — a finished episode has no
+// stored entry (see upsertWatchHistoryProgress), so this only ever matters
+// for an entry that exists but happens to report right at the edge.
+function watchedFraction(entry: WatchHistoryEntry | undefined): number | null {
+  if (!entry || entry.durationSeconds <= 0) return null;
+  const fraction = entry.positionSeconds / entry.durationSeconds;
+  if (fraction <= 0) return null;
+  return Math.min(fraction, 1);
 }
 
 type Props = {
@@ -18,12 +30,94 @@ type Props = {
   onToggleFavorite: () => void;
   onPlayEpisode: (episode: SeriesEpisode) => void;
   onBack: () => void;
+  /** Episode watch progress, keyed by episodeHistoryKey — an episode with no
+   * entry here (never started, or already finished and cleared) shows no
+   * progress bar at all. */
+  history: Map<string, WatchHistoryEntry>;
 };
 
-export function SeriesDetailsScreen({ show, playlistUrl, isFavorite, onToggleFavorite, onPlayEpisode, onBack }: Props) {
+const SeasonTab = memo(function SeasonTab({
+  season,
+  active,
+  onPress,
+}: {
+  season: number;
+  active: boolean;
+  onPress: (season: number) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.seasonTab, active && styles.seasonTabActive, focused && styles.seasonTabFocused]}
+      onPress={() => onPress(season)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    >
+      <ThemedText style={[styles.seasonTabText, active && styles.seasonTabTextActive]}>
+        Season {season}
+      </ThemedText>
+    </Pressable>
+  );
+});
+
+const EpisodeRow = memo(function EpisodeRow({
+  show,
+  episode,
+  progress,
+  onPress,
+}: {
+  show: SeriesShow;
+  episode: SeriesEpisode;
+  /** 0-1, or null to show no progress bar at all. */
+  progress: number | null;
+  onPress: (episode: SeriesEpisode) => void;
+}) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <Pressable
+      style={[styles.episodeRow, focused && styles.episodeRowFocused]}
+      onPress={() => onPress(episode)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    >
+      <View style={styles.episodeThumbWrap}>
+        {episode.channel.logo ? (
+          <Image source={{ uri: episode.channel.logo }} style={styles.episodeThumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.episodeThumb, styles.episodeThumbPlaceholder]}>
+            <ThemedText style={styles.episodeThumbIcon}>▶</ThemedText>
+          </View>
+        )}
+        {progress != null && (
+          <View style={styles.episodeProgressTrack}>
+            <View style={[styles.episodeProgressFill, { width: `${progress * 100}%` }]} />
+          </View>
+        )}
+      </View>
+      <View style={styles.episodeInfo}>
+        <ThemedText style={styles.episodeTitle} numberOfLines={1}>
+          {show.name} - S{pad2(episode.season)}E{pad2(episode.episode)}
+          {episode.episodeTitle ? ` - ${episode.episodeTitle}` : ''}
+        </ThemedText>
+      </View>
+    </Pressable>
+  );
+});
+
+export function SeriesDetailsScreen({
+  show,
+  playlistUrl,
+  isFavorite,
+  onToggleFavorite,
+  onPlayEpisode,
+  onBack,
+  history,
+}: Props) {
   const [selectedSeason, setSelectedSeason] = useState(show.seasons[0] ?? 1);
   const episodes = show.episodesBySeason.get(selectedSeason) ?? [];
   const [info, setInfo] = useState<SeriesInfo | null>(null);
+  const [backFocused, setBackFocused] = useState(false);
+  const [favoriteFocused, setFavoriteFocused] = useState(false);
 
   useEffect(() => {
     setInfo(null);
@@ -49,9 +143,15 @@ export function SeriesDetailsScreen({ show, playlistUrl, isFavorite, onToggleFav
       <View style={styles.backdropScrim} />
 
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-        <TouchableOpacity onPress={onBack} hitSlop={12} style={styles.backButton}>
+        <Pressable
+          onPress={onBack}
+          onFocus={() => setBackFocused(true)}
+          onBlur={() => setBackFocused(false)}
+          hitSlop={12}
+          style={[styles.backButton, backFocused && styles.backButtonFocused]}
+        >
           <ThemedText style={styles.backIcon}>‹</ThemedText>
-        </TouchableOpacity>
+        </Pressable>
 
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.mainRow}>
@@ -74,55 +174,38 @@ export function SeriesDetailsScreen({ show, playlistUrl, isFavorite, onToggleFav
 
               {info?.plot && <ThemedText style={styles.plot}>{info.plot}</ThemedText>}
 
-              <TouchableOpacity
-                style={[styles.favoriteButton, isFavorite && styles.favoriteButtonActive]}
+              <Pressable
+                style={[
+                  styles.favoriteButton,
+                  isFavorite && styles.favoriteButtonActive,
+                  favoriteFocused && styles.favoriteButtonFocused,
+                ]}
                 onPress={onToggleFavorite}
+                onFocus={() => setFavoriteFocused(true)}
+                onBlur={() => setFavoriteFocused(false)}
               >
                 <ThemedText style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
                   {isFavorite ? '♥' : '♡'}
                 </ThemedText>
-              </TouchableOpacity>
+              </Pressable>
             </View>
           </View>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.seasonTabs}>
             {show.seasons.map((season) => (
-              <TouchableOpacity
-                key={season}
-                style={[styles.seasonTab, season === selectedSeason && styles.seasonTabActive]}
-                onPress={() => setSelectedSeason(season)}
-              >
-                <ThemedText
-                  style={[styles.seasonTabText, season === selectedSeason && styles.seasonTabTextActive]}
-                >
-                  Season {season}
-                </ThemedText>
-              </TouchableOpacity>
+              <SeasonTab key={season} season={season} active={season === selectedSeason} onPress={setSelectedSeason} />
             ))}
           </ScrollView>
 
           <View style={styles.episodeList}>
             {episodes.map((episode) => (
-              <TouchableOpacity
+              <EpisodeRow
                 key={episode.channel.id}
-                style={styles.episodeRow}
-                onPress={() => onPlayEpisode(episode)}
-                activeOpacity={0.8}
-              >
-                {episode.channel.logo ? (
-                  <Image source={{ uri: episode.channel.logo }} style={styles.episodeThumb} resizeMode="cover" />
-                ) : (
-                  <View style={[styles.episodeThumb, styles.episodeThumbPlaceholder]}>
-                    <ThemedText style={styles.episodeThumbIcon}>▶</ThemedText>
-                  </View>
-                )}
-                <View style={styles.episodeInfo}>
-                  <ThemedText style={styles.episodeTitle} numberOfLines={1}>
-                    {show.name} - S{pad2(episode.season)}E{pad2(episode.episode)}
-                    {episode.episodeTitle ? ` - ${episode.episodeTitle}` : ''}
-                  </ThemedText>
-                </View>
-              </TouchableOpacity>
+                show={show}
+                episode={episode}
+                progress={watchedFraction(history.get(episodeHistoryKey(show.id, episode.season, episode.episode)))}
+                onPress={onPlayEpisode}
+              />
             ))}
           </View>
         </ScrollView>
@@ -156,6 +239,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     marginLeft: 16,
     marginTop: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  backButtonFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: '#132a4d',
   },
   backIcon: {
     fontSize: 24,
@@ -224,6 +313,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(230,57,70,0.15)',
     borderColor: '#e63946',
   },
+  favoriteButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(77,214,255,0.15)',
+  },
   favoriteIcon: {
     fontSize: 20,
     color: '#4dd6ff',
@@ -240,9 +334,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#1a1a45',
     marginRight: 10,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   seasonTabActive: {
     backgroundColor: '#e63946',
+  },
+  seasonTabFocused: {
+    borderColor: '#4dd6ff',
   },
   seasonTabText: {
     fontSize: 13,
@@ -263,12 +362,36 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255,255,255,0.08)',
     padding: 10,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  episodeRowFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(77,214,255,0.15)',
+  },
+  episodeThumbWrap: {
+    width: 96,
+    height: 64,
   },
   episodeThumb: {
     width: 96,
     height: 64,
     borderRadius: 6,
     backgroundColor: '#1a1a45',
+  },
+  episodeProgressTrack: {
+    position: 'absolute',
+    left: 4,
+    right: 4,
+    bottom: 4,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    overflow: 'hidden',
+  },
+  episodeProgressFill: {
+    height: '100%',
+    backgroundColor: '#e63946',
   },
   episodeThumbPlaceholder: {
     alignItems: 'center',

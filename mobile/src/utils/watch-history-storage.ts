@@ -18,6 +18,13 @@ export type WatchHistoryEntry = {
   episode?: number;
 };
 
+// Stable identity for an episode's watch-history entry: survives a playlist
+// "recarregar" the same way a movie's title-based key does, instead of being
+// tied to the reload-volatile M3uChannel.id.
+export function episodeHistoryKey(showId: string, season: number, episode: number): string {
+  return `${showId}::S${season}E${episode}`;
+}
+
 const STORAGE_KEY = 'webtech.watchHistory';
 const MAX_ENTRIES = 200;
 // Below this we treat "resume" as noise (an accidental tap); above the

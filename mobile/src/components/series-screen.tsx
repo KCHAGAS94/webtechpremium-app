@@ -16,18 +16,15 @@ import { groupSeriesShows, type SeriesEpisode, type SeriesShow } from '@/utils/s
 import { fetchSeriesEpisodes, fetchSeriesShows, parseXtreamCredentials, type SeriesMeta } from '@/utils/xtream-api';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
-import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
+import {
+  episodeHistoryKey,
+  loadWatchHistory,
+  upsertWatchHistoryProgress,
+  type WatchHistoryEntry,
+} from '@/utils/watch-history-storage';
 import { normalizeSearchText } from '@/utils/text-normalize';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
-
-// Stable identity for an episode's watch-history entry: survives a playlist
-// reload the same way movie titles do (see favorites-storage.ts) since it's
-// derived from the show id + season/episode, not the reload-volatile
-// M3uChannel.id.
-function episodeHistoryKey(showId: string, season: number, episode: number): string {
-  return `${showId}::S${season}E${episode}`;
-}
 
 const NAV_ITEMS: { key: NavKey; labelKey: TranslationKey }[] = [
   { key: 'home', labelKey: 'nav_home' },
@@ -522,6 +519,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
           onToggleFavorite={() => handleToggleFavorite(viewingShow.id)}
           onPlayEpisode={handlePlayEpisode}
           onBack={handleCloseShow}
+          history={history}
         />
         {playingEpisode && (
           <SeriesVodPlayer
