@@ -10,6 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { BootLoadingScreen } from './src/components/boot-loading-screen';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
@@ -38,25 +39,37 @@ const CONTENT_SCREENS: Partial<Record<string, ContentCategory>> = {
   series: 'series',
 };
 
+// Fixed dp sizes for the Home menu icons — matches the old emoji fontSize
+// values (64/40/28) that styles.tvIcon/midIcon/sideMenuIcon used, kept as
+// plain numbers here since Ionicons takes `size` as a prop, not a style.
+const ICON_SIZE_LARGE = 64;
+const ICON_SIZE_MEDIUM = 40;
+const ICON_SIZE_SMALL = 28;
+
 interface MenuItem {
   id: string;
   label: TranslationKey;
-  icon: string;
+  // Ionicons glyph name instead of an emoji character: emoji are rendered by
+  // each device's own system emoji font, which varies wildly between TV
+  // manufacturers (confirmed — the same emoji looked completely different on
+  // a different physical TV). An icon font bundled with the app looks
+  // identical everywhere.
+  icon: keyof typeof Ionicons.glyphMap;
   screen?: string;
 }
 
 const menuItems: MenuItem[] = [
-  { id: '1', label: 'nav_live', icon: '📺', screen: 'tv' },
-  { id: '2', label: 'nav_movies', icon: '▶️', screen: 'movies' },
-  { id: '3', label: 'nav_series', icon: '🎬', screen: 'series' },
-  { id: '4', label: 'nav_account', icon: '👤', screen: 'account' },
-  { id: '5', label: 'nav_change_playlist', icon: '🔄', screen: 'playlist' },
-  { id: '6', label: 'nav_settings', icon: '⚙️', screen: 'settings' },
+  { id: '1', label: 'nav_live', icon: 'tv-outline', screen: 'tv' },
+  { id: '2', label: 'nav_movies', icon: 'film-outline', screen: 'movies' },
+  { id: '3', label: 'nav_series', icon: 'albums-outline', screen: 'series' },
+  { id: '4', label: 'nav_account', icon: 'person-outline', screen: 'account' },
+  { id: '5', label: 'nav_change_playlist', icon: 'swap-horizontal-outline', screen: 'playlist' },
+  { id: '6', label: 'nav_settings', icon: 'settings-outline', screen: 'settings' },
 ];
 
 const sideMenuItems: MenuItem[] = [
-  { id: '7', label: 'nav_reload', icon: '🔄', screen: 'reload' },
-  { id: '8', label: 'nav_exit', icon: '🚪', screen: 'exit' },
+  { id: '7', label: 'nav_reload', icon: 'refresh-outline', screen: 'reload' },
+  { id: '8', label: 'nav_exit', icon: 'exit-outline', screen: 'exit' },
 ];
 
 // Highlights whichever card currently has TV-remote (D-pad) focus, so the
@@ -401,7 +414,7 @@ function AppContent() {
                 onPress={() => handleMenuPress(tvItem.screen)}
                 autoFocus
               >
-                <Text allowFontScaling={false} style={styles.tvIcon}>{tvItem.icon}</Text>
+                <Ionicons name={tvItem.icon} size={ICON_SIZE_LARGE} color="#ffffff" style={styles.tvIcon} />
                 <Text allowFontScaling={false} style={styles.tvLabel}>{t(tvItem.label)}</Text>
               </FocusableCard>
 
@@ -412,7 +425,7 @@ function AppContent() {
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(centerTop.screen)}
                 >
-                  <Text allowFontScaling={false} style={styles.midIcon}>{centerTop.icon}</Text>
+                  <Ionicons name={centerTop.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(centerTop.label)}</Text>
                 </FocusableCard>
 
@@ -422,7 +435,7 @@ function AppContent() {
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(centerBottom.screen)}
                 >
-                  <Text allowFontScaling={false} style={styles.midIcon}>{centerBottom.icon}</Text>
+                  <Ionicons name={centerBottom.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(centerBottom.label)}</Text>
                 </FocusableCard>
               </View>
@@ -434,7 +447,7 @@ function AppContent() {
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(rightTop.screen)}
                 >
-                  <Text allowFontScaling={false} style={styles.midIcon}>{rightTop.icon}</Text>
+                  <Ionicons name={rightTop.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(rightTop.label)}</Text>
                 </FocusableCard>
 
@@ -444,7 +457,7 @@ function AppContent() {
                   focusedStyle={styles.midCardFocused}
                   onPress={() => handleMenuPress(rightBottom.screen)}
                 >
-                  <Text allowFontScaling={false} style={styles.midIcon}>{rightBottom.icon}</Text>
+                  <Ionicons name={rightBottom.icon} size={ICON_SIZE_MEDIUM} color="#ffffff" style={styles.midIcon} />
                   <Text allowFontScaling={false} style={styles.midLabel}>{t(rightBottom.label)}</Text>
                 </FocusableCard>
               </View>
@@ -456,7 +469,7 @@ function AppContent() {
                   focusedStyle={styles.sideMenuItemFocused}
                   onPress={() => handleMenuPress(settingsItem.screen)}
                 >
-                  <Text allowFontScaling={false} style={styles.sideMenuIcon}>{settingsItem.icon}</Text>
+                  <Ionicons name={settingsItem.icon} size={ICON_SIZE_SMALL} color="#ffffff" style={styles.sideMenuIcon} />
                   <Text allowFontScaling={false} style={styles.sideMenuLabel}>{t(settingsItem.label)}</Text>
                 </FocusableCard>
 
@@ -472,7 +485,7 @@ function AppContent() {
                       {isReloadItem && reloadingChannels ? (
                         <ActivityIndicator color="#4dd6ff" style={styles.sideMenuSpinner} />
                       ) : (
-                        <Text allowFontScaling={false} style={styles.sideMenuIcon}>{item.icon}</Text>
+                        <Ionicons name={item.icon} size={ICON_SIZE_SMALL} color="#ffffff" style={styles.sideMenuIcon} />
                       )}
                       <Text allowFontScaling={false} style={styles.sideMenuLabel}>
                         {isReloadItem && reloadingChannels ? t('nav_reloading') : t(item.label)}
@@ -593,7 +606,12 @@ const styles = StyleSheet.create({
   layoutRow: {
     flex: 1,
     flexDirection: 'row',
-    width: '90%',
+    // Fixed dp width instead of '90%': a percentage resolves to a different
+    // absolute size on every screen (this is what changed the whole menu's
+    // proportions/size on a different physical TV — same dp values elsewhere
+    // in this file, like tvCard's width:220, didn't move at all). A fixed dp
+    // value renders the same everywhere, the same way dp is supposed to.
+    width: 900,
     gap: 8,
     minHeight: 0,
     maxHeight: 286,
