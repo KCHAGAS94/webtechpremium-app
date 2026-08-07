@@ -30,6 +30,7 @@ const DEFAULT_SUBTITLE_STYLE: SubtitleSettings = {
 
 const AUTO_HIDE_MS = 4000;
 const SKIP_SECONDS = 10;
+const SKIP_MINUTE_SECONDS = 60;
 const MAX_PLAYBACK_RETRIES = 2;
 const PLAYBACK_RETRY_DELAY_MS = 1500;
 
@@ -57,6 +58,33 @@ function formatTime(totalSeconds: number): string {
   const mm = String(minutes).padStart(2, '0');
   const ss = String(seconds).padStart(2, '0');
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
+// Reused for all four skip buttons (±10s, ±1min) — `label` is what tells
+// otherwise-identical ⏪/⏩ icons apart, since holding a button down isn't a
+// thing on a D-pad (every skip amount needs its own button, not a
+// press-and-hold gesture like a touch scrubber would use).
+function SkipButton({
+  seconds,
+  icon,
+  label,
+  onPress,
+}: {
+  seconds: number;
+  icon: string;
+  label: string;
+  onPress: (seconds: number) => void;
+}) {
+  return (
+    <PlayerControlButton
+      onPress={() => onPress(seconds)}
+      style={styles.controlButton}
+      focusedStyle={styles.controlButtonFocused}
+    >
+      <ThemedText style={styles.controlIcon}>{icon}</ThemedText>
+      <ThemedText style={styles.controlLabel}>{label}</ThemedText>
+    </PlayerControlButton>
+  );
 }
 
 /**
@@ -449,13 +477,8 @@ export function MoviePlayer({
               />
 
               <View style={styles.centerControls}>
-                <PlayerControlButton
-                  onPress={() => handleSkip(-SKIP_SECONDS)}
-                  style={styles.controlButton}
-                  focusedStyle={styles.controlButtonFocused}
-                >
-                  <ThemedText style={styles.controlIcon}>⏪</ThemedText>
-                </PlayerControlButton>
+                <SkipButton seconds={-SKIP_MINUTE_SECONDS} icon="⏪" label="1min" onPress={handleSkip} />
+                <SkipButton seconds={-SKIP_SECONDS} icon="⏪" label="10s" onPress={handleSkip} />
                 <PlayerControlButton
                   onPress={handleTogglePlayPause}
                   style={styles.playButton}
@@ -464,13 +487,8 @@ export function MoviePlayer({
                 >
                   <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
                 </PlayerControlButton>
-                <PlayerControlButton
-                  onPress={() => handleSkip(SKIP_SECONDS)}
-                  style={styles.controlButton}
-                  focusedStyle={styles.controlButtonFocused}
-                >
-                  <ThemedText style={styles.controlIcon}>⏩</ThemedText>
-                </PlayerControlButton>
+                <SkipButton seconds={SKIP_SECONDS} icon="⏩" label="10s" onPress={handleSkip} />
+                <SkipButton seconds={SKIP_MINUTE_SECONDS} icon="⏩" label="1min" onPress={handleSkip} />
               </View>
 
               <VerticalSlider
@@ -617,7 +635,7 @@ const styles = StyleSheet.create({
   centerControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 28,
+    gap: 18,
   },
   controlButton: {
     width: 44,
@@ -632,8 +650,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
   controlIcon: {
-    fontSize: 26,
+    fontSize: 20,
     color: '#fff',
+    lineHeight: 22,
+  },
+  controlLabel: {
+    fontSize: 9,
+    color: '#fff',
+    lineHeight: 11,
   },
   playButton: {
     width: 64,
