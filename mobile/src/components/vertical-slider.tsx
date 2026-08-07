@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { PanResponder, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -33,6 +33,12 @@ export function VerticalSlider({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const startValueRef = useRef(value);
+  // Plain Views (unlike Pressable) aren't focusable by default on Android —
+  // this track was a drag-only touch target with nothing to show a TV
+  // remote's D-pad ever reached it. `focusable` below lets D-pad focus land
+  // on it at all; this just mirrors that with a visible highlight, same as
+  // every other control in the player (PlayerControlButton, etc.).
+  const [focused, setFocused] = useState(false);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -55,7 +61,14 @@ export function VerticalSlider({
   return (
     <View style={styles.container}>
       <ThemedText style={styles.icon}>{icon}</ThemedText>
-      <View style={styles.track} accessibilityLabel={accessibilityLabel} {...panResponder.panHandlers}>
+      <View
+        style={[styles.track, focused && styles.trackFocused]}
+        accessibilityLabel={accessibilityLabel}
+        focusable
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        {...panResponder.panHandlers}
+      >
         <View style={styles.trackBackground} />
         <View style={[styles.trackFill, { height: `${value * 100}%` }]} />
         <View style={[styles.thumb, { bottom: `${value * 100}%` }]} />
@@ -78,6 +91,13 @@ const styles = StyleSheet.create({
     height: TRACK_HEIGHT,
     alignItems: 'center',
     justifyContent: 'flex-end',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  trackFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(19, 42, 77, 0.6)',
   },
   trackBackground: {
     position: 'absolute',

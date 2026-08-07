@@ -336,10 +336,19 @@ export function MoviePlayer({
       <StatusBar hidden />
       <View style={styles.container}>
         {(status !== 'error' || retrying) && (
-          // focusable={false}: see fullscreen-player.tsx — a fullscreen
-          // focusable view here would grab the TV remote's default D-pad
-          // focus and block navigation to the actual control buttons.
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo} focusable={false}>
+          // focusable only while controls are hidden: while they're visible,
+          // a focusable fullscreen view here would grab the TV remote's
+          // default D-pad focus and block navigation to the actual control
+          // buttons. While hidden there's nothing else on screen to focus at
+          // all, so nothing previously caught a remote press — hasTVPreferredFocus
+          // here means OK (and any D-pad move, since it's the only focusable
+          // view) always lands back on this catcher and reopens the controls.
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleTapVideo}
+            focusable={!controlsVisible}
+            hasTVPreferredFocus={!controlsVisible}
+          >
             <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
           </Pressable>
         )}

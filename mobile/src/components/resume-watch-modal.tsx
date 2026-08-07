@@ -1,4 +1,5 @@
-import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 
@@ -8,8 +9,13 @@ type Props = {
   onRestart: () => void;
 };
 
-/** Asks whether to pick up from the saved position or start over, before playback begins. */
+/** Asks whether to pick up from the saved position or start over, before
+ * playback begins. Starts focused on "Continuar de onde parou" — the option
+ * that matches why this modal showed up in the first place. */
 export function ResumeWatchModal({ title, onResume, onRestart }: Props) {
+  const [resumeFocused, setResumeFocused] = useState(true);
+  const [restartFocused, setRestartFocused] = useState(false);
+
   return (
     <Modal visible animationType="fade" transparent onRequestClose={onResume}>
       <View style={styles.backdrop}>
@@ -18,12 +24,23 @@ export function ResumeWatchModal({ title, onResume, onRestart }: Props) {
             {title}
           </ThemedText>
           <ThemedText style={styles.message}>Você parou de assistir no meio. O que deseja fazer?</ThemedText>
-          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onResume}>
+          <Pressable
+            style={[styles.button, styles.primaryButton, resumeFocused && styles.primaryButtonFocused]}
+            onPress={onResume}
+            onFocus={() => setResumeFocused(true)}
+            onBlur={() => setResumeFocused(false)}
+            hasTVPreferredFocus
+          >
             <ThemedText style={styles.primaryButtonText}>Continuar de onde parou</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={onRestart}>
+          </Pressable>
+          <Pressable
+            style={[styles.button, restartFocused && styles.buttonFocused]}
+            onPress={onRestart}
+            onFocus={() => setRestartFocused(true)}
+            onBlur={() => setRestartFocused(false)}
+          >
             <ThemedText style={styles.buttonText}>Começar do início</ThemedText>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -61,6 +78,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  buttonFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   buttonText: {
     fontSize: 15,
@@ -69,6 +92,9 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#4dd6ff',
+  },
+  primaryButtonFocused: {
+    borderColor: '#fff',
   },
   primaryButtonText: {
     fontSize: 15,

@@ -228,11 +228,20 @@ export function FullscreenPlayer({
       <StatusBar hidden />
       <View style={styles.container}>
         {status !== 'error' && (
-          // focusable={false}: this covers the entire screen, so if it were
-          // focusable it would grab the TV remote's default D-pad focus on
-          // entry and swallow directional navigation before it ever reaches
-          // the actual control buttons below.
-          <Pressable style={StyleSheet.absoluteFill} onPress={handleTapVideo} focusable={false}>
+          // focusable only while controls are hidden: while visible, a
+          // focusable fullscreen view here would grab the TV remote's
+          // default D-pad focus on entry and swallow directional navigation
+          // before it ever reaches the actual control buttons below. While
+          // hidden there's nothing else on screen to focus, so nothing
+          // caught a remote press at all — hasTVPreferredFocus here means OK
+          // (and any D-pad move, since it's the only focusable view) lands
+          // back on this catcher and reopens the controls.
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={handleTapVideo}
+            focusable={!controlsVisible}
+            hasTVPreferredFocus={!controlsVisible}
+          >
             <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
           </Pressable>
         )}

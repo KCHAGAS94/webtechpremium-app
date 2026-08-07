@@ -1,4 +1,5 @@
-import { Modal, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Modal, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 
@@ -7,19 +8,35 @@ type Props = {
   onCancel: () => void;
 };
 
-/** Confirms leaving playback before actually closing the player. */
+/** Confirms leaving playback before actually closing the player. Starts
+ * focused on "Continuar assistindo" (the safe/default choice) so an
+ * accidental extra OK press on the remote doesn't exit playback. */
 export function ExitConfirmModal({ onConfirm, onCancel }: Props) {
+  const [confirmFocused, setConfirmFocused] = useState(false);
+  const [cancelFocused, setCancelFocused] = useState(true);
+
   return (
     <Modal visible animationType="fade" transparent onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <ThemedText style={styles.message}>Deseja sair da reprodução?</ThemedText>
-          <TouchableOpacity style={[styles.button, styles.primaryButton]} onPress={onConfirm}>
+          <Pressable
+            style={[styles.button, styles.primaryButton, confirmFocused && styles.primaryButtonFocused]}
+            onPress={onConfirm}
+            onFocus={() => setConfirmFocused(true)}
+            onBlur={() => setConfirmFocused(false)}
+          >
             <ThemedText style={styles.primaryButtonText}>Sair</ThemedText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.button} onPress={onCancel}>
+          </Pressable>
+          <Pressable
+            style={[styles.button, cancelFocused && styles.buttonFocused]}
+            onPress={onCancel}
+            onFocus={() => setCancelFocused(true)}
+            onBlur={() => setCancelFocused(false)}
+            hasTVPreferredFocus
+          >
             <ThemedText style={styles.buttonText}>Continuar assistindo</ThemedText>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -53,6 +70,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  buttonFocused: {
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(255,255,255,0.18)',
   },
   buttonText: {
     fontSize: 15,
@@ -61,6 +84,9 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     backgroundColor: '#e63946',
+  },
+  primaryButtonFocused: {
+    borderColor: '#fff',
   },
   primaryButtonText: {
     fontSize: 15,
