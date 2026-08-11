@@ -288,6 +288,9 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
 
   const [selectedCategory, setSelectedCategory] = useState(FAVORITES_CATEGORY_ID);
   const [selectedChannel, setSelectedChannel] = useState<M3uChannel | undefined>(bucketChannels[0]);
+  // Tracks whether the user has explicitly picked a channel, so the
+  // favorites-priority effect below doesn't hijack their selection.
+  const userSelectedRef = useRef(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [isBuffering, setIsBuffering] = useState(true);
@@ -310,10 +313,24 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // Favorites live on disk (see favorites-storage.ts), keyed by channel name
   // rather than `selectedChannel.id` — that id is just the item's position
   // in the last parsed playlist, so it shifts on every reload.
+  //
+  // Favorites load asynchronously, after `selectedChannel` has already
+  // defaulted to `bucketChannels[0]` (and started playing/logging). Once
+  // they arrive, if the user hasn't picked a channel yet, switch the live
+  // preview over to the first favorite so a saved channel takes priority
+  // over "Tudo"'s first entry — but only for `live`, and only if the user
+  // hasn't already selected something themselves.
   useEffect(() => {
     loadHiddenGroups(category).then(setHiddenGroups);
-    loadFavorites(category).then(setFavorites);
+    loadFavorites(category).then((favs) => {
+      setFavorites(favs);
+      if (category === 'live' && !userSelectedRef.current) {
+        const firstFavorite = bucketChannels.find((c) => favs.has(c.name));
+        if (firstFavorite) setSelectedChannel(firstFavorite);
+      }
+    });
     loadFavoriteGroups(category).then(setFavoriteGroups);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   // Filled in here (not in the categoryShells memo above) because "Favoritos"
@@ -508,6 +525,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // preview pane first.
   const handleSelectChannel = useCallback(
     (channel: M3uChannel) => {
+      userSelectedRef.current = true;
       if (selectedChannel?.id === channel.id) {
         handleExpandFullscreen();
         return;
