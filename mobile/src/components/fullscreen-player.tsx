@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useEvent } from 'expo';
 import { VideoView, type VideoPlayer } from 'expo-video';
@@ -239,8 +239,8 @@ export function FullscreenPlayer({
           <Pressable
             style={StyleSheet.absoluteFill}
             onPress={handleTapVideo}
-            focusable={!controlsVisible}
-            hasTVPreferredFocus={!controlsVisible}
+            focusable={Platform.isTV ? !controlsVisible : undefined}
+            hasTVPreferredFocus={Platform.isTV ? !controlsVisible : undefined}
           >
             <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
           </Pressable>
