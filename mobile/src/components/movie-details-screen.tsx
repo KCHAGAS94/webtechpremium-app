@@ -7,7 +7,35 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { parseMovieTitle } from '@/utils/movie-info';
+import { fetchCastPhoto } from '@/utils/tmdb-api';
 import { getVodInfo, parseXtreamCredentials, type VodInfo } from '@/utils/xtream-api';
+
+function CastItem({ name }: { name: string }) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCastPhoto(name).then((url) => {
+      if (!cancelled) setPhotoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [name]);
+
+  return (
+    <View style={styles.castItem}>
+      {photoUrl ? (
+        <Image source={{ uri: photoUrl }} style={styles.castAvatar} />
+      ) : (
+        <View style={styles.castAvatar} />
+      )}
+      <ThemedText style={styles.castName} numberOfLines={1}>
+        {name}
+      </ThemedText>
+    </View>
+  );
+}
 
 type Props = {
   movie: M3uChannel;
@@ -122,16 +150,11 @@ export function MovieDetailsScreen({ movie, playlistUrl, isFavorite, onToggleFav
           {castNames.length > 0 && (
           <View style={styles.castSection}>
             <ThemedText style={styles.castHeading}>Elenco:</ThemedText>
-            <View style={styles.castRow}>
-              {castNames.map((name) => (
-                <View key={name} style={styles.castItem}>
-                  <View style={styles.castAvatar} />
-                  <ThemedText style={styles.castName} numberOfLines={1}>
-                    {name}
-                  </ThemedText>
-                </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.castRow}>
+              {castNames.slice(0, 10).map((name) => (
+                <CastItem key={name} name={name} />
               ))}
-            </View>
+            </ScrollView>
           </View>
           )}
         </ScrollView>
@@ -297,7 +320,6 @@ const styles = StyleSheet.create({
   },
   castRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 20,
   },
   castItem: {
