@@ -166,14 +166,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   body: {
-    flexDirection: 'row',
+    flexDirection: 'column',
   },
   sideActions: {
-    width: 160,
+    flexDirection: 'row',
     padding: 16,
     gap: 12,
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(26, 162, 255, 0.25)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(26, 162, 255, 0.25)',
   },
   list: {
     // Fixed height instead of flex:1 + maxHeight: `body`'s own height is
@@ -255,10 +255,10 @@ const styles = StyleSheet.create({
 // fits phone screen heights in landscape, which are shorter than a TV's.
 const mobileStyles = StyleSheet.create({
   box: {
-    width: 360,
+    width: 760,
+    minHeight: 320,
   },
   sideActions: {
-    width: 120,
     padding: 10,
     gap: 8,
   },
