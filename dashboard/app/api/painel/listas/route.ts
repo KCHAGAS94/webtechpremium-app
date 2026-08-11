@@ -24,12 +24,16 @@ export async function GET(request: NextRequest) {
   }
 
   const appId = request.nextUrl.searchParams.get('appId');
+  const mac = request.nextUrl.searchParams.get('mac');
 
   const listas = await prisma.lista.findMany({
     where: {
       ...(appId && { appId: Number(appId) }),
-      // Revendedor só vê os próprios MACs; admin vê tudo.
-      ...(auth.role !== 'ADMIN' && { app: { userId: auth.id } }),
+      app: {
+        ...(mac && { macAddress: mac.toUpperCase() }),
+        // Revendedor só vê os próprios MACs; admin vê tudo.
+        ...(auth.role !== 'ADMIN' && { userId: auth.id }),
+      },
     },
     orderBy: { createdAt: 'asc' },
     include: { app: true },
@@ -84,12 +88,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 });
     }
   } else {
-    // Se o MAC já existe e pertence a outro revendedor, não deixa "roubar"
-    // o dispositivo criando uma lista nele — só o dono (ou o admin) pode.
-    const existingApp = await prisma.app.findUnique({ where: { macAddress } });
-    if (existingApp && auth.role !== 'ADMIN' && existingApp.userId !== auth.id) {
-      return NextResponse.json({ error: 'MAC pertence a outro revendedor' }, { status: 403 });
-    }
+    // Não há mais restrição de dono do MAC aqui: qualquer revendedor logado
+    // pode cadastrar lista em qualquer App, desde que ele esteja ativo (ver
+    // checagem abaixo). Só existe uma data de ativação por App, e ela vale
+    // para todos — não é mais "propriedade" exclusiva de quem ativou.
 
     // A tela "Usuários" (sem `tipo`) só pode adicionar playlist a um MAC que
     // já tenha passado pela "Ativação App" e continue ativo (Vitalício ou

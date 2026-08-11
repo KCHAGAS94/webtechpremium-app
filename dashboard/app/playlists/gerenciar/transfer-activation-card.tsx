@@ -7,8 +7,59 @@ function formatMacAddress(value: string) {
   return hex.match(/.{1,2}/g)?.join(':') ?? hex;
 }
 
-export function TransferActivationCard() {
+type Props = {
+  mac: string;
+  onTransferred: (novoMac: string) => void;
+};
+
+export function TransferActivationCard({ mac, onTransferred }: Props) {
   const [novoMac, setNovoMac] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleTransfer = async () => {
+    setError('');
+
+    if (novoMac.replace(/:/g, '').length !== 12) {
+      setError('Informe um endereço MAC válido');
+      return;
+    }
+
+    const confirmado = window.confirm(
+      `Tem certeza que deseja trocar o MAC ativado de ${mac} para ${novoMac}?\n\n` +
+        'Essa ação vai apagar automaticamente todas as playlists cadastradas no MAC atual e não pode ser desfeita.'
+    );
+    if (!confirmado) return;
+
+    setLoading(true);
+    try {
+      const listasResponse = await fetch(`/api/painel/listas?mac=${encodeURIComponent(mac)}`);
+      const listasData = await listasResponse.json();
+      const ativacao = (listasData.listas ?? []).find((l: { tipo: string | null }) => l.tipo);
+
+      if (!ativacao) {
+        throw new Error('Nenhuma ativação encontrada para este MAC');
+      }
+
+      const response = await fetch('/api/painel/listas/transferir', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ativacao.id, novoMac }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Falha ao transferir ativação');
+      }
+
+      setNovoMac('');
+      onTransferred(novoMac);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Falha ao transferir ativação');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-8 max-w-xl">
@@ -35,20 +86,28 @@ export function TransferActivationCard() {
           <line x1="12" y1="17" x2="12.01" y2="17" strokeLinecap="round" />
         </svg>
         <p className="text-sm text-yellow-500/90 leading-relaxed">
-          Para transferir sua assinatura para outro endereço MAC, entre em contato com nossa equipe de
-          suporte.
+          Ao trocar o MAC ativado, todas as playlists cadastradas no dispositivo atual serão apagadas
+          automaticamente.
         </p>
       </div>
 
+      {error && <p className="text-sm text-red-400 mb-4">{error}</p>}
+
       <div className="flex justify-end gap-6">
-        <button type="button" className="text-sm font-semibold text-gray-300 hover:text-white">
+        <button
+          type="button"
+          onClick={() => setNovoMac('')}
+          className="text-sm font-semibold text-gray-300 hover:text-white"
+        >
           Cancelar
         </button>
         <button
           type="button"
-          className="rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 transition-colors"
+          disabled={loading}
+          onClick={handleTransfer}
+          className="rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 transition-colors disabled:opacity-60"
         >
-          Entrar em contato com o suporte
+          {loading ? 'Transferindo...' : 'Transferir ativação'}
         </button>
       </div>
     </div>

@@ -328,7 +328,13 @@ function GerenciarPlaylistsContent() {
                 </div>
               </>
             ) : (
-              <TransferActivationCard />
+              <TransferActivationCard
+                mac={mac}
+                onTransferred={(novoMac) => {
+                  setActiveSection('gerenciamento');
+                  router.push(`/playlists/gerenciar?mac=${encodeURIComponent(novoMac)}`);
+                }}
+              />
             )}
           </div>
         </div>

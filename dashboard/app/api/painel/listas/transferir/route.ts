@@ -4,8 +4,9 @@ import { getAuthUser } from '@/lib/auth';
 
 // Move uma ativação (Lista com `tipo` preenchido) de um MAC para outro sem
 // cobrar créditos de novo: tipo e dataExpiracao são preservados, só o
-// dispositivo (App) muda. O MAC de origem some do painel se não sobrar
-// nenhuma outra lista nele.
+// dispositivo (App) muda. Como o dispositivo muda, todas as demais listas
+// (playlists) cadastradas no MAC de origem deixam de fazer sentido e são
+// apagadas junto — o MAC de origem sempre some do painel após a troca.
 export async function POST(request: NextRequest) {
   const auth = getAuthUser(request);
   if (!auth) {
@@ -72,11 +73,14 @@ export async function POST(request: NextRequest) {
     },
   });
 
-  // Se não sobrou nenhuma lista no MAC de origem, ele deixa de existir no painel.
-  const restantesNaOrigem = await prisma.lista.count({ where: { appId: appOrigemId } });
-  if (restantesNaOrigem === 0) {
-    await prisma.app.delete({ where: { id: appOrigemId } }).catch(() => null);
-  }
+  // A ativação já foi movida para o novo App; qualquer outra lista que
+  // ainda aponte para o MAC de origem (playlists do usuário final) fica
+  // órfã de dispositivo ativo e é apagada automaticamente, junto com o App.
+  const listasApagadas = await prisma.lista.deleteMany({ where: { appId: appOrigemId } });
+  await prisma.app.delete({ where: { id: appOrigemId } }).catch(() => null);
 
-  return NextResponse.json({ lista: listaMovida }, { status: 200 });
+  return NextResponse.json(
+    { lista: listaMovida, listasApagadas: listasApagadas.count },
+    { status: 200 }
+  );
 }
