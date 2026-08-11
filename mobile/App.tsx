@@ -27,7 +27,7 @@ import type { TranslationKey } from './src/i18n/translations';
 import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
-import { fetchDevicePlaylists, type PanelPlaylist } from './src/utils/panel-api';
+import { fetchDevicePlaylists, fetchDeviceStatus, type PanelPlaylist } from './src/utils/panel-api';
 import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
 import type { SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
@@ -165,6 +165,13 @@ function AppContent() {
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
   const [booting, setBooting] = useState(true);
+  // Freshly checked at every boot (see bootstrap) against the painel's
+  // /app/device-status, independent of whatever stale cached playlist
+  // metadata says — a device can sit on a cold, never-reopened app for
+  // weeks after its plan lapses, so this can't be inferred from the disk
+  // cache alone. While true, content screens are blocked (handleMenuPress)
+  // and the user is kept on "Minhas listas" until they pick a valid one.
+  const [expired, setExpired] = useState(false);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
   const rightTop = menuItems[2];
@@ -221,6 +228,11 @@ function AppContent() {
     // low-RAM Android TV boxes when switching between large playlists.
     setChannels([]);
     setActivePlaylistId(playlist.id);
+    // /devices (which is where `playlist` here always comes from — the
+    // painel's own playlist picker, or the "Recarregar" reload) never
+    // returns an expired lista, so activating one always clears the
+    // expired gate from bootstrap's fresh check.
+    setExpired(false);
 
     // loadFastCatalog (TV ao Vivo/Filmes straight from the Xtream API, a
     // couple of small JSON calls) and loadPlaylist (the M3U download+parse,
@@ -270,12 +282,30 @@ function AppContent() {
     const activePlaylist = cached?.panelPlaylists.find((p) => p.id === cached.activePlaylistId);
     const disk = activePlaylist ? await loadPlaylistFromDisk(activePlaylist.url, mac) : null;
 
-    if (cached && disk) {
+    // Fresh check against the painel, independent of the cached playlist
+    // metadata above — that cache is only ever refreshed when the user
+    // manually reloads, so it can't be trusted to reflect a plan that
+    // expired while the app sat untouched. `expirado` is null for a MAC
+    // that was never activated at all, which is not the "expired" case.
+    const status = await fetchDeviceStatus(mac).catch(() => null);
+    const isExpired = status?.expirado === true;
+    setExpired(isExpired);
+
+    if (cached && disk && !isExpired) {
       setPlaylists(cached.panelPlaylists);
       setActivePlaylistId(cached.activePlaylistId);
       setChannels([...disk.tv, ...disk.filmes, ...disk.series]);
       setCurrentScreen('home');
     } else {
+      // Expired: still restore whatever cached playlists/channels we have
+      // (so the "Minhas listas" screen can show what was active and its
+      // expiration date), but land on the list-switching screen instead of
+      // Home — handleMenuPress keeps the user there until they pick a
+      // playlist the painel confirms isn't expired.
+      if (isExpired && cached) {
+        setPlaylists(cached.panelPlaylists);
+        setActivePlaylistId(cached.activePlaylistId);
+      }
       setCurrentScreen('playlist');
     }
     setBooting(false);
@@ -379,6 +409,16 @@ function AppContent() {
       setReloadBlockedMessage('Aguarde o fim do carregamento...');
       return;
     }
+    // Blocks watching on an expired plan: any attempt to reach a content
+    // screen gets redirected to "Minhas listas" instead, same place
+    // bootstrap already lands the user on expired boot. "Sair"/"Recarregar"
+    // stay allowed — recarregar is how the user picks up a renewal without
+    // restarting the app.
+    if (expired && screen && screen in CONTENT_SCREENS) {
+      setReloadBlockedMessage('Sua lista expirou. Escolha uma lista válida para continuar assistindo.');
+      setCurrentScreen('playlist');
+      return;
+    }
     if (screen === 'exit') {
       setExitModalVisible(true);
     } else if (screen === 'account') {
@@ -417,7 +457,12 @@ function AppContent() {
         activePlaylistId={activePlaylistId}
         macAddress={deviceMac}
         onSelect={activatePlaylist}
-        onClose={() => setCurrentScreen('home')}
+        // No way back to Home while expired — otherwise the user could
+        // close straight back to the menu and tap "TV ao vivo" etc., which
+        // handleMenuPress would just bounce them right back here anyway,
+        // but with no explanation of why.
+        onClose={expired ? undefined : () => setCurrentScreen('home')}
+        expired={expired}
       />
     );
   }

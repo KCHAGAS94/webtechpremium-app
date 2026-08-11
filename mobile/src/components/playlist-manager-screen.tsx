@@ -11,7 +11,12 @@ type Props = {
   activePlaylistId: number | null;
   macAddress: string;
   onSelect: (playlist: PanelPlaylist) => Promise<void> | void;
-  onClose: () => void;
+  /** Omitted while `expired` — there's nowhere useful to go back to yet. */
+  onClose?: () => void;
+  /** True when the painel says the device's plan lapsed (see App.tsx's
+   * bootstrap fresh-check). Hides the close button and shows a banner
+   * explaining why the user is stuck here until they pick a valid lista. */
+  expired?: boolean;
 };
 
 function CloseButton({ onPress }: { onPress: () => void }) {
@@ -56,11 +61,30 @@ function ServerCard({
   );
 }
 
-export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress, onSelect, onClose }: Props) {
+// dataExpiracao comes back as YYYY-MM-DD (see dashboard's /api/devices) —
+// reformatted here to the DD/MM/YYYY Brazilian users expect, same as the
+// painel itself shows it (mirrors App.tsx's formatPlaylistValidity).
+function formatExpirationDate(value: string): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return value;
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress, onSelect, onClose, expired }: Props) {
   const [activatingId, setActivatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
-  const expirationDate = activePlaylist?.expiracaoData;
+  // "Vitalício" listas have no dataExpiracao at all (null in the painel) —
+  // showing "Não informada" for those was misleading, so tipo takes
+  // priority over the raw date when it says VITALICIO. Same source of
+  // truth as the painel's own "Tipo" column and App.tsx's Account modal.
+  const expirationDate =
+    activePlaylist?.tipo === 'VITALICIO'
+      ? 'Vitalício'
+      : activePlaylist?.expiracaoData
+        ? formatExpirationDate(activePlaylist.expiracaoData)
+        : null;
 
   useEffect(() => {
     if (!error) return;
@@ -89,12 +113,21 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <View style={styles.header}>
           <ThemedText style={styles.title}>Minhas listas</ThemedText>
-          <CloseButton onPress={onClose} />
+          {onClose && <CloseButton onPress={onClose} />}
         </View>
 
-        <ThemedText style={styles.subtitle}>
-          Listas vinculadas a este dispositivo no painel.
-        </ThemedText>
+        {expired ? (
+          <View style={styles.expiredBanner}>
+            <ThemedText style={styles.expiredBannerText}>
+              Sua lista expirou e não é possível assistir no momento. Escolha uma lista válida abaixo ou
+              renove sua assinatura para continuar.
+            </ThemedText>
+          </View>
+        ) : (
+          <ThemedText style={styles.subtitle}>
+            Listas vinculadas a este dispositivo no painel.
+          </ThemedText>
+        )}
 
         <View style={styles.body}>
           <ScrollView style={styles.listColumn} contentContainerStyle={styles.list}>
@@ -191,6 +224,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#c7c7e6',
     marginBottom: 16,
+  },
+  expiredBanner: {
+    backgroundColor: 'rgba(120, 0, 0, 0.35)',
+    borderWidth: 1,
+    borderColor: '#ff4d4d',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 16,
+  },
+  expiredBannerText: {
+    fontSize: 13,
+    color: '#ffdddd',
+    lineHeight: 18,
   },
   errorBanner: {
     position: 'absolute',
