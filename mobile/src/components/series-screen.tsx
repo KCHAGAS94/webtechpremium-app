@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Dimensions,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   TextInput,
@@ -743,18 +742,18 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               contentContainerStyle={styles.gridContent}
             />
           </View>
-        </View>
 
-        {/* Some IPTV panels/set-top boxes take a while to return the
-            series catalog — this overlays the whole screen (instead of a
-            bare spinner in the grid) and cycles informational messages so
-            the wait doesn't read as the app being frozen. */}
-        <Modal visible={isLoadingCatalog} animationType="fade" statusBarTranslucent navigationBarTranslucent>
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator color="#4dd6ff" size="large" />
-            <ThemedText style={styles.loadingMessage}>{LOADING_MESSAGES[loadingMessageIndex]}</ThemedText>
-          </View>
-        </Modal>
+          {/* Some IPTV panels/set-top boxes take a while to return the
+              series catalog — this overlays just the body (header/nav stays
+              visible, matching the rest of the app) and cycles informational
+              messages so the wait doesn't read as the app being frozen. */}
+          {isLoadingCatalog && (
+            <View style={styles.loadingOverlay}>
+              <ActivityIndicator color="#4dd6ff" size="large" />
+              <ThemedText style={styles.loadingMessage}>{LOADING_MESSAGES[loadingMessageIndex]}</ThemedText>
+            </View>
+          )}
+        </View>
       </SafeAreaView>
     </ThemedView>
   );
@@ -823,6 +822,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     flexDirection: 'row',
+    position: 'relative',
   },
   categoriesColumn: {
     width: 220,
@@ -890,14 +890,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   loadingOverlay: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
     paddingHorizontal: 40,
-    backgroundColor: '#0a1a5c',
+    backgroundColor: '#0a0a2e',
   },
   loadingMessage: {
     fontSize: 15,
