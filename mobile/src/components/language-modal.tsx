@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(26, 162, 255, 0.25)',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
   },
   rowFocused: {
     borderColor: '#3ddc84',
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actions: {
-    padding: 12,
+    padding: 8,
     borderTopWidth: 1,
     borderTopColor: 'rgba(26, 162, 255, 0.25)',
   },
