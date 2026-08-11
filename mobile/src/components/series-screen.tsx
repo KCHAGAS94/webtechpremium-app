@@ -1,5 +1,15 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Image } from 'expo-image';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEvent } from 'expo';
@@ -37,6 +47,18 @@ const NAV_ITEMS: { key: NavKey; labelKey: TranslationKey }[] = [
 const ALL_CATEGORY_ID = 'all';
 const FAVORITES_CATEGORY_ID = 'favorites';
 const SEARCH_DEBOUNCE_MS = 200;
+
+// Cycled by the loading modal below while the (potentially huge) series
+// catalog is still being grouped — some IPTV panels/devices take a while
+// here, so this keeps the user informed instead of staring at a bare
+// spinner and assuming the app froze.
+const LOADING_MESSAGES = [
+  'Estamos carregando as séries…',
+  '♡ Favorite as séries que mais assiste para encontrá-las mais rápido',
+  '📺 Espelhe na TV tocando no ícone de cast dentro do player',
+  '↻ Seu progresso é salvo automaticamente — continue de onde parou',
+];
+const LOADING_MESSAGE_INTERVAL_MS = 3000;
 const NUM_COLUMNS = 5;
 
 // See the identical constants in movies-screen.tsx: without a precomputed
@@ -301,6 +323,17 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   const [playingEpisode, setPlayingEpisode] = useState<SeriesEpisode | null>(null);
   const [allShows, setAllShows] = useState<SeriesShow[]>([]);
   const [isGrouping, setIsGrouping] = useState(true);
+  const [loadingMessageIndex, setLoadingMessageIndex] = useState(0);
+  const isLoadingCatalog = isGrouping && allShows.length === 0;
+
+  useEffect(() => {
+    if (!isLoadingCatalog) return;
+    setLoadingMessageIndex(0);
+    const timer = setInterval(() => {
+      setLoadingMessageIndex((i) => (i + 1) % LOADING_MESSAGES.length);
+    }, LOADING_MESSAGE_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [isLoadingCatalog]);
   // Remembers which show was last opened so the grid can restore focus/scroll
   // to it on the way back, instead of resetting to the top — the grid screen
   // fully unmounts while `viewingShow` is set (see the early `if (viewingShow)`
@@ -692,31 +725,36 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               </ThemedText>
             </View>
 
-            {isGrouping && allShows.length === 0 ? (
-              <View style={styles.loadingBox}>
-                <ActivityIndicator color="#4dd6ff" size="large" />
-              </View>
-            ) : (
-              <FlatList
-                ref={gridListRef}
-                data={sortedShows}
-                keyExtractor={showKeyExtractor}
-                renderItem={renderCard}
-                numColumns={NUM_COLUMNS}
-                extraData={[favorites, loadingShowId, lastOpenedShowId]}
-                getItemLayout={getGridItemLayout}
-                onScrollToIndexFailed={({ index }) =>
-                  setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
-                }
-                initialNumToRender={20}
-                maxToRenderPerBatch={20}
-                windowSize={7}
-                removeClippedSubviews
-                contentContainerStyle={styles.gridContent}
-              />
-            )}
+            <FlatList
+              ref={gridListRef}
+              data={sortedShows}
+              keyExtractor={showKeyExtractor}
+              renderItem={renderCard}
+              numColumns={NUM_COLUMNS}
+              extraData={[favorites, loadingShowId, lastOpenedShowId]}
+              getItemLayout={getGridItemLayout}
+              onScrollToIndexFailed={({ index }) =>
+                setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
+              }
+              initialNumToRender={20}
+              maxToRenderPerBatch={20}
+              windowSize={7}
+              removeClippedSubviews
+              contentContainerStyle={styles.gridContent}
+            />
           </View>
         </View>
+
+        {/* Some IPTV panels/set-top boxes take a while to return the
+            series catalog — this overlays the whole screen (instead of a
+            bare spinner in the grid) and cycles informational messages so
+            the wait doesn't read as the app being frozen. */}
+        <Modal visible={isLoadingCatalog} animationType="fade" statusBarTranslucent navigationBarTranslucent>
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator color="#4dd6ff" size="large" />
+            <ThemedText style={styles.loadingMessage}>{LOADING_MESSAGES[loadingMessageIndex]}</ThemedText>
+          </View>
+        </Modal>
       </SafeAreaView>
     </ThemedView>
   );
@@ -851,10 +889,22 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  loadingBox: {
+  loadingOverlay: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 16,
+    paddingHorizontal: 40,
+    backgroundColor: '#0a1a5c',
+  },
+  loadingMessage: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+    maxWidth: 420,
   },
   gridContent: {
     paddingHorizontal: 12,
