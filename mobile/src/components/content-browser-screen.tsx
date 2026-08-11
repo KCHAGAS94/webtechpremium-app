@@ -147,7 +147,7 @@ const CategoryRow = memo(function CategoryRow({
 
   return (
     <Pressable
-      style={[styles.categoryRow, focused && styles.categoryRowFocused]}
+      style={[styles.categoryRow, (focused || isActive) && styles.categoryRowFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={handlePress}
@@ -562,7 +562,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
         isFavorite={favoriteGroups.has(item.id)}
         onPress={setSelectedCategory}
         onToggleFavorite={handleToggleFavoriteGroup}
-        hasTVPreferredFocus={item.id === FAVORITES_CATEGORY_ID}
+        hasTVPreferredFocus={item.id === selectedCategory}
       />
     ),
     [selectedCategory, favoriteGroups, handleToggleFavoriteGroup]
