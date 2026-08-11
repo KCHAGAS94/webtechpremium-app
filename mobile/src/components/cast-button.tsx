@@ -1,6 +1,8 @@
-import { useState } from 'react';
-import { StyleSheet, UIManager, View, type StyleProp, type ViewStyle } from 'react-native';
-import { CastButton as GoogleCastButton } from 'react-native-google-cast';
+import { MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet, UIManager, type StyleProp, type ViewStyle } from 'react-native';
+import { CastButton as GoogleCastButton, CastContext } from 'react-native-google-cast';
+
+import { PlayerControlButton } from '@/components/player-control-button';
 
 type Props = {
   style?: StyleProp<ViewStyle>;
@@ -20,36 +22,40 @@ type Props = {
 const CAST_BUTTON_SUPPORTED = UIManager.hasViewManagerConfig('RNGoogleCastButton');
 
 /**
- * Wraps react-native-google-cast's native cast icon (Android's
- * MediaRouteButton) with the app's icon-button chrome so it sits next to the
- * favorite heart looking like the rest of the player controls. The native
- * button is already focusable and handles D-pad/keyboard OK itself — no
- * onFocus/onBlur wiring needed like the custom Pressable-based buttons.
- * Tapping it opens the system Cast device picker; once connected, the
- * screens that render this button start sending the stream to the selected
- * device (see `useCastStream` in cast-stream.ts).
- *
- * The native view still takes D-pad focus itself (it's a real focusable
- * MediaRouteButton), but gave no visual cue when the remote moved onto it —
- * it extends RN's ViewProps, so it fires onFocus/onBlur like any other view;
- * this just mirrors PlayerControlButton's highlighted-ring pattern on top.
+ * The native MediaRouteButton (rendered below, invisible) IS a real
+ * focusable Android view, but it isn't an RN Pressable — RN's bridge never
+ * wires up JS onFocus/onBlur for it, so a TV remote could move D-pad focus
+ * onto it with zero visual feedback, making the icon look dead/unreachable.
+ * Instead we render our own PlayerControlButton (same focus-ring chrome as
+ * the rest of the fullscreen player's controls) and open the Cast dialog
+ * from it programmatically via `CastContext.showCastDialog()` — which, per
+ * the library's docs, requires a CastButton to be mounted somewhere on
+ * screen (it can be hidden) for it to work at all.
  */
 export function CastButton({ style }: Props) {
-  const [focused, setFocused] = useState(false);
   if (!CAST_BUTTON_SUPPORTED) return null;
   return (
-    <View style={[styles.container, focused && styles.containerFocused, style]}>
-      <GoogleCastButton
-        style={styles.button}
-        tintColor="#fff"
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-      />
-    </View>
+    <>
+      <GoogleCastButton style={styles.hiddenNativeButton} tintColor="transparent" />
+      <PlayerControlButton
+        onPress={() => CastContext.showCastDialog()}
+        hitSlop={12}
+        style={[styles.container, style]}
+        focusedStyle={styles.containerFocused}
+      >
+        <MaterialIcons name="cast" size={20} color="#fff" />
+      </PlayerControlButton>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
+  hiddenNativeButton: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
   container: {
     width: 36,
     height: 36,
@@ -62,9 +68,5 @@ const styles = StyleSheet.create({
   containerFocused: {
     borderWidth: 2,
     borderColor: '#4dd6ff',
-  },
-  button: {
-    width: 24,
-    height: 24,
   },
 });
