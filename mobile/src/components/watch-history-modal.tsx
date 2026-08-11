@@ -191,14 +191,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   body: {
-    flexDirection: 'row',
+    flexDirection: 'column',
   },
   sideActions: {
-    width: 160,
+    flexDirection: 'row',
     padding: 16,
     gap: 12,
-    borderRightWidth: 1,
-    borderRightColor: 'rgba(26, 162, 255, 0.25)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(26, 162, 255, 0.25)',
   },
   empty: {
     paddingVertical: 32,
@@ -302,10 +302,10 @@ const styles = StyleSheet.create({
 // smaller box/list so the whole modal reliably fits phone screen heights.
 const mobileStyles = StyleSheet.create({
   box: {
-    width: 360,
+    width: 760,
+    minHeight: 320,
   },
   sideActions: {
-    width: 120,
     padding: 10,
     gap: 8,
   },
