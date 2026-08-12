@@ -29,7 +29,7 @@ import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, fetchDeviceStatus, type PanelPlaylist } from './src/utils/panel-api';
 import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
-import type { SeriesMeta } from './src/utils/xtream-api';
+import { fetchAccountExpiration, parseXtreamCredentials, type SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
 import { popBackAction, useBackStackEntry } from './src/utils/back-stack';
 
@@ -191,6 +191,37 @@ function AppContent() {
   // so tipo takes priority over the raw date when it says VITALICIO.
   const playlistValidity =
     activePlaylist?.tipo === 'VITALICIO' ? 'Vitalício' : activePlaylist?.expiracaoData;
+  // Same idea as playlist-manager-screen.tsx's Minhas listas: the painel's
+  // own dataExpiracao/tipo are filled in manually at ativação time and can
+  // drift from the truth, so the provider's own Xtream account (exp_date) is
+  // tried first and playlistValidity above is only the fallback for
+  // non-Xtream lists or while this fetch is pending/fails.
+  const [xtreamExpiration, setXtreamExpiration] = useState<Date | null | undefined>(undefined);
+  useEffect(() => {
+    setXtreamExpiration(undefined);
+    if (!activePlaylist) return;
+    const credentials = parseXtreamCredentials(activePlaylist.url);
+    if (!credentials) {
+      setXtreamExpiration(null);
+      return;
+    }
+    let cancelled = false;
+    fetchAccountExpiration(credentials)
+      .then((date) => {
+        if (!cancelled) setXtreamExpiration(date);
+      })
+      .catch(() => {
+        if (!cancelled) setXtreamExpiration(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePlaylist]);
+  const displayedValidity = xtreamExpiration
+    ? xtreamExpiration.toLocaleDateString('pt-BR')
+    : playlistValidity
+      ? formatPlaylistValidity(playlistValidity)
+      : null;
   // Same source of truth as the painel's own "Expirado" column (see
   // /api/devices) — undefined only for playlists the user added themselves
   // rather than activated through the painel, which have no such status.
@@ -631,9 +662,9 @@ function AppContent() {
             </View>
           </View>
 
-          {!!playlistValidity && (
+          {!!displayedValidity && (
             <Text allowFontScaling={false} style={styles.playlistExpirationLabel}>
-              Data expira lista: {formatPlaylistValidity(playlistValidity)}
+              Data expira lista: {displayedValidity}
             </Text>
           )}
 
@@ -701,7 +732,7 @@ function AppContent() {
             <View style={styles.accountRow}>
               <Text allowFontScaling={false} style={styles.accountRowLabel}>Data de validade</Text>
               <Text allowFontScaling={false} style={styles.accountRowValue}>
-                {playlistValidity || 'Não informada'}
+                {displayedValidity || 'Não informada'}
               </Text>
             </View>
             <Text allowFontScaling={false} style={styles.accountRenewHint}>
