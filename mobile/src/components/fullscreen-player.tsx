@@ -263,6 +263,21 @@ export function FullscreenPlayer({
           </View>
         )}
 
+        {/* Mirrors content-browser-screen's expandHint (⤢) that got the user
+            into fullscreen — kept visible independent of controlsVisible so
+            there's always an obvious way back to the windowed preview,
+            instead of only the top bar's back button that's hidden most of
+            the time behind the auto-hide timer. */}
+        {status !== 'error' && (
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.shrinkHint, { bottom: insets.bottom + 12 }]}
+            hitSlop={12}
+          >
+            <ThemedText style={styles.shrinkHintIcon}>⤡</ThemedText>
+          </TouchableOpacity>
+        )}
+
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
             <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
@@ -433,6 +448,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#4dd6ff',
+  },
+  shrinkHint: {
+    position: 'absolute',
+    left: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  shrinkHintIcon: {
+    fontSize: 16,
+    color: '#fff',
   },
   topBar: {
     flexDirection: 'row',
