@@ -342,9 +342,10 @@ const styles = StyleSheet.create({
   macPanel: {
     width: 320,
     paddingHorizontal: 24,
-    paddingVertical: 26,
+    paddingTop: 4,
+    paddingBottom: 26,
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   expirationValue: {
     fontSize: 16,
