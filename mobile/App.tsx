@@ -165,6 +165,13 @@ function AppContent() {
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
   const [booting, setBooting] = useState(true);
+  // Full-screen progress shown while activatePlaylist downloads+parses a
+  // freshly activated playlist's M3U (Séries) — without this, currentScreen
+  // flipped to 'home' as soon as the fast Xtream catalog landed while that
+  // download/parse kept running invisibly in the background, so early taps
+  // went unanswered and looked like the app had frozen/crashed rather than
+  // still loading.
+  const [activationProgress, setActivationProgress] = useState<number | null>(null);
   // Freshly checked at every boot (see bootstrap) against the painel's
   // /app/device-status, independent of whatever stale cached playlist
   // metadata says — a device can sit on a cold, never-reopened app for
@@ -234,23 +241,30 @@ function AppContent() {
     // expired gate from bootstrap's fresh check.
     setExpired(false);
 
+    // Keeps the user on a full-screen progress bar (instead of an
+    // apparently-ready-but-unresponsive Home) until the full M3U
+    // download+parse below finishes — see the activationProgress comment.
+    setActivationProgress(0);
+
     // loadFastCatalog (TV ao Vivo/Filmes straight from the Xtream API, a
     // couple of small JSON calls) and loadPlaylist (the M3U download+parse,
     // still needed for Séries and for persisting the file boot reads back)
-    // run concurrently. Whichever finishes first — normally the fast
-    // catalog, since it doesn't scale with playlist size — puts the user on
-    // Home able to watch immediately, instead of making Live/Filmes wait on
-    // however long the M3U takes.
-    const fullPromise = loadPlaylist(playlist.url, mac);
+    // run concurrently, but Home isn't shown until both are done — see
+    // activationProgress.
+    const fullPromise = loadPlaylist(playlist.url, mac, (progress) => {
+      if (progress.totalLines > 0) {
+        setActivationProgress(progress.processedLines / progress.totalLines);
+      }
+    });
     const fast = await loadFastCatalog(playlist.url).catch(() => null);
     if (fast) {
       setChannels([...fast.tv, ...fast.filmes]);
-      setCurrentScreen('home');
     }
 
     const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await fullPromise;
     setChannels([...(fast?.tv ?? tv), ...(fast?.filmes ?? filmes), ...series]);
     setCurrentScreen('home');
+    setActivationProgress(null);
     if (freshSeriesMeta) {
       setSeriesMetaByShowName(freshSeriesMeta);
     }
@@ -342,6 +356,10 @@ function AppContent() {
 
   if (booting) {
     return <BootLoadingScreen />;
+  }
+
+  if (activationProgress !== null) {
+    return <BootLoadingScreen text="Carregando sua lista..." progress={activationProgress} />;
   }
 
   const handleReloadPlaylist = async () => {

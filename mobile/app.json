@@ -21,7 +21,7 @@
       "permissions": [
         "android.permission.WRITE_SETTINGS"
       ],
-      "versionCode": 13
+      "versionCode": 14
     },
     "ios": {
       "bundleIdentifier": "com.webtechpremium.app"

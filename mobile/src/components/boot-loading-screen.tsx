@@ -5,14 +5,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 
+type BootLoadingScreenProps = {
+  text?: string;
+  /** 0-1. Omitted (or undefined) falls back to the indeterminate spinner —
+   * used whenever there's no byte-level progress to report yet (e.g. still
+   * waiting on the download to start). */
+  progress?: number;
+};
+
 /**
  * Shown for the brief window between app mount and the boot effect in
  * App.tsx resolving (checking cached channels/playlist, or — first run —
- * hitting the painel). Without this, that gap rendered whatever screen
- * `currentScreen` defaulted to with empty data, which read as broken rather
- * than loading.
+ * hitting the painel), and reused by activatePlaylist while it downloads +
+ * parses a freshly activated playlist's full M3U — without it, that second
+ * case let the user land on a Home that looked ready but wasn't (channels
+ * still loading in the background), so taps went unanswered and it read as
+ * the app being frozen/buggy instead of just working.
  */
-export function BootLoadingScreen() {
+export function BootLoadingScreen({ text = 'Carregando sua lista...', progress }: BootLoadingScreenProps) {
+  const showBar = typeof progress === 'number' && Number.isFinite(progress);
+  const pct = showBar ? Math.max(0, Math.min(1, progress as number)) : 0;
+
   return (
     <LinearGradient
       colors={['#04041a', '#0a0a2e', '#04041a']}
@@ -27,8 +40,16 @@ export function BootLoadingScreen() {
             style={styles.logo}
             resizeMode="contain"
           />
-          <ActivityIndicator color="#4dd6ff" size="large" />
-          <ThemedText style={styles.text}>Carregando sua lista...</ThemedText>
+          {showBar ? (
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${Math.round(pct * 100)}%` }]} />
+            </View>
+          ) : (
+            <ActivityIndicator color="#4dd6ff" size="large" />
+          )}
+          <ThemedText style={styles.text}>
+            {showBar ? `${text} ${Math.round(pct * 100)}%` : text}
+          </ThemedText>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -55,5 +76,17 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 14,
     color: '#c7c7e6',
+  },
+  progressTrack: {
+    width: 220,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#1a1a3d',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 4,
+    backgroundColor: '#4dd6ff',
   },
 });
