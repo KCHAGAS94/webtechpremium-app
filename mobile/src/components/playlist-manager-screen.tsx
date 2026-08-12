@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { PanelPlaylist } from '@/utils/panel-api';
+import { fetchAccountExpiration, parseXtreamCredentials } from '@/utils/xtream-api';
 
 type Props = {
   playlists: PanelPlaylist[];
@@ -75,16 +76,46 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
   const [activatingId, setActivatingId] = useState<number | null>(null);
   const [error, setError] = useState('');
   const activePlaylist = playlists.find((p) => p.id === activePlaylistId);
-  // "Vitalício" listas have no dataExpiracao at all (null in the painel) —
-  // showing "Não informada" for those was misleading, so tipo takes
-  // priority over the raw date when it says VITALICIO. Same source of
-  // truth as the painel's own "Tipo" column and App.tsx's Account modal.
-  const expirationDate =
+  // The painel's own Lista.dataExpiracao/tipo are filled in manually at
+  // ativação time and can drift from the truth (a lista created before the
+  // tipo column existed, a provider that extends a plan on their own side
+  // without the reseller updating the painel, ...) — the provider's own
+  // Xtream account (get_account_info's exp_date) is the real source of
+  // truth, so that's tried first and the painel fields are only the
+  // fallback for non-Xtream (plain M3U) lists or while that fetch is
+  // pending/fails.
+  const [xtreamExpiration, setXtreamExpiration] = useState<Date | null | undefined>(undefined);
+
+  useEffect(() => {
+    setXtreamExpiration(undefined);
+    if (!activePlaylist) return;
+    const credentials = parseXtreamCredentials(activePlaylist.url);
+    if (!credentials) {
+      setXtreamExpiration(null);
+      return;
+    }
+    let cancelled = false;
+    fetchAccountExpiration(credentials)
+      .then((date) => {
+        if (!cancelled) setXtreamExpiration(date);
+      })
+      .catch(() => {
+        if (!cancelled) setXtreamExpiration(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activePlaylist]);
+
+  const painelExpirationDate =
     activePlaylist?.tipo === 'VITALICIO'
       ? 'Vitalício'
       : activePlaylist?.expiracaoData
         ? formatExpirationDate(activePlaylist.expiracaoData)
         : null;
+  const expirationDate = xtreamExpiration
+    ? xtreamExpiration.toLocaleDateString('pt-BR')
+    : painelExpirationDate;
 
   useEffect(() => {
     if (!error) return;

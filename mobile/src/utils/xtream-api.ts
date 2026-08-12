@@ -397,6 +397,29 @@ export async function fetchVodMovies(creds: XtreamCredentials): Promise<M3uChann
   }));
 }
 
+/**
+ * Calling player_api.php with no `action` param returns Xtream's own account
+ * info instead of a stream list — `exp_date` there is the provider's real
+ * plan validity (Unix seconds, or the literal string "0"/null for an
+ * unlimited/no-expiry account), independent of whatever the painel's own
+ * Lista.dataExpiracao/tipo says. That painel field is filled in manually at
+ * ativação time and can drift from the truth (e.g. a lista created before
+ * the tipo column existed, or a provider that extends a plan on their own
+ * side without the reseller updating the painel) — this hits the same
+ * source of truth "Minhas listas" ultimately depends on.
+ */
+export async function fetchAccountExpiration(creds: XtreamCredentials): Promise<Date | null> {
+  const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}`;
+  const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const data = await response.json();
+  const expDate = data?.user_info?.exp_date;
+  if (expDate === null || expDate === undefined || expDate === '' || expDate === '0') return null;
+  const seconds = Number(expDate);
+  if (!Number.isFinite(seconds) || seconds <= 0) return null;
+  return new Date(seconds * 1000);
+}
+
 export async function fetchLiveGenreByName(creds: XtreamCredentials): Promise<Map<string, string>> {
   const [categories, streams] = await Promise.all([
     fetchXtream<VodCategory[]>(creds, 'get_live_categories'),
