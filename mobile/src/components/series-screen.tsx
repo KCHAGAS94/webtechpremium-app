@@ -1,7 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
@@ -59,21 +58,6 @@ const LOADING_MESSAGES = [
 ];
 const LOADING_MESSAGE_INTERVAL_MS = 3000;
 const NUM_COLUMNS = 5;
-
-// See the identical constants in movies-screen.tsx: without a precomputed
-// row height, FlatList has to measure each grid row as it scrolls/focuses
-// into view instead of jumping straight to it — on a large catalog that's
-// what makes the D-pad feel like it takes a moment to catch up after every
-// arrow press. Mirrors the `card`/`poster`/`cardTitle` styles below exactly.
-const CATEGORIES_COLUMN_WIDTH = 221; // styles.categoriesColumn width (220) + its 1px border
-const GRID_HORIZONTAL_PADDING = 24; // styles.gridContent paddingHorizontal (12) * 2
-const CARD_PADDING = 16; // styles.card padding (8) * 2
-const CARD_GAP = 6; // styles.card gap
-const CARD_TITLE_HEIGHT = 32; // styles.cardTitle: 2 lines at fontSize 12
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CARD_WIDTH = (SCREEN_WIDTH - CATEGORIES_COLUMN_WIDTH - GRID_HORIZONTAL_PADDING) / NUM_COLUMNS;
-const POSTER_HEIGHT = ((CARD_WIDTH - CARD_PADDING) * 3) / 2;
-const GRID_ROW_HEIGHT = CARD_PADDING + POSTER_HEIGHT + CARD_GAP + CARD_TITLE_HEIGHT;
 
 type Category = {
   id: string;
@@ -611,11 +595,6 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   const categoryKeyExtractor = useCallback((item: Category) => item.id, []);
   const showKeyExtractor = useCallback((item: SeriesShow) => item.id, []);
 
-  const getGridItemLayout = useCallback((_: unknown, index: number) => {
-    const row = Math.floor(index / NUM_COLUMNS);
-    return { length: GRID_ROW_HEIGHT, offset: GRID_ROW_HEIGHT * row, index };
-  }, []);
-
   if (viewingShow) {
     return (
       <>
@@ -731,14 +710,12 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
               extraData={[favorites, loadingShowId, lastOpenedShowId]}
-              getItemLayout={getGridItemLayout}
               onScrollToIndexFailed={({ index }) =>
                 setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
               }
               initialNumToRender={20}
               maxToRenderPerBatch={20}
               windowSize={7}
-              removeClippedSubviews
               contentContainerStyle={styles.gridContent}
             />
           </View>
