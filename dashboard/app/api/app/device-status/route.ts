@@ -3,11 +3,16 @@ import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
 
 // Backs the "Endereço MAC / Status / Expiração" card on the app's
-// "Gerenciar suas playlists" screen. A device can have more than one Lista
-// (e.g. one registered by the reseller in "Ativação App" and one pasted by
-// the end user in-app), so we take the one with the furthest-out
-// dataExpiracao and derive status from that, instead of the first one
-// created — a device counts as active as long as ANY of its lists is valid.
+// "Gerenciar suas playlists" screen, and the "Conta" modal's "Estado da
+// conta"/"Data de validade" rows. A device can have more than one Lista —
+// the "Ativação App" row (tipo ANUAL/VITALICIO, no url — see
+// /api/painel/listas' POST) that represents the MAC's actual plan with the
+// reseller, plus zero or more playlist rows (tipo null, url set, own
+// expiracaoData) added either by the reseller in "Usuários" or by the end
+// user in-app. Those playlist dates are about specific credentials, not the
+// device's plan, so this endpoint prefers the tipo'd ativação row — falling
+// back to the furthest-out dataExpiracao among the rest only for older
+// devices activated before `tipo` existed (see schema.prisma comment).
 export async function GET(request: NextRequest) {
   const mac = request.nextUrl.searchParams.get('mac');
   if (!mac) {
@@ -20,20 +25,25 @@ export async function GET(request: NextRequest) {
   });
 
   if (listas.length === 0) {
-    return NextResponse.json({ mac: macAddress, dataExpiracao: null, expirado: null }, { status: 200 });
+    return NextResponse.json({ mac: macAddress, dataExpiracao: null, expirado: null, tipo: null }, { status: 200 });
   }
 
-  const maisRecente = listas.reduce((max, lista) => {
-    if (!max.dataExpiracao) return lista;
-    if (!lista.dataExpiracao) return max;
-    return lista.dataExpiracao > max.dataExpiracao ? lista : max;
-  });
+  const ativacao = listas.find((lista) => lista.tipo !== null);
+
+  const maisRecente =
+    ativacao ??
+    listas.reduce((max, lista) => {
+      if (!max.dataExpiracao) return max;
+      if (!lista.dataExpiracao) return lista;
+      return lista.dataExpiracao > max.dataExpiracao ? lista : max;
+    });
 
   return NextResponse.json(
     {
       mac: macAddress,
       dataExpiracao: maisRecente.dataExpiracao ? maisRecente.dataExpiracao.toISOString().slice(0, 10) : null,
       expirado: isExpirado(maisRecente.dataExpiracao),
+      tipo: maisRecente.tipo,
     },
     { status: 200 }
   );

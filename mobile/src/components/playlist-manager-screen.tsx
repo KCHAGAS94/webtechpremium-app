@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import type { PanelPlaylist } from '@/utils/panel-api';
+import { fetchDeviceStatus, type DeviceStatus, type PanelPlaylist } from '@/utils/panel-api';
 import { fetchAccountExpiration, parseXtreamCredentials } from '@/utils/xtream-api';
 
 type Props = {
@@ -107,15 +107,46 @@ export function PlaylistManagerScreen({ playlists, activePlaylistId, macAddress,
     };
   }, [activePlaylist]);
 
+  // The MAC's own ativação record (tipo + dataExpiracao from "Ativação
+  // App"), independent of which specific playlist is active — a device can
+  // have a Vitalício ativação plus a separately-dated playlist credential,
+  // and this card means the former (see the same fetch in App.tsx's
+  // bootstrap/accountValidity).
+  const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
+  useEffect(() => {
+    if (!macAddress) return;
+    let cancelled = false;
+    fetchDeviceStatus(macAddress)
+      .then((status) => {
+        if (!cancelled) setDeviceStatus(status);
+      })
+      .catch(() => {
+        if (!cancelled) setDeviceStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [macAddress]);
+
   const painelExpirationDate =
     activePlaylist?.tipo === 'VITALICIO'
       ? 'Vitalício'
       : activePlaylist?.expiracaoData
         ? formatExpirationDate(activePlaylist.expiracaoData)
         : null;
-  const expirationDate = xtreamExpiration
-    ? xtreamExpiration.toLocaleDateString('pt-BR')
-    : painelExpirationDate;
+  // Prefers the device's ativação record over the active playlist's own
+  // painel/Xtream date — falls back to the playlist for older devices with
+  // no ativação record at all.
+  const expirationDate =
+    deviceStatus?.tipo === 'VITALICIO'
+      ? 'Vitalício'
+      : deviceStatus?.dataExpiracao
+        ? formatExpirationDate(deviceStatus.dataExpiracao)
+        : painelExpirationDate
+          ? painelExpirationDate
+          : xtreamExpiration
+            ? xtreamExpiration.toLocaleDateString('pt-BR')
+            : null;
 
   useEffect(() => {
     if (!error) return;

@@ -27,7 +27,7 @@ import type { TranslationKey } from './src/i18n/translations';
 import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
-import { fetchDevicePlaylists, fetchDeviceStatus, type PanelPlaylist } from './src/utils/panel-api';
+import { fetchDevicePlaylists, fetchDeviceStatus, type DeviceStatus, type PanelPlaylist } from './src/utils/panel-api';
 import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
 import { fetchAccountExpiration, parseXtreamCredentials, type SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
@@ -179,6 +179,12 @@ function AppContent() {
   // cache alone. While true, content screens are blocked (handleMenuPress)
   // and the user is kept on "Minhas listas" until they pick a valid one.
   const [expired, setExpired] = useState(false);
+  // The MAC's actual ativação/plan (tipo + dataExpiracao), as opposed to
+  // whichever playlist happens to be active — backs the "Conta" modal so it
+  // reflects the reseller's "Ativação App" record instead of one playlist's
+  // own expiracaoData. Set alongside `expired` in bootstrap (see
+  // fetchDeviceStatus there).
+  const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
   const rightTop = menuItems[2];
@@ -222,11 +228,38 @@ function AppContent() {
     : playlistValidity
       ? formatPlaylistValidity(playlistValidity)
       : null;
-  // Same source of truth as the painel's own "Expirado" column (see
-  // /api/devices) — undefined only for playlists the user added themselves
-  // rather than activated through the painel, which have no such status.
+  // The "Conta" modal shows the MAC's own ativação record from the painel
+  // (deviceStatus, from "Ativação App" — tipo + dataExpiracao) rather than
+  // whichever playlist happens to be active: a device can have a Vitalício
+  // ativação plus a separately-dated playlist credential, and "Conta" means
+  // the former, not the latter. Falls back to the active playlist's own
+  // painel/Xtream date only when the device has no ativação record at all
+  // (e.g. an older device or a playlist added without going through
+  // "Ativação App").
+  const accountValidity =
+    deviceStatus?.tipo === 'VITALICIO'
+      ? 'Vitalício'
+      : deviceStatus?.dataExpiracao
+        ? formatPlaylistValidity(deviceStatus.dataExpiracao)
+        : playlistValidity
+          ? formatPlaylistValidity(playlistValidity)
+          : xtreamExpiration
+            ? xtreamExpiration.toLocaleDateString('pt-BR')
+            : null;
+  // Same source of truth as the painel's own "Expirado" column, from the
+  // device's own ativação record (deviceStatus) rather than one playlist's
+  // `expirado` — falls back to the playlist's status only when the device
+  // has no ativação record fetched yet/at all.
   const accountStatus =
-    activePlaylist?.expirado === undefined ? null : activePlaylist.expirado ? 'Expirado' : 'Ativo';
+    deviceStatus?.expirado != null
+      ? deviceStatus.expirado
+        ? 'Expirado'
+        : 'Ativo'
+      : activePlaylist?.expirado === undefined
+        ? null
+        : activePlaylist.expirado
+          ? 'Expirado'
+          : 'Ativo';
 
   useEffect(() => {
     if (!reloadBlockedMessage) return;
@@ -335,6 +368,7 @@ function AppContent() {
     const status = await fetchDeviceStatus(mac).catch(() => null);
     const isExpired = status?.expirado === true;
     setExpired(isExpired);
+    setDeviceStatus(status);
 
     if (cached && disk && !isExpired) {
       setPlaylists(cached.panelPlaylists);
@@ -732,7 +766,7 @@ function AppContent() {
             <View style={styles.accountRow}>
               <Text allowFontScaling={false} style={styles.accountRowLabel}>Data de validade</Text>
               <Text allowFontScaling={false} style={styles.accountRowValue}>
-                {displayedValidity || 'Não informada'}
+                {accountValidity || 'Não informada'}
               </Text>
             </View>
             <Text allowFontScaling={false} style={styles.accountRenewHint}>

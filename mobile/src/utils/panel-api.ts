@@ -37,6 +37,9 @@ export type DeviceStatus = {
   mac: string;
   dataExpiracao: string | null;
   expirado: boolean | null;
+  /** ANUAL | VITALICIO | null — the MAC's actual plan with the reseller
+   * (from "Ativação App"), as opposed to any one playlist's own date. */
+  tipo?: 'ANUAL' | 'VITALICIO' | null;
 };
 
 // Backs the boot-time "did this device's plan expire?" check — unlike
