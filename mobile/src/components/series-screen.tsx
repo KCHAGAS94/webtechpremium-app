@@ -123,7 +123,7 @@ const CategoryRow = memo(function CategoryRow({
   const [focused, setFocused] = useState(false);
   return (
     <Pressable
-      style={[styles.categoryRow, focused && styles.categoryRowFocused]}
+      style={[styles.categoryRow, (focused || isActive) && styles.categoryRowFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item.id)}

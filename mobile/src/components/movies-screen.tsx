@@ -90,7 +90,7 @@ const CategoryRow = memo(function CategoryRow({
   const [focused, setFocused] = useState(!!hasTVPreferredFocus);
   return (
     <Pressable
-      style={[styles.categoryRow, focused && styles.categoryRowFocused]}
+      style={[styles.categoryRow, (focused || isActive) && styles.categoryRowFocused]}
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       onPress={() => onPress(item.id)}
@@ -453,7 +453,7 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
         item={item}
         isActive={item.id === selectedCategory}
         onPress={setSelectedCategory}
-        hasTVPreferredFocus={item.id === CONTINUE_WATCHING_CATEGORY_ID}
+        hasTVPreferredFocus={item.id === selectedCategory}
       />
     ),
     [selectedCategory]
