@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
+import { corsPreflight, withCors } from '@/lib/cors';
+
+export function OPTIONS() {
+  return corsPreflight();
+}
 
 // A device polling for the first time has no App/Lista rows yet. We register
 // it here (rather than requiring a reseller to type the MAC in manually) so
@@ -43,7 +48,7 @@ async function registerDevice(macAddress: string) {
 export async function GET(request: NextRequest) {
   const mac = request.nextUrl.searchParams.get('mac');
   if (!mac) {
-    return NextResponse.json({ error: 'Parâmetro mac é obrigatório' }, { status: 400 });
+    return withCors(NextResponse.json({ error: 'Parâmetro mac é obrigatório' }, { status: 400 }));
   }
 
   const macAddress = mac.toUpperCase();
@@ -77,5 +82,5 @@ export async function GET(request: NextRequest) {
       expirado: isExpirado(lista.dataExpiracao),
     }));
 
-  return NextResponse.json(playlists, { status: 200 });
+  return withCors(NextResponse.json(playlists, { status: 200 }));
 }

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
+import { corsPreflight, withCors } from '@/lib/cors';
+
+export function OPTIONS() {
+  return corsPreflight();
+}
 
 // Backs the "Endereço MAC / Status / Expiração" card on the app's
 // "Gerenciar suas playlists" screen, and the "Conta" modal's "Estado da
@@ -16,7 +21,7 @@ import { isExpirado } from '@/lib/hls-url';
 export async function GET(request: NextRequest) {
   const mac = request.nextUrl.searchParams.get('mac');
   if (!mac) {
-    return NextResponse.json({ error: 'Parâmetro mac é obrigatório' }, { status: 400 });
+    return withCors(NextResponse.json({ error: 'Parâmetro mac é obrigatório' }, { status: 400 }));
   }
 
   const macAddress = mac.toUpperCase();
@@ -25,7 +30,9 @@ export async function GET(request: NextRequest) {
   });
 
   if (listas.length === 0) {
-    return NextResponse.json({ mac: macAddress, dataExpiracao: null, expirado: null, tipo: null }, { status: 200 });
+    return withCors(
+      NextResponse.json({ mac: macAddress, dataExpiracao: null, expirado: null, tipo: null }, { status: 200 })
+    );
   }
 
   const ativacao = listas.find((lista) => lista.tipo !== null);
@@ -38,13 +45,15 @@ export async function GET(request: NextRequest) {
       return lista.dataExpiracao > max.dataExpiracao ? lista : max;
     });
 
-  return NextResponse.json(
-    {
-      mac: macAddress,
-      dataExpiracao: maisRecente.dataExpiracao ? maisRecente.dataExpiracao.toISOString().slice(0, 10) : null,
-      expirado: isExpirado(maisRecente.dataExpiracao),
-      tipo: maisRecente.tipo,
-    },
-    { status: 200 }
+  return withCors(
+    NextResponse.json(
+      {
+        mac: macAddress,
+        dataExpiracao: maisRecente.dataExpiracao ? maisRecente.dataExpiracao.toISOString().slice(0, 10) : null,
+        expirado: isExpirado(maisRecente.dataExpiracao),
+        tipo: maisRecente.tipo,
+      },
+      { status: 200 }
+    )
   );
 }
