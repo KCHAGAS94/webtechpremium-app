@@ -664,7 +664,7 @@ function AppContent() {
 
           {!!displayedValidity && (
             <Text allowFontScaling={false} style={styles.playlistExpirationLabel}>
-              Data expira lista: {displayedValidity}
+              Data expira lista: <Text allowFontScaling={false} style={styles.playlistExpirationValue}>{displayedValidity}</Text>
             </Text>
           )}
 
@@ -887,8 +887,11 @@ const styles = StyleSheet.create({
   playlistExpirationLabel: {
     textAlign: 'center',
     color: '#8888aa',
-    fontSize: 13,
+    fontSize: 18,
     marginBottom: 12,
+  },
+  playlistExpirationValue: {
+    fontWeight: 'bold',
   },
   reloadErrorBanner: {
     position: 'absolute',
