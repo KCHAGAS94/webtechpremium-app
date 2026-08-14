@@ -19,6 +19,12 @@ export type SeriesShow = {
   id: string;
   name: string;
   logo: string;
+  // Xtream/TMDB cover, kept even when `logo` (the provider's own tvg-logo)
+  // is present — some providers tag episodes with a logo URL that's dead/
+  // blocked, which permanently blanks the poster since there'd otherwise be
+  // no other source to fall back to. PosterCard (series-screen.tsx) retries
+  // with this if `logo` fails to load.
+  logoFallback?: string;
   groupTitle: string;
   seasons: number[];
   episodesBySeason: Map<number, SeriesEpisode[]>;
@@ -139,6 +145,7 @@ export async function groupSeriesShows(
         // tag a handful of episodes per show with a logo, so relying on the
         // M3U alone left some shows permanently stuck without a poster.
         logo: channel.logo || meta?.cover || '',
+        logoFallback: meta?.cover,
         groupTitle: meta?.genre ?? channel.groupTitle,
         seasons: [],
         episodesBySeason: new Map(),

@@ -149,12 +149,12 @@ const CategoryRow = memo(function CategoryRow({
   );
 });
 
-// Posters intermittently fail to load on a native build (transient
-// network/CDN blip) and expo-image doesn't retry on its own — without this
-// the card is left permanently blank instead of showing the artwork.
-// `retryKey` forces a fresh Image mount (new request) on each attempt.
-const POSTER_MAX_RETRIES = 2;
-
+// The provider's own tvg-logo (item.logo) is sometimes a dead/blocked URL —
+// that permanently blanks the poster since expo-image doesn't retry on its
+// own. `sourceIndex` walks [logo, logoFallback] (the Xtream/TMDB cover) in
+// order, falling through to the next candidate on error before giving up to
+// the placeholder icon. `attempt` forces a fresh Image mount per try (also
+// covers plain transient network blips on an otherwise-good URL).
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
@@ -167,8 +167,13 @@ const PosterCard = memo(function PosterCard({
   hasTVPreferredFocus?: boolean;
 }) {
   const [focused, setFocused] = useState(!!hasTVPreferredFocus);
-  const [retryKey, setRetryKey] = useState(0);
-  const [failed, setFailed] = useState(false);
+  const [sourceIndex, setSourceIndex] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+  const sources = useMemo(
+    () => [item.logo, item.logoFallback].filter((uri, i, arr): uri is string => !!uri && arr.indexOf(uri) === i),
+    [item.logo, item.logoFallback]
+  );
+  const currentSource = sources[sourceIndex];
   return (
     <Pressable
       style={[styles.card, focused && styles.cardFocused]}
@@ -177,17 +182,18 @@ const PosterCard = memo(function PosterCard({
       onPress={() => onPress(item)}
       hasTVPreferredFocus={hasTVPreferredFocus}
     >
-      {item.logo && !failed ? (
+      {currentSource ? (
         <Image
-          key={retryKey}
-          source={{ uri: item.logo }}
+          key={`${sourceIndex}-${attempt}`}
+          source={{ uri: currentSource }}
           style={styles.poster}
           contentFit="cover"
           onError={() => {
-            if (retryKey < POSTER_MAX_RETRIES) {
-              setRetryKey((k) => k + 1);
-            } else {
-              setFailed(true);
+            if (attempt < 1) {
+              setAttempt((a) => a + 1);
+            } else if (sourceIndex < sources.length - 1) {
+              setSourceIndex((i) => i + 1);
+              setAttempt(0);
             }
           }}
         />
