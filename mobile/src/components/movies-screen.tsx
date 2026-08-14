@@ -34,12 +34,16 @@ const FAVORITES_CATEGORY_ID = 'favorites';
 const CONTINUE_WATCHING_CATEGORY_ID = 'continue';
 const SEARCH_DEBOUNCE_MS = 200;
 const NUM_COLUMNS = 5;
-// Matches styles.card's paddingVertical (8+8) and the fixed-ish height of a
-// 2-line title below the poster — used by getItemLayout below so
-// scrollToIndex can jump straight to a row without FlatList needing to
-// render/measure everything in between first (what made restoring a scroll
-// position past the first render batch unreliable).
+// Matches styles.card's paddingVertical (8+8), its internal poster/title
+// gap (6), and the fixed-ish height of a 2-line title below the poster —
+// used by getItemLayout below so scrollToIndex can jump straight to a row
+// without FlatList needing to render/measure everything in between first
+// (what made restoring a scroll position past the first render batch
+// unreliable). Missing the gap here undercounts every row by a few px,
+// which on a large catalog accumulates into an offset drift large enough
+// that FlatList scrolls to blank, unrendered space.
 const CARD_VERTICAL_PADDING = 16;
+const CARD_GAP = 6;
 const CARD_TITLE_HEIGHT = 32;
 
 type Category = {
@@ -407,7 +411,7 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
     if (!gridWidth) return 0;
     const cardWidth = gridWidth / NUM_COLUMNS;
     const posterHeight = cardWidth * (3 / 2);
-    return posterHeight + CARD_TITLE_HEIGHT + CARD_VERTICAL_PADDING;
+    return posterHeight + CARD_TITLE_HEIGHT + CARD_VERTICAL_PADDING + CARD_GAP;
   }, [gridWidth]);
 
   // Without this, scrollToIndex can only reliably reach whatever FlatList
