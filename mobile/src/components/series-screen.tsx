@@ -32,6 +32,7 @@ import {
   type WatchHistoryEntry,
 } from '@/utils/watch-history-storage';
 import { normalizeSearchText } from '@/utils/text-normalize';
+import { useBackStackEntry } from '@/utils/back-stack';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
 
@@ -58,6 +59,13 @@ const LOADING_MESSAGES = [
 ];
 const LOADING_MESSAGE_INTERVAL_MS = 3000;
 const NUM_COLUMNS = 5;
+// Matches styles.card's paddingVertical (8+8) and the fixed-ish height of a
+// 2-line title below the poster — used by getItemLayout below so
+// scrollToIndex can jump straight to a row without FlatList needing to
+// render/measure everything in between first (what made restoring a scroll
+// position past the first render batch unreliable).
+const CARD_VERTICAL_PADDING = 16;
+const CARD_TITLE_HEIGHT = 32;
 
 type Category = {
   id: string;
@@ -324,6 +332,8 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   // read back from the FlatList's own scroll state; it has to be kept here.
   const gridListRef = useRef<FlatList<SeriesShow>>(null);
   const [lastOpenedShowId, setLastOpenedShowId] = useState<string | null>(null);
+  // Measured once the grid column lays out — feeds getItemLayout below.
+  const [gridWidth, setGridWidth] = useState(0);
   // Cycles Adicionado → A-Z → Z-A → Adicionado on each tap of the sort
   // button (see handleToggleSort/SORT_LABEL below).
   const [sortMode, setSortMode] = useState<SortMode>('added');
@@ -538,6 +548,32 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     setViewingShow(null);
   }, []);
 
+  // Lets the TV remote/hardware back key close the show's details screen
+  // first (restoring the grid's scroll position via the effect above)
+  // instead of App.tsx's own back-stack entry for the whole "series" screen
+  // firing first and unmounting this component straight to Home.
+  useBackStackEntry(!!viewingShow, handleCloseShow);
+
+  const itemHeight = useMemo(() => {
+    if (!gridWidth) return 0;
+    const cardWidth = gridWidth / NUM_COLUMNS;
+    const posterHeight = cardWidth * (3 / 2);
+    return posterHeight + CARD_TITLE_HEIGHT + CARD_VERTICAL_PADDING;
+  }, [gridWidth]);
+
+  // Without this, scrollToIndex can only reliably reach whatever FlatList
+  // has already rendered/measured (its initial batch) — restoring a scroll
+  // position a few rows in worked, but anything further down the list
+  // (bigger catalogs, deeper scroll) silently failed or landed wrong. This
+  // lets it jump straight to the row's offset instead.
+  const getItemLayout = useCallback(
+    (_: ArrayLike<SeriesShow> | null | undefined, index: number) => {
+      const row = Math.floor(index / NUM_COLUMNS);
+      return { length: itemHeight, offset: itemHeight * row, index };
+    },
+    [itemHeight]
+  );
+
   const handlePlayEpisode = useCallback((episode: SeriesEpisode) => {
     setPlayingEpisode(episode);
   }, []);
@@ -710,8 +746,13 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
               extraData={[favorites, loadingShowId, lastOpenedShowId]}
+              onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}
+              getItemLayout={itemHeight ? getItemLayout : undefined}
               onScrollToIndexFailed={({ index }) =>
-                setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
+                setTimeout(
+                  () => gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }),
+                  50
+                )
               }
               initialNumToRender={20}
               maxToRenderPerBatch={20}

@@ -18,6 +18,7 @@ import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
 import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { loadWatchHistory, upsertWatchHistoryProgress, type WatchHistoryEntry } from '@/utils/watch-history-storage';
 import { normalizeSearchText } from '@/utils/text-normalize';
+import { useBackStackEntry } from '@/utils/back-stack';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
 
@@ -33,6 +34,13 @@ const FAVORITES_CATEGORY_ID = 'favorites';
 const CONTINUE_WATCHING_CATEGORY_ID = 'continue';
 const SEARCH_DEBOUNCE_MS = 200;
 const NUM_COLUMNS = 5;
+// Matches styles.card's paddingVertical (8+8) and the fixed-ish height of a
+// 2-line title below the poster — used by getItemLayout below so
+// scrollToIndex can jump straight to a row without FlatList needing to
+// render/measure everything in between first (what made restoring a scroll
+// position past the first render batch unreliable).
+const CARD_VERTICAL_PADDING = 16;
+const CARD_TITLE_HEIGHT = 32;
 
 type Category = {
   id: string;
@@ -296,6 +304,8 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   // identical pattern (and fuller explanation) in series-screen.tsx.
   const gridListRef = useRef<FlatList<M3uChannel>>(null);
   const [lastOpenedMovieId, setLastOpenedMovieId] = useState<string | null>(null);
+  // Measured once the grid column lays out — feeds getItemLayout below.
+  const [gridWidth, setGridWidth] = useState(0);
   // Cycles Adicionado → A-Z → Z-A → Adicionado on each tap of the sort
   // button (see handleToggleSort/sortLabelText below).
   const [sortMode, setSortMode] = useState<SortMode>('added');
@@ -386,6 +396,32 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   const handleCloseDetails = useCallback(() => {
     setViewingMovie(null);
   }, []);
+
+  // Lets the TV remote/hardware back key close the details screen first
+  // (restoring the grid's scroll position via the effect below) instead of
+  // App.tsx's own back-stack entry for the whole "movies" screen firing
+  // first and unmounting this component straight to Home.
+  useBackStackEntry(!!viewingMovie, handleCloseDetails);
+
+  const itemHeight = useMemo(() => {
+    if (!gridWidth) return 0;
+    const cardWidth = gridWidth / NUM_COLUMNS;
+    const posterHeight = cardWidth * (3 / 2);
+    return posterHeight + CARD_TITLE_HEIGHT + CARD_VERTICAL_PADDING;
+  }, [gridWidth]);
+
+  // Without this, scrollToIndex can only reliably reach whatever FlatList
+  // has already rendered/measured (its initial batch) — restoring a scroll
+  // position a few rows in worked, but anything further down the list
+  // (bigger catalogs, deeper scroll) silently failed or landed wrong. This
+  // lets it jump straight to the row's offset instead.
+  const getItemLayout = useCallback(
+    (_: ArrayLike<M3uChannel> | null | undefined, index: number) => {
+      const row = Math.floor(index / NUM_COLUMNS);
+      return { length: itemHeight, offset: itemHeight * row, index };
+    },
+    [itemHeight]
+  );
 
   // Runs after the grid remounts (the whole screen, including this FlatList,
   // unmounts while a movie's details are open and mounts fresh once closed —
@@ -579,8 +615,13 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
               extraData={[favorites, lastOpenedMovieId]}
+              onLayout={(e) => setGridWidth(e.nativeEvent.layout.width)}
+              getItemLayout={itemHeight ? getItemLayout : undefined}
               onScrollToIndexFailed={({ index }) =>
-                setTimeout(() => gridListRef.current?.scrollToIndex({ index, animated: false }), 50)
+                setTimeout(
+                  () => gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }),
+                  50
+                )
               }
               initialNumToRender={20}
               maxToRenderPerBatch={20}
