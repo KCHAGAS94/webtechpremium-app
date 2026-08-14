@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ActivationStatusModal } from './src/components/activation-status-modal';
 import { BootLoadingScreen } from './src/components/boot-loading-screen';
 import { ContentBrowserScreen, type NavKey } from './src/components/content-browser-screen';
 import { DeviceActivationScreen } from './src/components/device-activation-screen';
@@ -185,6 +186,15 @@ function AppContent() {
   // own expiracaoData. Set alongside `expired` in bootstrap (see
   // fetchDeviceStatus there).
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus | null>(null);
+  // Backs the "Verificar status do app" button on ActivationStatusModal —
+  // separate from `booting` since this re-check happens after boot, on
+  // whatever screen is already mounted, without re-running the rest of
+  // bootstrap (cached channels etc. stay untouched).
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  // Shown on ActivationStatusModal right after a check finishes and the MAC
+  // is still not active — tells the user to go activate it in the painel
+  // instead of the button appearing to do nothing.
+  const [notActiveMessage, setNotActiveMessage] = useState<string | null>(null);
   const tvItem = menuItems[0];
   const centerTop = menuItems[1];
   const rightTop = menuItems[2];
@@ -246,6 +256,12 @@ function AppContent() {
           : xtreamExpiration
             ? xtreamExpiration.toLocaleDateString('pt-BR')
             : null;
+  // Drives ActivationStatusModal: true only once the painel has explicitly
+  // confirmed this MAC as active (expirado: false). `null` (never linked to
+  // an "Ativação App" record) and a failed/not-yet-run fetch both count as
+  // "not active" here, same as `true` — additive to the existing `expired`
+  // gate above, not a replacement for it.
+  const isAppActive = deviceStatus?.expirado === false;
   // Same source of truth as the painel's own "Expirado" column, from the
   // device's own ativação record (deviceStatus) rather than one playlist's
   // `expirado` — falls back to the playlist's status only when the device
@@ -427,6 +443,26 @@ function AppContent() {
     return <BootLoadingScreen text="Carregando sua lista..." progress={activationProgress} />;
   }
 
+  // "Verificar status do app" on ActivationStatusModal — re-polls the painel
+  // for this MAC's ativação record so the modal can close as soon as a
+  // reseller links/activates it, without requiring a full app restart.
+  const handleCheckStatus = async () => {
+    setCheckingStatus(true);
+    setNotActiveMessage(null);
+    try {
+      const status = await fetchDeviceStatus(deviceMac);
+      setDeviceStatus(status);
+      if (status?.expirado !== false) {
+        setNotActiveMessage('MAC ainda não está ativo. Ative-o no painel e tente novamente.');
+      }
+    } catch {
+      // Painel unreachable — leave deviceStatus as-is, modal stays open.
+      setNotActiveMessage('Não foi possível consultar o painel. Tente novamente.');
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
   const handleReloadPlaylist = async () => {
     setReloadingPlaylist(true);
     setReloadPlaylistError('');
@@ -522,80 +558,119 @@ function AppContent() {
     });
   };
 
+  // Overlaid on top of whichever screen renders below (Modal is a native
+  // portal, so it doesn't matter which branch returns) whenever the painel
+  // hasn't confirmed this MAC as active — see isAppActive above. Additive to
+  // every existing screen/return below; none of them had to change.
+  const activationModal = (
+    <ActivationStatusModal
+      visible={!isAppActive}
+      macAddress={deviceMac}
+      // Only shows the real date/tipo once the painel actually confirms the
+      // MAC as active — otherwise accountValidity can still hold a stale
+      // record (e.g. an already-expired ativação) that would misleadingly
+      // read as "Vitalício"/a date while this modal is telling the user the
+      // device isn't active.
+      expirationLabel={isAppActive ? accountValidity : null}
+      checking={checkingStatus}
+      onCheckStatus={handleCheckStatus}
+      notActiveMessage={notActiveMessage}
+    />
+  );
+
   if (currentScreen === 'playlist') {
     if (playlists.length === 0) {
       return (
-        <DeviceActivationScreen
-          macAddress={deviceMac}
-          onReload={handleReloadPlaylist}
-          error={reloadPlaylistError}
-          reloading={reloadingPlaylist}
-        />
+        <>
+          <DeviceActivationScreen
+            macAddress={deviceMac}
+            onReload={handleReloadPlaylist}
+            error={reloadPlaylistError}
+            reloading={reloadingPlaylist}
+          />
+          {activationModal}
+        </>
       );
     }
 
     return (
-      <PlaylistManagerScreen
-        playlists={playlists}
-        activePlaylistId={activePlaylistId}
-        macAddress={deviceMac}
-        onSelect={activatePlaylist}
-        // No way back to Home while expired — otherwise the user could
-        // close straight back to the menu and tap "TV ao vivo" etc., which
-        // handleMenuPress would just bounce them right back here anyway,
-        // but with no explanation of why.
-        onClose={expired ? undefined : () => setCurrentScreen('home')}
-        expired={expired}
-      />
+      <>
+        <PlaylistManagerScreen
+          playlists={playlists}
+          activePlaylistId={activePlaylistId}
+          macAddress={deviceMac}
+          onSelect={activatePlaylist}
+          // No way back to Home while expired — otherwise the user could
+          // close straight back to the menu and tap "TV ao vivo" etc., which
+          // handleMenuPress would just bounce them right back here anyway,
+          // but with no explanation of why.
+          onClose={expired ? undefined : () => setCurrentScreen('home')}
+          expired={expired}
+        />
+        {activationModal}
+      </>
     );
   }
 
   if (currentScreen === 'movies') {
     return (
-      <MoviesScreen
-        channels={channels}
-        playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
-        activeNav="movies"
-        onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
-      />
+      <>
+        <MoviesScreen
+          channels={channels}
+          playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
+          activeNav="movies"
+          onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+        />
+        {activationModal}
+      </>
     );
   }
 
   if (currentScreen === 'series') {
     return (
-      <SeriesScreen
-        channels={channels}
-        metaByShowName={seriesMetaByShowName}
-        playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
-        activeNav="series"
-        onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
-      />
+      <>
+        <SeriesScreen
+          channels={channels}
+          metaByShowName={seriesMetaByShowName}
+          playlistUrl={playlists.find((p) => p.id === activePlaylistId)?.url ?? ''}
+          activeNav="series"
+          onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+        />
+        {activationModal}
+      </>
     );
   }
 
   if (currentScreen === 'settings') {
     return (
-      <SettingsScreen
-        onBack={() => setCurrentScreen('home')}
-        channels={channels}
-        seriesMetaByShowName={seriesMetaByShowName}
-      />
+      <>
+        <SettingsScreen
+          onBack={() => setCurrentScreen('home')}
+          channels={channels}
+          seriesMetaByShowName={seriesMetaByShowName}
+        />
+        {activationModal}
+      </>
     );
   }
 
   const contentCategory = CONTENT_SCREENS[currentScreen];
   if (contentCategory) {
     return (
-      <ContentBrowserScreen
-        channels={channels}
-        category={contentCategory}
-        activeNav={currentScreen === 'tv' ? 'live' : (currentScreen as NavKey)}
-        onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
-      />
+      <>
+        <ContentBrowserScreen
+          channels={channels}
+          category={contentCategory}
+          activeNav={currentScreen === 'tv' ? 'live' : (currentScreen as NavKey)}
+          onNavigate={(key) => setCurrentScreen(key === 'live' ? 'tv' : key)}
+        />
+        {activationModal}
+      </>
     );
   }
 
   return (
+    <>
     <LinearGradient
       colors={['#050042', '#0d0569', '#050042']}
       start={{ x: 0, y: 0 }}
@@ -787,6 +862,8 @@ function AppContent() {
         </View>
       </Modal>
     </LinearGradient>
+    {activationModal}
+    </>
   );
 }
 
