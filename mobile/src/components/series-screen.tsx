@@ -149,6 +149,12 @@ const CategoryRow = memo(function CategoryRow({
   );
 });
 
+// Posters intermittently fail to load on a native build (transient
+// network/CDN blip) and expo-image doesn't retry on its own — without this
+// the card is left permanently blank instead of showing the artwork.
+// `retryKey` forces a fresh Image mount (new request) on each attempt.
+const POSTER_MAX_RETRIES = 2;
+
 const PosterCard = memo(function PosterCard({
   item,
   onPress,
@@ -161,6 +167,8 @@ const PosterCard = memo(function PosterCard({
   hasTVPreferredFocus?: boolean;
 }) {
   const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  const [retryKey, setRetryKey] = useState(0);
+  const [failed, setFailed] = useState(false);
   return (
     <Pressable
       style={[styles.card, focused && styles.cardFocused]}
@@ -169,8 +177,20 @@ const PosterCard = memo(function PosterCard({
       onPress={() => onPress(item)}
       hasTVPreferredFocus={hasTVPreferredFocus}
     >
-      {item.logo ? (
-        <Image source={{ uri: item.logo }} style={styles.poster} contentFit="cover" />
+      {item.logo && !failed ? (
+        <Image
+          key={retryKey}
+          source={{ uri: item.logo }}
+          style={styles.poster}
+          contentFit="cover"
+          onError={() => {
+            if (retryKey < POSTER_MAX_RETRIES) {
+              setRetryKey((k) => k + 1);
+            } else {
+              setFailed(true);
+            }
+          }}
+        />
       ) : (
         <View style={[styles.poster, styles.posterPlaceholder]}>
           <ThemedText style={styles.posterPlaceholderIcon}>📺</ThemedText>
@@ -762,6 +782,13 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               initialNumToRender={20}
               maxToRenderPerBatch={20}
               windowSize={7}
+              // Android defaults FlatList to removeClippedSubviews=true when
+              // unset. Combined with async poster images (expo-image/Glide),
+              // recycled cells sometimes never repaint after the image
+              // finishes loading off-screen — the bitmap is cached but the
+              // view stays blank. Explicitly disabling it trades a little
+              // memory for correct rendering on a catalog this size.
+              removeClippedSubviews={false}
               contentContainerStyle={styles.gridContent}
             />
           </View>
