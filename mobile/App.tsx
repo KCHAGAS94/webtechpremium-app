@@ -386,7 +386,19 @@ function AppContent() {
     setExpired(isExpired);
     setDeviceStatus(status);
 
-    if (cached && disk && !isExpired) {
+    // Independent check: does the painel actually have an M3U lista linked
+    // to this MAC right now? A device can have disk/cache left over from a
+    // lista that was since unlinked or never had a URL to begin with (a
+    // reseller can register the MAC in "Usuários" without pasting a link),
+    // and device-status alone doesn't catch that — it only looks at whether
+    // a Lista row exists and isn't expired, not whether it has a usable url.
+    // `null` here means the painel couldn't be reached at all, which must
+    // NOT be treated as "no lista" — that keeps the offline-cache fallback
+    // below working.
+    const panelPlaylists = await fetchDevicePlaylists(mac).catch(() => null);
+    const noListaLinked = panelPlaylists !== null && panelPlaylists.length === 0;
+
+    if (cached && disk && !isExpired && !noListaLinked) {
       setPlaylists(cached.panelPlaylists);
       setActivePlaylistId(cached.activePlaylistId);
       setChannels([...disk.tv, ...disk.filmes, ...disk.series]);
@@ -396,8 +408,12 @@ function AppContent() {
       // (so the "Minhas listas" screen can show what was active and its
       // expiration date), but land on the list-switching screen instead of
       // Home — handleMenuPress keeps the user there until they pick a
-      // playlist the painel confirms isn't expired.
-      if (isExpired && cached) {
+      // playlist the painel confirms isn't expired. Skipped when
+      // noListaLinked — showing a card for a lista the painel no longer has
+      // on file would be misleading, so playlists is left empty and
+      // DeviceActivationScreen ("Recarregar Lista") shows instead of
+      // PlaylistManagerScreen (see currentScreen === 'playlist' below).
+      if (isExpired && cached && !noListaLinked) {
         setPlaylists(cached.panelPlaylists);
         setActivePlaylistId(cached.activePlaylistId);
       }
@@ -505,7 +521,14 @@ function AppContent() {
     try {
       const panelPlaylists = await fetchDevicePlaylists(deviceMac);
       if (panelPlaylists.length === 0) {
-        setReloadChannelsError('Nenhuma lista vinculada a este MAC ainda no painel.');
+        // No lista linked anymore (unlinked, or never had a url) — same
+        // "não tem lista" case bootstrap checks for. Drop whatever's
+        // playing and send the user to DeviceActivationScreen instead of
+        // leaving stale, no-longer-backed channels playable on Home.
+        setPlaylists([]);
+        setActivePlaylistId(null);
+        setChannels([]);
+        setCurrentScreen('playlist');
         return;
       }
       setPlaylists(panelPlaylists);
