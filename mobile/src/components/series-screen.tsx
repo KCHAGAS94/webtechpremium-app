@@ -71,6 +71,12 @@ const NUM_COLUMNS = 5;
 const CARD_VERTICAL_PADDING = 16;
 const CARD_GAP = 6;
 const CARD_TITLE_HEIGHT = 32;
+// styles.gridContent's paddingHorizontal (12) * 2 — the FlatList itself
+// measures full column width via onLayout, but cards are laid out inside
+// this padded content area, so leaving it out overestimates each card's
+// (and thus each row's) height, drifting getItemLayout's offsets the same
+// way the missing CARD_GAP did.
+const GRID_HORIZONTAL_PADDING = 24;
 
 type Category = {
   id: string;
@@ -587,7 +593,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
 
   const itemHeight = useMemo(() => {
     if (!gridWidth) return 0;
-    const cardWidth = gridWidth / NUM_COLUMNS;
+    const cardWidth = (gridWidth - GRID_HORIZONTAL_PADDING) / NUM_COLUMNS;
     const posterHeight = cardWidth * (3 / 2);
     return posterHeight + CARD_TITLE_HEIGHT + CARD_VERTICAL_PADDING + CARD_GAP;
   }, [gridWidth]);
