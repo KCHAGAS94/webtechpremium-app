@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,6 +13,18 @@ type BootLoadingScreenProps = {
   progress?: number;
 };
 
+// Cycled above the logo while the boot fetch/parse (or a fresh playlist
+// download) is running — same idea as series-screen.tsx's loading modal:
+// gives the user something to read instead of staring at a bare spinner
+// long enough to start wondering if the app is frozen.
+const TIPS = [
+  '♡ Favorite os filmes e séries que mais assiste para encontrá-los mais rápido',
+  '📺 Espelhe na TV tocando no ícone de cast dentro do player',
+  '↻ Seu progresso é salvo automaticamente — continue de onde parou',
+  '💬 Configure tamanho, cor e fundo da legenda em Configurações > Configurações de legenda',
+];
+const TIP_INTERVAL_MS = 3000;
+
 /**
  * Shown for the brief window between app mount and the boot effect in
  * App.tsx resolving (checking cached channels/playlist, or — first run —
@@ -26,6 +38,14 @@ export function BootLoadingScreen({ text = 'Carregando sua lista...', progress }
   const showBar = typeof progress === 'number' && Number.isFinite(progress);
   const pct = showBar ? Math.max(0, Math.min(1, progress as number)) : 0;
 
+  const [tipIndex, setTipIndex] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTipIndex((i) => (i + 1) % TIPS.length);
+    }, TIP_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
   return (
     <LinearGradient
       colors={['#04041a', '#0a0a2e', '#04041a']}
@@ -35,6 +55,7 @@ export function BootLoadingScreen({ text = 'Carregando sua lista...', progress }
     >
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.content}>
+          <ThemedText style={styles.tip}>{TIPS[tipIndex]}</ThemedText>
           <Image
             source={require('@/assets/images/logo_quadrada_sem_fundo.png')}
             style={styles.logo}
@@ -72,6 +93,12 @@ const styles = StyleSheet.create({
   logo: {
     width: 140,
     height: 140,
+  },
+  tip: {
+    fontSize: 13,
+    color: '#c7c7e6',
+    textAlign: 'center',
+    maxWidth: 320,
   },
   text: {
     fontSize: 14,
