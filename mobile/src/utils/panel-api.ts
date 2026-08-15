@@ -30,7 +30,16 @@ export async function fetchDevicePlaylists(mac: string): Promise<PanelPlaylist[]
   }
 
   const data = await response.json();
-  return Array.isArray(data) ? (data as PanelPlaylist[]) : [];
+  // An HTTP 200 with a non-array body (partial response, error page under a
+  // heavy query, etc.) is a malformed response, not "device has no lista" —
+  // conflating the two made App.tsx's bootstrap wipe a perfectly good cached
+  // catalog whenever the painel hiccuped instead of falling back to it (see
+  // App.tsx's `.catch(() => null)` around this call, which only guards
+  // against a rejected fetch, not a 200 with garbage inside).
+  if (!Array.isArray(data)) {
+    throw new Error('Resposta inesperada do painel ao buscar listas do dispositivo.');
+  }
+  return data as PanelPlaylist[];
 }
 
 export type DeviceStatus = {
