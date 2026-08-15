@@ -48,6 +48,11 @@ type Props = {
    * series episodes `title` is "Show - S01E02" (display-only), which never
    * matches a real subtitle; pass the plain show name here instead. */
   subtitleSearchTitle?: string;
+  /** Season/episode of the episode being played — required alongside
+   * subtitleSearchTitle for SubDL to search as a TV episode instead of a
+   * movie. Omit for actual movies. */
+  subtitleSeason?: number;
+  subtitleEpisode?: number;
 };
 
 function formatTime(totalSeconds: number): string {
@@ -103,6 +108,8 @@ export function MoviePlayer({
   onToggleFavorite,
   onClose,
   subtitleSearchTitle,
+  subtitleSeason,
+  subtitleEpisode,
 }: Props) {
   const [controlsVisible, setControlsVisible] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -187,42 +194,70 @@ export function MoviePlayer({
   // itself is applied explicitly below, once, via the same code path the
   // 💬 button uses, so both give the same feedback instead of the initial
   // auto-enable silently skipping the toast/fetch-retry logic.
+  //
+  // The saved font size/color only apply while "habilitar legendas" itself
+  // is on in Configurações — turning that off but still switching subtitles
+  // on for this one playback (the 💬 button) falls back to the plain
+  // default look instead of a stale custom style the user just told the
+  // app they don't want active.
   useEffect(() => {
     let cancelled = false;
     loadSubtitleSettings().then((settings) => {
-      if (!cancelled) setSubtitleStyle(settings);
+      if (!cancelled) setSubtitleStyle(settings.enabled ? settings : DEFAULT_SUBTITLE_STYLE);
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Turns subtitles on: prefers a native track already in the stream, then
-  // falls back to OpenSubtitles. Always reports what happened via a toast —
-  // re-running this on every toggle-on (not gated to "once per playback")
-  // is what lets a failed attempt be retried by just toggling again.
+  // Turns subtitles on: prefers our own fetched SubDL cues, rendered through
+  // SubtitleOverlay, so the size/color/background the user picked in
+  // Configurações actually shows up — expo-video's native subtitleTrack
+  // rendering (used below as a fallback) is a fixed OS-drawn style that
+  // can't be customized at all (confirmed against the SDK docs), so leaning
+  // on it first silently ignored every subtitle setting whenever the stream
+  // happened to carry an embedded track. Only falls back to that native
+  // track when SubDL has nothing for this title. Always reports what
+  // happened via a toast — re-running this on every toggle-on (not gated to
+  // "once per playback") is what lets a failed attempt be retried by just
+  // toggling again.
   const activateSubtitles = useCallback(async () => {
-    if (availableSubtitleTracks.length > 0) {
-      if (!player.subtitleTrack) player.subtitleTrack = availableSubtitleTracks[0];
-      showSubtitleToast('Legenda ativada');
-      return;
-    }
     if (subtitleCues.length > 0) {
       showSubtitleToast('Legenda ativada');
       return;
     }
     setSubtitlesLoading(true);
-    const { cues, connectionError } = await fetchSubtitleCues({ title: subtitleSearchTitle ?? title, year });
+    const { cues, connectionError } = await fetchSubtitleCues({
+      title: subtitleSearchTitle ?? title,
+      year,
+      season: subtitleSeason,
+      episode: subtitleEpisode,
+    });
     setSubtitlesLoading(false);
-    setSubtitleCues(cues);
+    if (cues.length > 0) {
+      setSubtitleCues(cues);
+      showSubtitleToast('Legenda encontrada');
+      return;
+    }
+    if (availableSubtitleTracks.length > 0) {
+      if (!player.subtitleTrack) player.subtitleTrack = availableSubtitleTracks[0];
+      showSubtitleToast('Legenda ativada (estilo padrão do player — não encontramos uma legenda para aplicar seu estilo)');
+      return;
+    }
     showSubtitleToast(
-      cues.length > 0
-        ? 'Legenda encontrada'
-        : connectionError
-          ? 'Erro de conexão ao buscar legenda'
-          : 'Legenda não encontrada para este título'
+      connectionError ? 'Erro de conexão ao buscar legenda' : 'Legenda não encontrada para este título'
     );
-  }, [availableSubtitleTracks, player, subtitleCues.length, subtitleSearchTitle, title, year, showSubtitleToast]);
+  }, [
+    availableSubtitleTracks,
+    player,
+    subtitleCues.length,
+    subtitleSearchTitle,
+    subtitleSeason,
+    subtitleEpisode,
+    title,
+    year,
+    showSubtitleToast,
+  ]);
 
   // "habilitar legendas" in Configurações auto-activates once per playback,
   // through the same `activateSubtitles` the button uses.

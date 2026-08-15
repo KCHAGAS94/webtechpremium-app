@@ -1,7 +1,7 @@
 import JSZip from 'jszip';
 
 import { SUBDL_API_KEY } from '@/config/subdl';
-import { parseSrt, type SubtitleCue } from './srt-parser';
+import { decodeSrtBytes, parseSrt, type SubtitleCue } from './srt-parser';
 
 const SEARCH_URL = 'https://api.subdl.com/api/v1/subtitles';
 const DOWNLOAD_HOST = 'https://dl.subdl.com';
@@ -10,6 +10,12 @@ const REQUEST_TIMEOUT_MS = 8000;
 type SearchParams = {
   title: string;
   year?: string | null;
+  /** Season/episode of the specific episode being played — SubDL treats a
+   * search as a movie lookup unless `type=tv` plus both of these are sent,
+   * so omitting them for a series either finds nothing or returns whatever
+   * unrelated subtitle matched the show's name alone. */
+  season?: number;
+  episode?: number;
 };
 
 export type SubtitleFetchResult = {
@@ -32,7 +38,7 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}): Promise
 // SubDL (unlike OpenSubtitles' free "consumer" tier) explicitly supports
 // being embedded in a third-party app on its free key — search + download,
 // 2,000 requests/day, no separate "resolve a download link" round trip.
-export async function fetchSubtitleCues({ title, year }: SearchParams): Promise<SubtitleFetchResult> {
+export async function fetchSubtitleCues({ title, year, season, episode }: SearchParams): Promise<SubtitleFetchResult> {
   if (!SUBDL_API_KEY) {
     console.warn('[subtitles] sem EXPO_PUBLIC_SUBDL_API_KEY configurada — pulando busca.');
     return { cues: [], connectionError: false };
@@ -54,8 +60,13 @@ export async function fetchSubtitleCues({ title, year }: SearchParams): Promise<
       languages: 'PT',
     });
     if (year) searchParams.set('year', year);
+    if (season != null && episode != null) {
+      searchParams.set('type', 'tv');
+      searchParams.set('season_number', String(season));
+      searchParams.set('episode_number', String(episode));
+    }
 
-    console.warn('[subtitles] buscando (subdl)', { title: sanitizedTitle, year });
+    console.warn('[subtitles] buscando (subdl)', { title: sanitizedTitle, year, season, episode });
     const searchResponse = await fetchWithTimeout(`${SEARCH_URL}?${searchParams.toString()}`);
     if (!searchResponse.ok) {
       console.warn('[subtitles] busca falhou', searchResponse.status, await searchResponse.text());
@@ -88,8 +99,11 @@ export async function fetchSubtitleCues({ title, year }: SearchParams): Promise<
       console.warn('[subtitles] nenhum .srt dentro do .zip');
       return { cues: [], connectionError: true };
     }
-    const srtContent = await srtEntry.async('text');
-    const cues = parseSrt(srtContent);
+    // Not `.async('text')` — that always assumes UTF-8, and these releases
+    // are frequently Windows-1252/Latin-1 (see decodeSrtBytes for why that
+    // matters).
+    const srtBytes = await srtEntry.async('uint8array');
+    const cues = parseSrt(decodeSrtBytes(srtBytes));
     console.warn('[subtitles] cues parseados', cues.length);
     return { cues, connectionError: false };
   } catch (err) {

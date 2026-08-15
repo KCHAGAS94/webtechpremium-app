@@ -304,6 +304,8 @@ function SeriesVodPlayer({
         title={title}
         streamUrl={episode.channel.url}
         subtitleSearchTitle={showName}
+        subtitleSeason={episode.season}
+        subtitleEpisode={episode.episode}
         isFavorite={isFavorite}
         onToggleFavorite={onToggleFavorite}
         onClose={onClose}
