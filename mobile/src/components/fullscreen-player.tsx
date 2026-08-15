@@ -283,15 +283,17 @@ export function FullscreenPlayer({
             <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
               <PlayerControlButton
                 onPress={onClose}
-                style={styles.backButton}
+                style={styles.backGroup}
                 focusedStyle={styles.backButtonFocused}
                 hitSlop={12}
               >
-                <ThemedText style={styles.backIcon}>‹</ThemedText>
+                <View style={styles.backButton}>
+                  <ThemedText style={styles.backIcon}>‹</ThemedText>
+                </View>
+                <ThemedText style={styles.title} numberOfLines={1}>
+                  {title}
+                </ThemedText>
               </PlayerControlButton>
-              <ThemedText style={styles.title} numberOfLines={1}>
-                {title}
-              </ThemedText>
               <CastButton />
               <PlayerControlButton
                 onPress={onToggleFavorite}
@@ -467,8 +469,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 40,
     paddingTop: 16,
+  },
+  backGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
   },
   backButton: {
     width: 36,
@@ -516,7 +524,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 56,
   },
   centerControls: {
     flexDirection: 'row',

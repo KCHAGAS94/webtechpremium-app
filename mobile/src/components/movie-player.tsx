@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 40,
     paddingTop: 16,
   },
   topBarLeft: {
@@ -665,7 +665,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 56,
   },
   centerControls: {
     flexDirection: 'row',
