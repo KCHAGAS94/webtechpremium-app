@@ -46,6 +46,14 @@ const NAV_ITEMS: { key: NavKey; labelKey: TranslationKey }[] = [
 const ALL_CATEGORY_ID = 'all';
 const FAVORITES_CATEGORY_ID = 'favorites';
 const SEARCH_DEBOUNCE_MS = 200;
+// get_series/get_series_categories occasionally hiccups the same way the
+// painel's own API does (a transient timeout/edge-cache miss, not a real
+// "this MAC has no series") — without a retry, that one failed request
+// permanently left the grid on "Tudo(0)" until the user backed out to
+// Filmes and back in, which just re-ran this effect and got lucky on the
+// second try. Retrying here does the same thing automatically.
+const FETCH_SERIES_MAX_RETRIES = 2;
+const FETCH_SERIES_RETRY_DELAY_MS = 1200;
 
 // Cycled by the loading modal below while the (potentially huge) series
 // catalog is still being grouped — some IPTV panels/devices take a while
@@ -401,16 +409,27 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
     if (credentials) {
       let cancelled = false;
       setIsGrouping(true);
-      fetchSeriesShows(credentials)
-        .then((shows) => {
-          if (!cancelled) {
-            setAllShows(shows);
-            setIsGrouping(false);
+
+      const loadWithRetries = async () => {
+        for (let attempt = 0; attempt <= FETCH_SERIES_MAX_RETRIES; attempt++) {
+          try {
+            const shows = await fetchSeriesShows(credentials);
+            if (!cancelled) {
+              setAllShows(shows);
+              setIsGrouping(false);
+            }
+            return;
+          } catch {
+            if (cancelled) return;
+            if (attempt < FETCH_SERIES_MAX_RETRIES) {
+              await new Promise((resolve) => setTimeout(resolve, FETCH_SERIES_RETRY_DELAY_MS));
+            }
           }
-        })
-        .catch(() => {
-          if (!cancelled) setIsGrouping(false);
-        });
+        }
+        if (!cancelled) setIsGrouping(false);
+      };
+      loadWithRetries();
+
       return () => {
         cancelled = true;
       };
