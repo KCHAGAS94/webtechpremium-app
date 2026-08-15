@@ -75,10 +75,12 @@ export function FullscreenPlayer({
   useKeepAwake();
 
   useEffect(() => {
-    NavigationBar.setVisibilityAsync('hidden');
+    NavigationBar.setPositionAsync('absolute');
     NavigationBar.setBehaviorAsync('overlay-swipe');
+    NavigationBar.setVisibilityAsync('hidden');
     return () => {
       NavigationBar.setVisibilityAsync('visible');
+      NavigationBar.setPositionAsync('relative');
     };
   }, []);
 
@@ -224,6 +226,16 @@ export function FullscreenPlayer({
       onRequestClose={onClose}
       statusBarTranslucent
       navigationBarTranslucent
+      onShow={() => {
+        // RN's Modal opens its own Android Dialog window, so the Activity's
+        // system-bar flags set in the mount effect above don't carry over to
+        // it — the nav bar (and, on some devices, the status bar) can pop
+        // back up as soon as the dialog window is created. Re-apply once the
+        // dialog has actually shown so the immersive state sticks.
+        NavigationBar.setPositionAsync('absolute');
+        NavigationBar.setBehaviorAsync('overlay-swipe');
+        NavigationBar.setVisibilityAsync('hidden');
+      }}
     >
       <StatusBar hidden />
       <View style={styles.container}>
@@ -263,20 +275,6 @@ export function FullscreenPlayer({
           </View>
         )}
 
-        {/* Mirrors content-browser-screen's expandHint (⤢) that got the user
-            into fullscreen — kept visible independent of controlsVisible so
-            there's always an obvious way back to the windowed preview,
-            instead of only the top bar's back button that's hidden most of
-            the time behind the auto-hide timer. */}
-        {status !== 'error' && (
-          <TouchableOpacity
-            onPress={onClose}
-            style={[styles.shrinkHint, { bottom: insets.bottom + 12 }]}
-            hitSlop={12}
-          >
-            <ThemedText style={styles.shrinkHintIcon}>⤡</ThemedText>
-          </TouchableOpacity>
-        )}
 
         {controlsVisible && (
           <View style={styles.overlay} pointerEvents="box-none">
@@ -450,20 +448,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#4dd6ff',
-  },
-  shrinkHint: {
-    position: 'absolute',
-    left: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  shrinkHintIcon: {
-    fontSize: 16,
-    color: '#fff',
   },
   topBar: {
     flexDirection: 'row',

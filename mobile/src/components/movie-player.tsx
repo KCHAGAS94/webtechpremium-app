@@ -128,10 +128,12 @@ export function MoviePlayer({
   useKeepAwake();
 
   useEffect(() => {
-    NavigationBar.setVisibilityAsync('hidden');
+    NavigationBar.setPositionAsync('absolute');
     NavigationBar.setBehaviorAsync('overlay-swipe');
+    NavigationBar.setVisibilityAsync('hidden');
     return () => {
       NavigationBar.setVisibilityAsync('visible');
+      NavigationBar.setPositionAsync('relative');
     };
   }, []);
 
@@ -395,6 +397,11 @@ export function MoviePlayer({
       onRequestClose={handleRequestExit}
       statusBarTranslucent
       navigationBarTranslucent
+      onShow={() => {
+        NavigationBar.setPositionAsync('absolute');
+        NavigationBar.setBehaviorAsync('overlay-swipe');
+        NavigationBar.setVisibilityAsync('hidden');
+      }}
     >
       <StatusBar hidden />
       <View style={styles.container}>
