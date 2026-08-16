@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
 
 // Concede 7 dias grátis (tipo TRIAL, 0 créditos) a um App já registrado, sem
 // exigir uma ativação prévia — o revendedor só precisa depois adicionar a
-// playlist na tela "Usuários" para o MAC já ativado.
+// playlist na tela "Usuários" para o MAC já ativado. Os 7 dias contam a
+// partir da instalação do app, não do clique do admin (ver cálculo abaixo).
 export async function POST(request: NextRequest) {
   const auth = getAuthUser(request);
   if (!auth || auth.role !== 'ADMIN') {
@@ -64,7 +65,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Este MAC já está ativado' }, { status: 409 });
   }
 
-  const expira = new Date();
+  // Conta a partir da instalação (app.createdAt), não do clique do admin —
+  // senão bastaria demorar pra conceder o trial pra "esticar" os 7 dias.
+  const expira = new Date(app.createdAt);
   expira.setDate(expira.getDate() + 7);
 
   const lista = await prisma.lista.create({
