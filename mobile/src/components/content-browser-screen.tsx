@@ -605,7 +605,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerNav}>

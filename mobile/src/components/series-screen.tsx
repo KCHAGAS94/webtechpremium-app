@@ -691,7 +691,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.header}>
           <View style={styles.headerNav}>
             {NAV_ITEMS.map((item) => (
