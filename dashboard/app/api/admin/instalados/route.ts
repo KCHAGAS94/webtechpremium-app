@@ -77,6 +77,7 @@ export async function POST(request: NextRequest) {
       url: '',
       dataExpiracao: expira,
       tipo: 'TRIAL',
+      criadoPorId: auth.id,
     },
   });
 

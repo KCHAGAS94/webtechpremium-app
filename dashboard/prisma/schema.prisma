@@ -28,6 +28,7 @@ model User {
   apps                    App[]
   creditPurchases         CreditPurchase[]
   transferenciasAtivacao  TransferenciaAtivacao[]
+  listasCriadas           Lista[]                  @relation("ListaCriadoPor")
 }
 
 enum CreditPurchaseStatus {
@@ -112,6 +113,13 @@ model Servidor {
 // app's "Gerenciamento de Playlist" screen (not every MAC has a reseller who
 // bothers linking a list). Both feed the same device — `origem` distinguishes
 // them so /api/devices can prioritize PAINEL over APP without a second table.
+// `criadoPorId` é quem cadastrou essa linha pelo painel (tela "Usuários" ou
+// "Ativação App") — diferente de `app.userId`, que é o dono do dispositivo.
+// Sem isso, um admin cadastrando lista num MAC que pertence a um revendedor
+// fazia essa linha aparecer na tela "Usuários" do revendedor, mesmo sem ele
+// ter feito nada. Nulo em linhas antigas, criadas antes desse campo existir,
+// e em linhas criadas pelo próprio app do usuário final (`origem: APP`), que
+// não têm um usuário do painel por trás.
 model Lista {
   id            Int         @id @default(autoincrement())
   nome          String
@@ -122,10 +130,13 @@ model Lista {
   tipo          TipoAtivacao?
   appId         Int
   app           App         @relation(fields: [appId], references: [id], onDelete: Cascade)
+  criadoPorId   Int?
+  criadoPor     User?       @relation("ListaCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@index([appId])
+  @@index([criadoPorId])
 }
 
 enum ListaOrigem {

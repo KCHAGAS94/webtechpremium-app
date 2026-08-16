@@ -137,7 +137,7 @@ export default function UsuariosPage() {
 
   const loadListas = async () => {
     try {
-      const response = await fetch('/api/painel/listas');
+      const response = await fetch('/api/painel/listas?minhas=1');
       const data = await response.json();
       setListas(data.listas ?? []);
     } catch (error) {

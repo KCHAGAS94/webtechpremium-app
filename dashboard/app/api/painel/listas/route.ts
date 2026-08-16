@@ -27,14 +27,19 @@ export async function GET(request: NextRequest) {
 
   const appId = request.nextUrl.searchParams.get('appId');
   const mac = request.nextUrl.searchParams.get('mac');
+  // A tela "Usuários" manda minhas=1: só o que o próprio usuário logado
+  // cadastrou aparece ali, admin incluso — ninguém vê cadastro alheio nessa
+  // tela. Sem o parâmetro (tela "Ativação App"), mantém o comportamento
+  // antigo: admin vê tudo, revendedor só os MACs que possui.
+  const minhas = request.nextUrl.searchParams.get('minhas') === '1';
 
   const listas = await prisma.lista.findMany({
     where: {
       ...(appId && { appId: Number(appId) }),
+      ...(minhas ? { criadoPorId: auth.id } : {}),
       app: {
         ...(mac && { macAddress: mac.toUpperCase() }),
-        // Revendedor só vê os próprios MACs; admin vê tudo.
-        ...(auth.role !== 'ADMIN' && { userId: auth.id }),
+        ...(!minhas && auth.role !== 'ADMIN' && { userId: auth.id }),
       },
     },
     orderBy: { createdAt: 'asc' },
@@ -172,6 +177,7 @@ export async function POST(request: NextRequest) {
           nome: nome || 'Lista',
           url: url || '',
           dataExpiracao,
+          criadoPorId: auth.id,
           ...(tipoAtivacao && { tipo: tipoAtivacao }),
         },
       });
