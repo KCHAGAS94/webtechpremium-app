@@ -23,6 +23,14 @@ export async function GET(request: NextRequest) {
     {
       apps: apps.map((app) => {
         const ativacao = app.listas.find((l) => l.tipo !== null && !isExpirado(l.dataExpiracao));
+
+        // Sem ativação: mostra a data em que o trial de 7 dias venceria se
+        // fosse concedido agora mesmo (sempre contado da instalação — ver
+        // cálculo idêntico no POST abaixo), pra o admin já ver de cara o
+        // prazo antes de clicar em "7 dias grátis".
+        const expiraTrialPrevisto = new Date(app.createdAt);
+        expiraTrialPrevisto.setDate(expiraTrialPrevisto.getDate() + 7);
+
         return {
           id: app.id,
           mac: app.macAddress,
@@ -31,7 +39,9 @@ export async function GET(request: NextRequest) {
           instaladoEm: app.createdAt.toISOString(),
           ativado: !!ativacao,
           tipo: ativacao?.tipo ?? null,
-          expiracaoData: ativacao?.dataExpiracao ? ativacao.dataExpiracao.toISOString().slice(0, 10) : '',
+          expiracaoData: ativacao?.dataExpiracao
+            ? ativacao.dataExpiracao.toISOString().slice(0, 10)
+            : expiraTrialPrevisto.toISOString().slice(0, 10),
           temPlaylist: app.listas.some((l) => l.url),
         };
       }),

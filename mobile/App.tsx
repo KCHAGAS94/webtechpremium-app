@@ -242,40 +242,29 @@ function AppContent() {
   // (deviceStatus, from "Ativação App" — tipo + dataExpiracao) rather than
   // whichever playlist happens to be active: a device can have a Vitalício
   // ativação plus a separately-dated playlist credential, and "Conta" means
-  // the former, not the latter. Falls back to the active playlist's own
-  // painel/Xtream date only when the device has no ativação record at all
-  // (e.g. an older device or a playlist added without going through
-  // "Ativação App").
+  // the former, not the latter. No fallback to the playlist's own date when
+  // there's no ativação record — that showed a stale/unrelated date for a
+  // MAC the painel itself reports as "Não ativado".
   const accountValidity =
     deviceStatus?.tipo === 'VITALICIO'
       ? 'Vitalício'
       : deviceStatus?.dataExpiracao
         ? formatPlaylistValidity(deviceStatus.dataExpiracao)
-        : playlistValidity
-          ? formatPlaylistValidity(playlistValidity)
-          : xtreamExpiration
-            ? xtreamExpiration.toLocaleDateString('pt-BR')
-            : null;
+        : null;
   // Drives ActivationStatusModal: true only once the painel has explicitly
   // confirmed this MAC as active (expirado: false). `null` (never linked to
   // an "Ativação App" record) and a failed/not-yet-run fetch both count as
   // "not active" here, same as `true` — additive to the existing `expired`
   // gate above, not a replacement for it.
   const isAppActive = deviceStatus?.expirado === false;
-  // Same source of truth as the painel's own "Expirado" column, from the
-  // device's own ativação record (deviceStatus) rather than one playlist's
-  // `expirado` — falls back to the playlist's status only when the device
-  // has no ativação record fetched yet/at all.
+  // Same source of truth as the painel's own "Expirado" column ("Ativação
+  // App"/"Instalados"), from the device's own ativação record (deviceStatus)
+  // — never a playlist's own `expirado`. A playlist can be perfectly valid
+  // while the device's actual ativação (tipo) doesn't exist or lapsed, and
+  // showing the playlist's status there made "Conta" say "Ativo" for a MAC
+  // the painel itself shows as "Não ativado".
   const accountStatus =
-    deviceStatus?.expirado != null
-      ? deviceStatus.expirado
-        ? 'Expirado'
-        : 'Ativo'
-      : activePlaylist?.expirado === undefined
-        ? null
-        : activePlaylist.expirado
-          ? 'Expirado'
-          : 'Ativo';
+    deviceStatus?.expirado != null ? (deviceStatus.expirado ? 'Expirado' : 'Ativo') : 'Não ativado';
 
   useEffect(() => {
     if (!reloadBlockedMessage) return;

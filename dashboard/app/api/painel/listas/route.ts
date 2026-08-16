@@ -30,13 +30,16 @@ export async function GET(request: NextRequest) {
   // A tela "Usuários" manda minhas=1: só o que o próprio usuário logado
   // cadastrou aparece ali, admin incluso — ninguém vê cadastro alheio nessa
   // tela. Sem o parâmetro (tela "Ativação App"), mantém o comportamento
-  // antigo: admin vê tudo, revendedor só os MACs que possui.
+  // antigo: admin vê tudo, revendedor só os MACs que possui — mas só
+  // ativações de verdade (tipo setado pelo botão "Adicionar" dessa tela).
+  // MACs auto-registrados por /api/devices (sem nenhuma ativação) não têm
+  // linha de Lista com tipo, então não aparecem aqui — só em "Instalados".
   const minhas = request.nextUrl.searchParams.get('minhas') === '1';
 
   const listas = await prisma.lista.findMany({
     where: {
       ...(appId && { appId: Number(appId) }),
-      ...(minhas ? { criadoPorId: auth.id } : {}),
+      ...(minhas ? { criadoPorId: auth.id } : { tipo: { not: null } }),
       app: {
         ...(mac && { macAddress: mac.toUpperCase() }),
         ...(!minhas && auth.role !== 'ADMIN' && { userId: auth.id }),

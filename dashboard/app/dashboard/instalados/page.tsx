@@ -20,6 +20,20 @@ const TIPO_LABEL: Record<'ANUAL' | 'VITALICIO' | 'TRIAL', string> = {
   TRIAL: 'Teste grátis (7 dias)',
 };
 
+function formatData(value: string): string {
+  if (!value) return '';
+  const [year, month, day] = value.split('-');
+  return `${day}/${month}/${year}`;
+}
+
+// Sem ativação, expiracaoData é a data prevista do trial (instalação + 7
+// dias) caso o admin conceda agora — não uma expiração real ainda.
+function formatExpira(a: AppInstalado): string {
+  if (a.tipo === 'VITALICIO') return 'Vitalício';
+  if (!a.expiracaoData) return '—';
+  return a.ativado ? formatData(a.expiracaoData) : `${formatData(a.expiracaoData)} (previsto)`;
+}
+
 function formatDataHora(iso: string): string {
   if (!iso) return '';
   return new Date(iso).toLocaleString('pt-BR', {
@@ -156,7 +170,7 @@ export default function InstaladosPage() {
               </div>
               <div>
                 <div className="text-xs text-gray-400">Expira</div>
-                <div className="text-gray-700">{a.expiracaoData || (a.tipo === 'VITALICIO' ? 'Vitalício' : '—')}</div>
+                <div className="text-gray-700">{formatExpira(a)}</div>
               </div>
               <div>
                 <div className="text-xs text-gray-400">Playlist</div>
@@ -213,9 +227,7 @@ export default function InstaladosPage() {
                     )}
                   </td>
                   <td className="px-6 py-3 text-gray-600">{a.tipo ? TIPO_LABEL[a.tipo] : '—'}</td>
-                  <td className="px-6 py-3 text-gray-600">
-                    {a.expiracaoData || (a.tipo === 'VITALICIO' ? 'Vitalício' : '—')}
-                  </td>
+                  <td className="px-6 py-3 text-gray-600">{formatExpira(a)}</td>
                   <td className="px-6 py-3 text-gray-600">{a.temPlaylist ? 'Sim' : 'Não'}</td>
                   <td className="px-6 py-3 text-center">
                     {!a.ativado && (
