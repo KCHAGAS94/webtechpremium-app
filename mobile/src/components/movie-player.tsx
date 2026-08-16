@@ -74,17 +74,20 @@ function SkipButton({
   icon,
   label,
   onPress,
+  onFocus,
 }: {
   seconds: number;
   icon: string;
   label: string;
   onPress: (seconds: number) => void;
+  onFocus?: () => void;
 }) {
   return (
     <PlayerControlButton
       onPress={() => onPress(seconds)}
       style={styles.controlButton}
       focusedStyle={styles.controlButtonFocused}
+      onFocus={onFocus}
     >
       <ThemedText style={styles.controlIcon}>{icon}</ThemedText>
       <ThemedText style={styles.controlLabel}>{label}</ThemedText>
@@ -443,6 +446,7 @@ export function MoviePlayer({
               style={styles.errorBackButton}
               focusedStyle={styles.errorBackButtonFocused}
               autoFocus
+              onFocus={showControls}
             >
               <ThemedText style={styles.errorBackButtonText}>Voltar</ThemedText>
             </PlayerControlButton>
@@ -473,6 +477,7 @@ export function MoviePlayer({
                 focusedStyle={styles.iconButtonFocused}
                 onPress={handleRequestExit}
                 hitSlop={12}
+                onFocus={showControls}
               >
                 <View style={styles.iconButton}>
                   <ThemedText style={styles.backIcon}>‹</ThemedText>
@@ -491,6 +496,7 @@ export function MoviePlayer({
                   hitSlop={4}
                   style={styles.iconButton}
                   focusedStyle={styles.iconButtonFocused}
+                  onFocus={showControls}
                 >
                   {subtitlesLoading ? (
                     <ActivityIndicator color="#fff" size="small" />
@@ -504,6 +510,7 @@ export function MoviePlayer({
                   hitSlop={4}
                   style={styles.iconButton}
                   focusedStyle={styles.iconButtonFocused}
+                  onFocus={showControls}
                 >
                   <ThemedText style={[styles.toolIcon, isFavorite && styles.toolIconActive]}>
                     {isFavorite ? '♥' : '♡'}
@@ -523,18 +530,43 @@ export function MoviePlayer({
               />
 
               <View style={styles.centerControls}>
-                <SkipButton seconds={-SKIP_MINUTE_SECONDS} icon="⏪" label="1min" onPress={handleSkip} />
-                <SkipButton seconds={-SKIP_SECONDS} icon="⏪" label="10s" onPress={handleSkip} />
+                <SkipButton
+                  seconds={-SKIP_MINUTE_SECONDS}
+                  icon="⏪"
+                  label="1min"
+                  onPress={handleSkip}
+                  onFocus={showControls}
+                />
+                <SkipButton
+                  seconds={-SKIP_SECONDS}
+                  icon="⏪"
+                  label="10s"
+                  onPress={handleSkip}
+                  onFocus={showControls}
+                />
                 <PlayerControlButton
                   onPress={handleTogglePlayPause}
                   style={styles.playButton}
                   focusedStyle={styles.playButtonFocused}
                   autoFocus
+                  onFocus={showControls}
                 >
                   <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
                 </PlayerControlButton>
-                <SkipButton seconds={SKIP_SECONDS} icon="⏩" label="10s" onPress={handleSkip} />
-                <SkipButton seconds={SKIP_MINUTE_SECONDS} icon="⏩" label="1min" onPress={handleSkip} />
+                <SkipButton
+                  seconds={SKIP_SECONDS}
+                  icon="⏩"
+                  label="10s"
+                  onPress={handleSkip}
+                  onFocus={showControls}
+                />
+                <SkipButton
+                  seconds={SKIP_MINUTE_SECONDS}
+                  icon="⏩"
+                  label="1min"
+                  onPress={handleSkip}
+                  onFocus={showControls}
+                />
               </View>
 
               <VerticalSlider

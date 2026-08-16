@@ -284,6 +284,7 @@ export function FullscreenPlayer({
                 style={styles.backGroup}
                 focusedStyle={styles.backButtonFocused}
                 hitSlop={12}
+                onFocus={showControls}
               >
                 <View style={styles.backButton}>
                   <ThemedText style={styles.backIcon}>‹</ThemedText>
@@ -298,6 +299,7 @@ export function FullscreenPlayer({
                 hitSlop={12}
                 style={styles.favoriteButton}
                 focusedStyle={styles.favoriteButtonFocused}
+                onFocus={showControls}
               >
                 <ThemedText style={[styles.favoriteIcon, isFavorite && styles.favoriteIconActive]}>
                   {isFavorite ? '♥' : '♡'}
@@ -321,6 +323,7 @@ export function FullscreenPlayer({
                     onPress={() => handleSkip(-SKIP_SECONDS)}
                     style={styles.controlButton}
                     focusedStyle={styles.controlButtonFocused}
+                    onFocus={showControls}
                   >
                     <ThemedText style={styles.controlIcon}>⏪</ThemedText>
                   </PlayerControlButton>
@@ -333,6 +336,7 @@ export function FullscreenPlayer({
                     }}
                     style={styles.controlButton}
                     focusedStyle={styles.controlButtonFocused}
+                    onFocus={showControls}
                   >
                     <ThemedText style={styles.controlIcon}>⏮</ThemedText>
                   </PlayerControlButton>
@@ -342,6 +346,7 @@ export function FullscreenPlayer({
                   style={styles.playButton}
                   focusedStyle={styles.playButtonFocused}
                   autoFocus
+                  onFocus={showControls}
                 >
                   <ThemedText style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
                 </PlayerControlButton>
@@ -353,6 +358,7 @@ export function FullscreenPlayer({
                     }}
                     style={styles.controlButton}
                     focusedStyle={styles.controlButtonFocused}
+                    onFocus={showControls}
                   >
                     <ThemedText style={styles.controlIcon}>⏭</ThemedText>
                   </PlayerControlButton>
@@ -362,6 +368,7 @@ export function FullscreenPlayer({
                     onPress={() => handleSkip(SKIP_SECONDS)}
                     style={styles.controlButton}
                     focusedStyle={styles.controlButtonFocused}
+                    onFocus={showControls}
                   >
                     <ThemedText style={styles.controlIcon}>⏩</ThemedText>
                   </PlayerControlButton>
@@ -385,6 +392,7 @@ export function FullscreenPlayer({
                     style={styles.goLiveBadge}
                     focusedStyle={styles.goLiveBadgeFocused}
                     onPress={handleGoLive}
+                    onFocus={showControls}
                   >
                     <View style={styles.liveDot} />
                     <ThemedText style={styles.goLiveBadgeText}>Toque para voltar ao vivo</ThemedText>

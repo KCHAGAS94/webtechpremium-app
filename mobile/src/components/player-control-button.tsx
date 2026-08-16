@@ -9,6 +9,11 @@ type Props = {
    * App.tsx for the same pattern used elsewhere in the app. */
   autoFocus?: boolean;
   hitSlop?: number;
+  /** Called when D-pad/remote navigation moves focus onto this button, so
+   * the overlay's auto-hide countdown can restart — otherwise controls can
+   * disappear mid-navigation while the user is still moving toward a
+   * button (e.g. slowly arrowing over to the favorite heart). */
+  onFocus?: () => void;
   children: React.ReactNode;
 };
 
@@ -19,12 +24,15 @@ type Props = {
  * work inside the fullscreen player. This wraps Pressable's focus events
  * with a highlighted ring so the current selection is always visible.
  */
-export function PlayerControlButton({ onPress, style, focusedStyle, autoFocus, hitSlop, children }: Props) {
+export function PlayerControlButton({ onPress, style, focusedStyle, autoFocus, hitSlop, onFocus, children }: Props) {
   const [focused, setFocused] = useState(!!autoFocus);
   return (
     <Pressable
       style={[style, focused && (focusedStyle ?? styles.defaultFocused)]}
-      onFocus={() => setFocused(true)}
+      onFocus={() => {
+        setFocused(true);
+        onFocus?.();
+      }}
       onBlur={() => setFocused(false)}
       onPress={onPress}
       hasTVPreferredFocus={autoFocus}
