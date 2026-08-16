@@ -1,5 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { StyleSheet, UIManager, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, StyleSheet, UIManager, type StyleProp, type ViewStyle } from 'react-native';
 import { CastButton as GoogleCastButton, CastContext } from 'react-native-google-cast';
 
 import { PlayerControlButton } from '@/components/player-control-button';
@@ -33,6 +33,10 @@ const CAST_BUTTON_SUPPORTED = UIManager.hasViewManagerConfig('RNGoogleCastButton
  * screen (it can be hidden) for it to work at all.
  */
 export function CastButton({ style }: Props) {
+  // Casting mirrors playback to a nearby screen — on a TV device the app is
+  // already the thing playing on the big screen, so there's nowhere useful
+  // to cast to.
+  if (Platform.isTV) return null;
   if (!CAST_BUTTON_SUPPORTED) return null;
   return (
     <>
