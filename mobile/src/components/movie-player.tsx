@@ -181,10 +181,14 @@ export function MoviePlayer({
     }
     retryCountRef.current += 1;
     setRetrying(true);
+    const resumeFrom = player.currentTime;
     const timer = setTimeout(() => {
       player
         .replaceAsync({ uri: streamUrl, headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } })
-        .then(() => player.play())
+        .then(() => {
+          if (resumeFrom > 0) player.currentTime = resumeFrom;
+          player.play();
+        })
         .catch(() => {});
     }, PLAYBACK_RETRY_DELAY_MS);
     return () => clearTimeout(timer);

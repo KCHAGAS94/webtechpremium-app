@@ -32,6 +32,11 @@ const MAX_ENTRIES = 200;
 // cluttering "Retomar para assistir" with things already watched through.
 const MIN_RESUME_SECONDS = 10;
 const COMPLETION_RATIO = 0.95;
+// A big drop in position right after the last save (e.g. the player
+// reconnecting from a buffering stall and restarting the stream from 0)
+// is a glitch, not the user rewinding — don't let it clobber real progress
+// within this same watch session.
+const REGRESSION_GUARD_WINDOW_MS = 10 * 60 * 1000;
 
 let cache: WatchHistoryEntry[] | null = null;
 
@@ -57,6 +62,14 @@ export async function upsertWatchHistoryProgress(
   if (entry.positionSeconds < MIN_RESUME_SECONDS) return;
 
   const entries = await readAll();
+  const existing = entries.find((e) => e.key === entry.key);
+  if (
+    existing &&
+    entry.positionSeconds < existing.positionSeconds &&
+    Date.now() - existing.updatedAt < REGRESSION_GUARD_WINDOW_MS
+  ) {
+    return;
+  }
   const withoutKey = entries.filter((e) => e.key !== entry.key);
 
   const isFinished =
