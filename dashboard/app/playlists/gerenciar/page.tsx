@@ -24,6 +24,21 @@ function buildXtreamUrl(servidor: string, usuario: string, senha: string): strin
   return `${trimmed}/get.php?${params.toString()}`;
 }
 
+// Reverso de buildXtreamUrl, usado só ao abrir "Editar" numa lista XC
+// existente — reconstrói servidor/usuário/senha a partir da URL salva, já
+// que o formulário Xtream não guarda esses três campos separados.
+function parseXtreamUrl(url: string): { servidor: string; usuario: string; senha: string } | null {
+  try {
+    const parsed = new URL(url);
+    const usuario = parsed.searchParams.get('username');
+    const senha = parsed.searchParams.get('password');
+    if (!usuario || !senha) return null;
+    return { servidor: `${parsed.protocol}//${parsed.host}`, usuario, senha };
+  } catch {
+    return null;
+  }
+}
+
 const SIDEBAR_ITEMS = [
   {
     key: 'gerenciamento',
@@ -69,6 +84,7 @@ function GerenciarPlaylistsContent() {
     expirado: null,
   });
   const [modalType, setModalType] = useState<'m3u' | 'xc' | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
   const [submitError, setSubmitError] = useState('');
 
   const [nome, setNome] = useState('');
@@ -117,6 +133,7 @@ function GerenciarPlaylistsContent() {
 
   const closeModal = () => {
     setModalType(null);
+    setEditingId(null);
     setNome('');
     setUrl('');
     setServidor('');
@@ -127,6 +144,24 @@ function GerenciarPlaylistsContent() {
     setConfirmarPin('');
     setPinError('');
     setSubmitError('');
+  };
+
+  const handleEditClick = (playlist: Playlist) => {
+    setEditingId(playlist.id);
+    setNome(playlist.nome);
+    setSubmitError('');
+    if (playlist.tipo === 'XC') {
+      const parsed = parseXtreamUrl(playlist.url);
+      if (parsed) {
+        setServidor(parsed.servidor);
+        setUsuario(parsed.usuario);
+        setSenha(parsed.senha);
+        setModalType('xc');
+        return;
+      }
+    }
+    setUrl(playlist.url);
+    setModalType('m3u');
   };
 
   const handleSubmitModal = async (e: React.FormEvent) => {
@@ -157,9 +192,11 @@ function GerenciarPlaylistsContent() {
     setSubmitError('');
     try {
       const response = await fetch('/api/app/listas', {
-        method: 'POST',
+        method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mac, nome, url: playlistUrl }),
+        body: JSON.stringify(
+          editingId ? { id: editingId, nome, url: playlistUrl } : { mac, nome, url: playlistUrl }
+        ),
       });
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
@@ -317,7 +354,10 @@ function GerenciarPlaylistsContent() {
                             </td>
                             <td className="px-6 py-4">
                               <div className="flex gap-2 justify-end">
-                                <button className="flex items-center gap-1 rounded-lg border border-sky-500/50 text-sky-400 text-xs font-semibold px-3 py-1.5 hover:bg-sky-500/10">
+                                <button
+                                  onClick={() => handleEditClick(playlist)}
+                                  className="flex items-center gap-1 rounded-lg border border-sky-500/50 text-sky-400 text-xs font-semibold px-3 py-1.5 hover:bg-sky-500/10"
+                                >
                                   Editar
                                 </button>
                                 <button
@@ -343,7 +383,7 @@ function GerenciarPlaylistsContent() {
       {modalType && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-[#151320] border border-white/10 p-8">
-            <h2 className="text-xl font-bold mb-6">Gerenciar Playlist</h2>
+            <h2 className="text-xl font-bold mb-6">{editingId ? 'Editar Playlist' : 'Gerenciar Playlist'}</h2>
 
             <form onSubmit={handleSubmitModal} className="space-y-4">
               <input
@@ -454,7 +494,7 @@ function GerenciarPlaylistsContent() {
                   type="submit"
                   className="rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 transition-colors"
                 >
-                  Enviar
+                  {editingId ? 'Salvar' : 'Enviar'}
                 </button>
               </div>
             </form>

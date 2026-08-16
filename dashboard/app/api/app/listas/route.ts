@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
 import { corsPreflight, withCors } from '@/lib/cors';
+import { getOrCreateSystemUser } from '@/lib/systemUser';
 
 export function OPTIONS() {
   return corsPreflight();
@@ -11,18 +12,6 @@ export function OPTIONS() {
 // playlist directly in the app's "Gerenciamento de Playlist" screen instead
 // of a reseller assigning one in the painel. Scoped by `mac` (not `appId`)
 // since the app only ever knows its own device's MAC, never an internal id.
-async function getOrCreateSystemUser() {
-  const existing = await prisma.user.findFirst();
-  if (existing) return existing;
-
-  return prisma.user.create({
-    data: {
-      email: 'system@webtechpremium.local',
-      password: 'unused',
-      name: 'Sistema',
-    },
-  });
-}
 
 export async function GET(request: NextRequest) {
   const mac = request.nextUrl.searchParams.get('mac');
@@ -82,6 +71,41 @@ export async function POST(request: NextRequest) {
   });
 
   return withCors(NextResponse.json({ lista }, { status: 200 }));
+}
+
+// "Editar" na tela pública "Gerenciamento de Playlist" — só permite mudar
+// nome/url de uma lista que o próprio usuário final cadastrou (origem
+// APP), mesma restrição do DELETE abaixo. Listas atribuídas pelo painel
+// (origem PAINEL) continuam só editáveis por um revendedor/admin logado.
+export async function PATCH(request: NextRequest) {
+  const { id, nome, url } = await request.json();
+
+  if (!id) {
+    return withCors(NextResponse.json({ error: 'id é obrigatório' }, { status: 400 }));
+  }
+  if (!url) {
+    return withCors(NextResponse.json({ error: 'Link da lista é obrigatório' }, { status: 400 }));
+  }
+
+  const lista = await prisma.lista.findUnique({ where: { id: Number(id) } });
+  if (!lista) {
+    return withCors(NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 }));
+  }
+  if (lista.origem !== 'APP') {
+    return withCors(
+      NextResponse.json(
+        { error: 'Esta lista foi cadastrada pelo painel e não pode ser editada pelo app' },
+        { status: 403 }
+      )
+    );
+  }
+
+  const atualizada = await prisma.lista.update({
+    where: { id: Number(id) },
+    data: { nome: nome || lista.nome, url },
+  });
+
+  return withCors(NextResponse.json({ lista: atualizada }, { status: 200 }));
 }
 
 export async function DELETE(request: NextRequest) {
