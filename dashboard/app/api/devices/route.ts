@@ -12,10 +12,31 @@ export function OPTIONS() {
 // it here (rather than requiring a reseller to type the MAC in manually) so
 // it shows up in the painel's "Usuários" table right away, with no Lista
 // linked, ready for a reseller to paste the M3U link in.
+//
+// It also gets 7 days grátis (tipo TRIAL) automatically, right here at
+// registration — the admin "Instalados" page used to require a manual
+// "Dar 7 dias grátis" click per MAC, which doesn't scale. The button there
+// stays as a catch-up for devices registered before this existed.
 async function registerDevice(macAddress: string) {
   const systemUser = await getOrCreateSystemUser();
+  const expiraTrial = new Date();
+  expiraTrial.setDate(expiraTrial.getDate() + 7);
+
   return prisma.app.create({
-    data: { macAddress, name: macAddress, version: '1.0.0', userId: systemUser.id },
+    data: {
+      macAddress,
+      name: macAddress,
+      version: '1.0.0',
+      userId: systemUser.id,
+      listas: {
+        create: {
+          nome: 'Teste grátis',
+          url: '',
+          tipo: 'TRIAL',
+          dataExpiracao: expiraTrial,
+        },
+      },
+    },
     include: {
       listas: {
         where: { isActive: true },

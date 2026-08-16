@@ -50,6 +50,7 @@ export default function InstaladosPage() {
   const [apps, setApps] = useState<AppInstalado[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [grantingId, setGrantingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState('');
 
   const loadMe = async () => {
@@ -104,6 +105,27 @@ export default function InstaladosPage() {
     }
   };
 
+  const handleDelete = async (app: AppInstalado) => {
+    if (!confirm(`Excluir o MAC ${app.mac}? Isso remove o dispositivo e todas as listas dele do painel.`)) return;
+
+    setDeletingId(app.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/admin/instalados?id=${app.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Falha ao excluir MAC');
+        return;
+      }
+      setApps((prev) => prev.filter((a) => a.id !== app.id));
+    } catch (e) {
+      console.error('Falha ao excluir MAC', e);
+      setError('Falha ao excluir MAC');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (allowed === null) return null;
 
   if (!allowed) {
@@ -120,8 +142,9 @@ export default function InstaladosPage() {
       <div>
         <h2 className="text-2xl font-bold text-white">Instalados</h2>
         <p className="text-sm text-gray-400">
-          Todos os MACs que já abriram o app, ativados ou não. Conceda 7 dias grátis a um MAC novo e
-          depois adicione a playlist dele em &quot;Usuários&quot;.
+          Todos os MACs que já abriram o app. Todo MAC novo já recebe 7 dias grátis automaticamente — só
+          adicione a playlist dele em &quot;Usuários&quot;. MACs &quot;Não ativado&quot; são de antes
+          dessa mudança (o botão concede o trial manualmente pra esses).
         </p>
       </div>
 
@@ -177,15 +200,24 @@ export default function InstaladosPage() {
                 <div className="text-gray-700">{a.temPlaylist ? 'Sim' : 'Não'}</div>
               </div>
             </div>
-            {!a.ativado && (
+            <div className="flex gap-2">
+              {!a.ativado && (
+                <button
+                  onClick={() => handleGrantTrial(a)}
+                  disabled={grantingId === a.id}
+                  className="flex-1 bg-fuchsia-600 text-white px-4 py-2 rounded font-semibold hover:bg-fuchsia-700 disabled:opacity-50 transition"
+                >
+                  {grantingId === a.id ? 'Concedendo...' : '🎁 Dar 7 dias grátis'}
+                </button>
+              )}
               <button
-                onClick={() => handleGrantTrial(a)}
-                disabled={grantingId === a.id}
-                className="w-full bg-fuchsia-600 text-white px-4 py-2 rounded font-semibold hover:bg-fuchsia-700 disabled:opacity-50 transition"
+                onClick={() => handleDelete(a)}
+                disabled={deletingId === a.id}
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 disabled:opacity-50 transition"
               >
-                {grantingId === a.id ? 'Concedendo...' : '🎁 Dar 7 dias grátis'}
+                {deletingId === a.id ? 'Excluindo...' : '🗑️ Excluir'}
               </button>
-            )}
+            </div>
           </div>
         ))}
       </div>
@@ -230,15 +262,24 @@ export default function InstaladosPage() {
                   <td className="px-6 py-3 text-gray-600">{formatExpira(a)}</td>
                   <td className="px-6 py-3 text-gray-600">{a.temPlaylist ? 'Sim' : 'Não'}</td>
                   <td className="px-6 py-3 text-center">
-                    {!a.ativado && (
+                    <div className="flex justify-center gap-2">
+                      {!a.ativado && (
+                        <button
+                          onClick={() => handleGrantTrial(a)}
+                          disabled={grantingId === a.id}
+                          className="bg-fuchsia-600 text-white px-3 py-1.5 rounded font-semibold text-xs hover:bg-fuchsia-700 disabled:opacity-50 transition whitespace-nowrap"
+                        >
+                          {grantingId === a.id ? 'Concedendo...' : '🎁 7 dias grátis'}
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleGrantTrial(a)}
-                        disabled={grantingId === a.id}
-                        className="bg-fuchsia-600 text-white px-3 py-1.5 rounded font-semibold text-xs hover:bg-fuchsia-700 disabled:opacity-50 transition whitespace-nowrap"
+                        onClick={() => handleDelete(a)}
+                        disabled={deletingId === a.id}
+                        className="bg-red-600 text-white px-3 py-1.5 rounded font-semibold text-xs hover:bg-red-700 disabled:opacity-50 transition whitespace-nowrap"
                       >
-                        {grantingId === a.id ? 'Concedendo...' : '🎁 7 dias grátis'}
+                        {deletingId === a.id ? 'Excluindo...' : '🗑️ Excluir'}
                       </button>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -4,10 +4,11 @@ import { isExpirado } from '@/lib/hls-url';
 import { getAuthUser } from '@/lib/auth';
 
 // Página admin "Instalados": todo App (MAC) já registrado no sistema, tenha
-// ou não uma ativação (Lista com tipo) associada — inclui os MACs que só
-// bateram em /api/devices (auto-registrados no primeiro boot do app) e nunca
-// passaram pela "Ativação App". É daqui que o admin identifica um MAC novo
-// e concede o trial de 7 dias em um clique.
+// ou não uma ativação (Lista com tipo) associada. Desde que /api/devices
+// passou a conceder o trial de 7 dias automaticamente no primeiro boot, um
+// MAC "Não ativado" aqui só acontece pra devices registrados antes dessa
+// mudança — o botão "7 dias grátis" abaixo existe só como catch-up manual
+// pra esses casos.
 export async function GET(request: NextRequest) {
   const auth = getAuthUser(request);
   if (!auth || auth.role !== 'ADMIN') {
@@ -92,4 +93,22 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ lista }, { status: 200 });
+}
+
+// Remove um MAC inteiro (App) e todas as suas Listas junto (onDelete:
+// Cascade no schema) — usado quando o admin quer limpar um MAC de teste ou
+// nunca mais utilizado da lista de "Instalados".
+export async function DELETE(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth || auth.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  }
+
+  const id = request.nextUrl.searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'Parâmetro id é obrigatório' }, { status: 400 });
+  }
+
+  await prisma.app.delete({ where: { id: Number(id) } }).catch(() => null);
+  return NextResponse.json({ ok: true }, { status: 200 });
 }
