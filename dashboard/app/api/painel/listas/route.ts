@@ -4,10 +4,12 @@ import { isExpirado } from '@/lib/hls-url';
 import { getAuthUser } from '@/lib/auth';
 
 // Custo em créditos de cada tipo de ativação. ANUAL expira 1 ano após a
-// ativação; VITALICIO nunca expira (dataExpiracao fica null).
-const ATIVACAO_CREDITS: Record<'ANUAL' | 'VITALICIO', number> = {
+// ativação; VITALICIO nunca expira (dataExpiracao fica null); TRIAL é
+// gratuito e expira 7 dias após a concessão (ver página admin "Instalados").
+const ATIVACAO_CREDITS: Record<'ANUAL' | 'VITALICIO' | 'TRIAL', number> = {
   ANUAL: 1,
   VITALICIO: 3,
+  TRIAL: 0,
 };
 
 // Backs the flat "Usuários" table in the panel — one row por Lista
@@ -120,26 +122,32 @@ export async function POST(request: NextRequest) {
   // dispositivo sem passar `tipo`, e continua sem custo — ela só adiciona
   // playlists a um app já existente, não ativa um app novo.
   let dataExpiracao: Date | null = null;
-  let tipoAtivacao: 'ANUAL' | 'VITALICIO' | null = null;
+  let tipoAtivacao: 'ANUAL' | 'VITALICIO' | 'TRIAL' | null = null;
 
   if (!id && tipo) {
-    if (tipo !== 'ANUAL' && tipo !== 'VITALICIO') {
+    if (tipo !== 'ANUAL' && tipo !== 'VITALICIO' && tipo !== 'TRIAL') {
       return NextResponse.json({ error: 'Tipo de ativação inválido' }, { status: 400 });
     }
     tipoAtivacao = tipo;
 
-    const cost = ATIVACAO_CREDITS[tipo as 'ANUAL' | 'VITALICIO'];
-    const debited = await prisma.user.updateMany({
-      where: { id: auth.id, credits: { gte: cost } },
-      data: { credits: { decrement: cost } },
-    });
-    if (debited.count === 0) {
-      return NextResponse.json({ error: 'Créditos insuficientes para ativar este app' }, { status: 402 });
+    const cost = ATIVACAO_CREDITS[tipo as 'ANUAL' | 'VITALICIO' | 'TRIAL'];
+    if (cost > 0) {
+      const debited = await prisma.user.updateMany({
+        where: { id: auth.id, credits: { gte: cost } },
+        data: { credits: { decrement: cost } },
+      });
+      if (debited.count === 0) {
+        return NextResponse.json({ error: 'Créditos insuficientes para ativar este app' }, { status: 402 });
+      }
     }
 
     if (tipoAtivacao === 'ANUAL') {
       const expira = new Date();
       expira.setFullYear(expira.getFullYear() + 1);
+      dataExpiracao = expira;
+    } else if (tipoAtivacao === 'TRIAL') {
+      const expira = new Date();
+      expira.setDate(expira.getDate() + 7);
       dataExpiracao = expira;
     } else {
       dataExpiracao = null;

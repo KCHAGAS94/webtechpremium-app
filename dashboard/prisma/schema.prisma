@@ -135,11 +135,14 @@ enum ListaOrigem {
 
 // Tipo de ativação escolhido ao criar o app: ANUAL desconta 1 crédito e
 // expira 1 ano após a ativação; VITALICIO desconta 3 créditos e nunca
-// expira (dataExpiracao fica null). Nulo em linhas antigas, criadas antes
-// dessa cobrança existir.
+// expira (dataExpiracao fica null). TRIAL não custa crédito e expira 7 dias
+// após a concessão — usado pela página admin "Instalados" para liberar um
+// MAC recém-detectado sem cobrar do revendedor. Nulo em linhas antigas,
+// criadas antes dessa cobrança existir.
 enum TipoAtivacao {
   ANUAL
   VITALICIO
+  TRIAL
 }
 
 // Histórico de transferências de ativação entre MACs (ver

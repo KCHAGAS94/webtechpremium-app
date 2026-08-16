@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-type TipoAtivacao = 'ANUAL' | 'VITALICIO';
+type TipoAtivacao = 'ANUAL' | 'VITALICIO' | 'TRIAL';
 
 type Lista = {
   id: number;
@@ -19,6 +19,7 @@ type Lista = {
 const ATIVACAO_LABEL: Record<TipoAtivacao, string> = {
   ANUAL: 'Anual (1 crédito)',
   VITALICIO: 'Vitalício (3 créditos)',
+  TRIAL: 'Teste grátis (7 dias)',
 };
 
 const mockListas: Lista[] = [];
