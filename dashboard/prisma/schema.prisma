@@ -132,6 +132,11 @@ model Lista {
   app           App         @relation(fields: [appId], references: [id], onDelete: Cascade)
   criadoPorId   Int?
   criadoPor     User?       @relation("ListaCriadoPor", fields: [criadoPorId], references: [id], onDelete: SetNull)
+  // PIN opcional (hash bcrypt) que o próprio usuário final define ao
+  // cadastrar uma lista pela tela pública "Gerenciamento de Playlist"
+  // ("Proteja sua playlist com um PIN"). Só se aplica a origem APP — exige
+  // digitar o PIN certo antes de editar ou excluir essa lista por lá.
+  pinHash       String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

@@ -12,6 +12,7 @@ type Playlist = {
   url: string;
   tipo: 'M3U' | 'XC';
   protegido: boolean;
+  protegidoPorPin: boolean;
 };
 
 // Xtream credentials get folded into the same get.php URL format the painel
@@ -85,6 +86,9 @@ function GerenciarPlaylistsContent() {
   });
   const [modalType, setModalType] = useState<'m3u' | 'xc' | null>(null);
   const [editingId, setEditingId] = useState<number | null>(null);
+  // Pin já conferido pra lista que está sendo editada — vai junto no PATCH
+  // final, já que o servidor nunca confia só na checagem feita no prompt.
+  const [editingPin, setEditingPin] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState('');
 
   const [nome, setNome] = useState('');
@@ -102,12 +106,13 @@ function GerenciarPlaylistsContent() {
       const response = await fetch(`/api/app/listas?mac=${encodeURIComponent(mac)}`);
       const data = await response.json();
       setPlaylists(
-        (data.listas ?? []).map((lista: { id: number; nome: string; url: string }) => ({
+        (data.listas ?? []).map((lista: { id: number; nome: string; url: string; protegidoPorPin?: boolean }) => ({
           id: lista.id,
           nome: lista.nome,
           url: lista.url,
           tipo: lista.url.includes('get.php') ? 'XC' : 'M3U',
           protegido: lista.url.includes('get.php'),
+          protegidoPorPin: !!lista.protegidoPorPin,
         }))
       );
     } catch (error) {
@@ -134,6 +139,7 @@ function GerenciarPlaylistsContent() {
   const closeModal = () => {
     setModalType(null);
     setEditingId(null);
+    setEditingPin(null);
     setNome('');
     setUrl('');
     setServidor('');
@@ -146,8 +152,9 @@ function GerenciarPlaylistsContent() {
     setSubmitError('');
   };
 
-  const handleEditClick = (playlist: Playlist) => {
+  const openEditModal = (playlist: Playlist, pinConfirmado: string | null) => {
     setEditingId(playlist.id);
+    setEditingPin(pinConfirmado);
     setNome(playlist.nome);
     setSubmitError('');
     if (playlist.tipo === 'XC') {
@@ -162,6 +169,68 @@ function GerenciarPlaylistsContent() {
     }
     setUrl(playlist.url);
     setModalType('m3u');
+  };
+
+  // Prompt de PIN compartilhado por Editar e Excluir — abre em vez da ação
+  // direta sempre que a lista tem protegidoPorPin.
+  const [pinPrompt, setPinPrompt] = useState<{ action: 'editar' | 'excluir'; playlist: Playlist } | null>(null);
+  const [pinPromptValue, setPinPromptValue] = useState('');
+  const [pinPromptError, setPinPromptError] = useState('');
+  const [pinPromptLoading, setPinPromptLoading] = useState(false);
+
+  const handleEditClick = (playlist: Playlist) => {
+    if (playlist.protegidoPorPin) {
+      setPinPrompt({ action: 'editar', playlist });
+      setPinPromptValue('');
+      setPinPromptError('');
+      return;
+    }
+    openEditModal(playlist, null);
+  };
+
+  const handleRemoveClick = (playlist: Playlist) => {
+    if (playlist.protegidoPorPin) {
+      setPinPrompt({ action: 'excluir', playlist });
+      setPinPromptValue('');
+      setPinPromptError('');
+      return;
+    }
+    performDelete(playlist.id, null);
+  };
+
+  const closePinPrompt = () => {
+    setPinPrompt(null);
+    setPinPromptValue('');
+    setPinPromptError('');
+  };
+
+  const handlePinPromptConfirm = async () => {
+    if (!pinPrompt) return;
+    setPinPromptLoading(true);
+    setPinPromptError('');
+    try {
+      const res = await fetch('/api/app/listas', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pinPrompt.playlist.id, pin: pinPromptValue }),
+      });
+      if (!res.ok) {
+        setPinPromptError('PIN incorreto');
+        return;
+      }
+
+      if (pinPrompt.action === 'editar') {
+        openEditModal(pinPrompt.playlist, pinPromptValue);
+        closePinPrompt();
+      } else {
+        const ok = await performDelete(pinPrompt.playlist.id, pinPromptValue);
+        if (ok) closePinPrompt();
+      }
+    } catch {
+      setPinPromptError('Falha ao conferir o PIN');
+    } finally {
+      setPinPromptLoading(false);
+    }
   };
 
   const handleSubmitModal = async (e: React.FormEvent) => {
@@ -195,7 +264,9 @@ function GerenciarPlaylistsContent() {
         method: editingId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(
-          editingId ? { id: editingId, nome, url: playlistUrl } : { mac, nome, url: playlistUrl }
+          editingId
+            ? { id: editingId, nome, url: playlistUrl, pin: editingPin || undefined }
+            : { mac, nome, url: playlistUrl, pin: protegerComPin ? pin : undefined }
         ),
       });
       if (!response.ok) {
@@ -209,13 +280,23 @@ function GerenciarPlaylistsContent() {
     }
   };
 
-  const handleRemove = async (id: number) => {
-    setPlaylists((prev) => prev.filter((p) => p.id !== id));
+  const performDelete = async (id: number, pinValue: string | null): Promise<boolean> => {
     try {
-      const response = await fetch(`/api/app/listas?id=${id}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error();
-    } catch {
+      const qs = pinValue ? `?id=${id}&pin=${encodeURIComponent(pinValue)}` : `?id=${id}`;
+      const response = await fetch(`/api/app/listas${qs}`, { method: 'DELETE' });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Falha ao excluir playlist');
+      }
+      setPlaylists((prev) => prev.filter((p) => p.id !== id));
+      return true;
+    } catch (error) {
+      if (pinValue) {
+        setPinPromptError(error instanceof Error ? error.message : 'Falha ao excluir playlist');
+        return false;
+      }
       await loadPlaylists();
+      return false;
     }
   };
 
@@ -337,7 +418,14 @@ function GerenciarPlaylistsContent() {
                       <tbody>
                         {playlists.map((playlist) => (
                           <tr key={playlist.id} className="border-b border-white/5 last:border-0">
-                            <td className="px-6 py-4 font-medium">{playlist.nome}</td>
+                            <td className="px-6 py-4 font-medium">
+                              {playlist.nome}
+                              {playlist.protegidoPorPin && (
+                                <span className="ml-2" title="Protegida por PIN">
+                                  🔒
+                                </span>
+                              )}
+                            </td>
                             <td className="px-6 py-4 text-gray-300 max-w-xs truncate">
                               {playlist.protegido ? (
                                 <span className="inline-block rounded border border-orange-500/60 text-orange-400 text-xs font-semibold px-2 py-0.5">
@@ -361,7 +449,7 @@ function GerenciarPlaylistsContent() {
                                   Editar
                                 </button>
                                 <button
-                                  onClick={() => handleRemove(playlist.id)}
+                                  onClick={() => handleRemoveClick(playlist)}
                                   className="flex items-center gap-1 rounded-lg border border-red-500/50 text-red-400 text-xs font-semibold px-3 py-1.5 hover:bg-red-500/10"
                                 >
                                   Excluir
@@ -433,20 +521,22 @@ function GerenciarPlaylistsContent() {
                 </>
               )}
 
-              <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={protegerComPin}
-                  onChange={(e) => {
-                    setProtegerComPin(e.target.checked);
-                    setPinError('');
-                  }}
-                  className="w-4 h-4 rounded border-white/30 bg-transparent accent-fuchsia-600"
-                />
-                Proteja sua playlist com um PIN
-              </label>
+              {!editingId && (
+                <label className="flex items-center gap-3 text-sm cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={protegerComPin}
+                    onChange={(e) => {
+                      setProtegerComPin(e.target.checked);
+                      setPinError('');
+                    }}
+                    className="w-4 h-4 rounded border-white/30 bg-transparent accent-fuchsia-600"
+                  />
+                  Proteja sua playlist com um PIN
+                </label>
+              )}
 
-              {protegerComPin && (
+              {!editingId && protegerComPin && (
                 <>
                   <div className="flex gap-3 rounded-xl bg-yellow-900/20 border border-yellow-600/30 p-4">
                     <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2">
@@ -498,6 +588,52 @@ function GerenciarPlaylistsContent() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {pinPrompt && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[#151320] border border-white/10 p-8">
+            <h2 className="text-xl font-bold mb-2">
+              {pinPrompt.action === 'editar' ? 'Digite o PIN pra editar' : 'Digite o PIN pra excluir'}
+            </h2>
+            <p className="text-sm text-gray-400 mb-6">
+              A lista <strong>{pinPrompt.playlist.nome}</strong> está protegida por PIN.
+            </p>
+
+            <input
+              type="password"
+              placeholder="PIN"
+              value={pinPromptValue}
+              onChange={(e) => {
+                setPinPromptValue(e.target.value.replace(/\D/g, ''));
+                setPinPromptError('');
+              }}
+              inputMode="numeric"
+              maxLength={8}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handlePinPromptConfirm();
+              }}
+              className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 mb-4"
+            />
+
+            {pinPromptError && <p className="text-sm text-red-400 mb-4">{pinPromptError}</p>}
+
+            <div className="flex justify-end gap-6">
+              <button type="button" onClick={closePinPrompt} className="text-sm font-semibold text-gray-300 hover:text-white">
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={pinPromptLoading || !pinPromptValue}
+                onClick={handlePinPromptConfirm}
+                className="rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 disabled:opacity-60 transition-colors"
+              >
+                {pinPromptLoading ? 'Confirmando...' : 'Confirmar'}
+              </button>
+            </div>
           </div>
         </div>
       )}
