@@ -144,8 +144,9 @@ enum ListaOrigem {
   APP
 }
 
-// Tipo de ativação escolhido ao criar o app: ANUAL desconta 1 crédito e
-// expira 1 ano após a ativação; VITALICIO desconta 3 créditos e nunca
+// Tipo de ativação escolhido ao criar o app: ANUAL desconta 1 crédito (ou
+// R$8 via Pix direto do cliente, ver AtivacaoPagamento) e expira 1 ano após
+// a ativação; VITALICIO desconta 5 créditos (ou R$40 via Pix) e nunca
 // expira (dataExpiracao fica null). TRIAL não custa crédito e expira 7 dias
 // após a concessão — usado pela página admin "Instalados" para liberar um
 // MAC recém-detectado sem cobrar do revendedor. Nulo em linhas antigas,
@@ -154,6 +155,25 @@ enum TipoAtivacao {
   ANUAL
   VITALICIO
   TRIAL
+}
+
+// Uma linha por tentativa de compra de ativação Pix pelo próprio cliente
+// final, direto na página pública "Ativar Dispositivo" (sem login, sem
+// revendedor no meio). Mesma máquina de estado/idempotência que
+// CreditPurchase (ver /api/app/ativacao/pagamento, .../status,
+// .../webhook), mas em vez de somar créditos a um User, aplica a ativação
+// (tipo + dataExpiracao) direto na Lista do App daquele mac.
+model AtivacaoPagamento {
+  id          Int                  @id @default(autoincrement())
+  mac         String
+  tipo        TipoAtivacao
+  amount      Float
+  status      CreditPurchaseStatus @default(PENDING)
+  mpPaymentId String               @unique
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([mac])
 }
 
 // Histórico de transferências de ativação entre MACs (ver

@@ -18,7 +18,7 @@ type Lista = {
 
 const ATIVACAO_LABEL: Record<TipoAtivacao, string> = {
   ANUAL: 'Anual (1 crédito)',
-  VITALICIO: 'Vitalício (3 créditos)',
+  VITALICIO: 'Vitalício (5 créditos)',
   TRIAL: 'Teste grátis (7 dias)',
 };
 

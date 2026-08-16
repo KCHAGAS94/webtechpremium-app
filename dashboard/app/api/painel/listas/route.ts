@@ -8,7 +8,7 @@ import { getAuthUser } from '@/lib/auth';
 // gratuito e expira 7 dias após a concessão (ver página admin "Instalados").
 const ATIVACAO_CREDITS: Record<'ANUAL' | 'VITALICIO' | 'TRIAL', number> = {
   ANUAL: 1,
-  VITALICIO: 3,
+  VITALICIO: 5,
   TRIAL: 0,
 };
 

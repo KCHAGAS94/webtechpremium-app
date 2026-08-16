@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
 import { corsPreflight, withCors } from '@/lib/cors';
+import { getOrCreateSystemUser } from '@/lib/systemUser';
 
 export function OPTIONS() {
   return corsPreflight();
@@ -11,19 +12,6 @@ export function OPTIONS() {
 // it here (rather than requiring a reseller to type the MAC in manually) so
 // it shows up in the painel's "Usuários" table right away, with no Lista
 // linked, ready for a reseller to paste the M3U link in.
-async function getOrCreateSystemUser() {
-  const existing = await prisma.user.findFirst();
-  if (existing) return existing;
-
-  return prisma.user.create({
-    data: {
-      email: 'system@webtechpremium.local',
-      password: 'unused',
-      name: 'Sistema',
-    },
-  });
-}
-
 async function registerDevice(macAddress: string) {
   const systemUser = await getOrCreateSystemUser();
   return prisma.app.create({

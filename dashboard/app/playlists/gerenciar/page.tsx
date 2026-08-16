@@ -254,8 +254,16 @@ function GerenciarPlaylistsContent() {
           {/* Conteúdo */}
           <div>
             {activeSection === 'ativar' ? (
-              <ActivateDeviceCard />
-            ) : activeSection === 'gerenciamento' ? (
+              <ActivateDeviceCard mac={mac} onActivated={loadDeviceStatus} />
+            ) : activeSection === 'transferir' ? (
+              <TransferActivationCard
+                mac={mac}
+                onTransferred={(novoMac) => {
+                  setActiveSection('gerenciamento');
+                  router.push(`/playlists/gerenciar?mac=${encodeURIComponent(novoMac)}`);
+                }}
+              />
+            ) : (
               <>
                 <div className="flex gap-3 mb-6">
                   <button
@@ -327,14 +335,6 @@ function GerenciarPlaylistsContent() {
                   )}
                 </div>
               </>
-            ) : (
-              <TransferActivationCard
-                mac={mac}
-                onTransferred={(novoMac) => {
-                  setActiveSection('gerenciamento');
-                  router.push(`/playlists/gerenciar?mac=${encodeURIComponent(novoMac)}`);
-                }}
-              />
             )}
           </div>
         </div>

@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 import { SiteHeader } from '../components/site-header';
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Ex: revendedor clica "Fazer login" na aba de transferência da página
+  // pública de gerenciamento — sem isso, ele voltaria sempre pro painel em
+  // vez de continuar de onde parou.
+  const returnTo = searchParams.get('returnTo');
   const [checkingStatus, setCheckingStatus] = useState(true);
   const [isFirstAccess, setIsFirstAccess] = useState(false);
   const [name, setName] = useState('');
@@ -33,7 +38,9 @@ export default function LoginPage() {
     try {
       const endpoint = isFirstAccess ? '/api/auth/register' : '/api/auth/login';
       await axios.post(endpoint, { email, password, name });
-      router.push('/dashboard/usuarios');
+      // Só aceita caminho relativo local — evita open redirect via returnTo.
+      const safeReturnTo = returnTo && returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : null;
+      router.push(safeReturnTo || '/dashboard/usuarios');
       router.refresh();
     } catch (err) {
       const message = axios.isAxiosError(err)
@@ -171,5 +178,13 @@ export default function LoginPage() {
       </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

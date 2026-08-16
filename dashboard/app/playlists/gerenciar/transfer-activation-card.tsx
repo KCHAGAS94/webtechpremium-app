@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 function formatMacAddress(value: string) {
   const hex = value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
@@ -12,10 +12,26 @@ type Props = {
   onTransferred: (novoMac: string) => void;
 };
 
+// Trocar o MAC ativado é ação de revendedor/admin (a API já garante isso —
+// só o dono do MAC ou um admin consegue), não do cliente final. Antes essa
+// aba chamava a API autenticada direto: sem sessão, dava 401 silencioso;
+// com uma sessão de revendedor aberta por acaso no mesmo navegador, ela
+// agia sobre os dados desse revendedor em vez de pedir login. Agora checa
+// /api/auth/me primeiro e pede login explicitamente quando não há sessão.
 export function TransferActivationCard({ mac, onTransferred }: Props) {
+  const [authChecked, setAuthChecked] = useState(false);
+  const [loggedIn, setLoggedIn] = useState(false);
   const [novoMac, setNovoMac] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then((res) => res.json())
+      .then((data) => setLoggedIn(!!data.user))
+      .catch(() => setLoggedIn(false))
+      .finally(() => setAuthChecked(true));
+  }, []);
 
   const handleTransfer = async () => {
     setError('');
@@ -60,6 +76,27 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
       setLoading(false);
     }
   };
+
+  if (!authChecked) return null;
+
+  if (!loggedIn) {
+    const returnTo = typeof window !== 'undefined' ? window.location.pathname + window.location.search : '/playlists/gerenciar';
+    return (
+      <div className="rounded-2xl bg-white/5 border border-white/10 p-8 max-w-xl text-center space-y-4">
+        <h2 className="text-xl font-bold">Transferir ativação para outro dispositivo</h2>
+        <p className="text-sm text-gray-400">
+          Essa ação é feita pelo revendedor ou pelo administrador responsável pelo seu MAC. Faça login no
+          painel para continuar.
+        </p>
+        <a
+          href={`/login?returnTo=${encodeURIComponent(returnTo)}`}
+          className="inline-block rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 transition-colors"
+        >
+          Fazer login
+        </a>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl bg-white/5 border border-white/10 p-8 max-w-xl">
