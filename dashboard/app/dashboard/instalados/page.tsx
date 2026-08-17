@@ -147,11 +147,11 @@ export default function InstaladosPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-white">Instalados</h2>
-        <p className="text-sm text-gray-400">
+        {/* <p className="text-sm text-gray-400">
           Todos os MACs que já abriram o app. Todo MAC novo já recebe 7 dias grátis automaticamente — só
           adicione a playlist dele em &quot;Usuários&quot;. MACs &quot;Não ativado&quot; são de antes
           dessa mudança (o botão concede o trial manualmente pra esses).
-        </p>
+        </p> */}
       </div>
 
       <div className="flex items-center bg-white rounded border border-gray-300 px-3">

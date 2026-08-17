@@ -116,7 +116,9 @@ function EditModal({
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de ativação</label>
               <div className="flex gap-3">
-                {(Object.keys(ATIVACAO_LABEL) as TipoAtivacao[]).map((tipo) => (
+                {(Object.keys(ATIVACAO_LABEL) as TipoAtivacao[])
+                  .filter((tipo) => tipo !== 'TRIAL')
+                  .map((tipo) => (
                   <button
                     key={tipo}
                     type="button"
