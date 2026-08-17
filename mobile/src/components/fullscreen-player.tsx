@@ -215,6 +215,24 @@ export function FullscreenPlayer({
     showControls();
   }, [onGoLive, showControls]);
 
+  const handleReload = useCallback(() => {
+    // Live TV: jump straight to the live edge on reload, same as switching
+    // channels and back — restoring the old `currentTime` here would seek
+    // back into the stale buffer position instead, which is what made this
+    // feel much slower than the channel-switch path.
+    player
+      .replaceAsync({
+        uri: streamUrl,
+        ...(isHlsStreamUrl(streamUrl) ? { contentType: 'hls' as const } : {}),
+        headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
+      })
+      .then(() => {
+        player.play();
+      })
+      .catch(() => {});
+    showControls();
+  }, [player, streamUrl, showControls]);
+
   const isBehindLive = isLive && !!offsetFromLive && offsetFromLive > LIVE_EDGE_THRESHOLD_SECONDS;
 
   const progress = duration > 0 ? currentTime / duration : 0;
@@ -294,6 +312,15 @@ export function FullscreenPlayer({
                 </ThemedText>
               </PlayerControlButton>
               <CastButton />
+              <PlayerControlButton
+                onPress={handleReload}
+                hitSlop={12}
+                style={styles.reloadButton}
+                focusedStyle={styles.reloadButtonFocused}
+                onFocus={showControls}
+              >
+                <ThemedText style={styles.reloadIcon}>⟳</ThemedText>
+              </PlayerControlButton>
               <PlayerControlButton
                 onPress={onToggleFavorite}
                 hitSlop={12}
@@ -503,6 +530,22 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#4dd6ff',
   },
+  reloadButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  reloadButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+  },
+  reloadIcon: {
+    fontSize: 18,
+    color: '#fff',
+  },
   favoriteIcon: {
     fontSize: 18,
     color: '#fff',
@@ -564,7 +607,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingHorizontal: 16,
+    paddingLeft: 56,
+    paddingRight: 16,
     paddingBottom: 16,
   },
   time: {

@@ -145,7 +145,7 @@ export function SeriesDetailsScreen({
       ) : null}
       <View style={styles.backdropScrim} />
 
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom', 'left', 'right']}>
         <Pressable
           onPress={onBack}
           onFocus={() => setBackFocused(true)}
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-    marginLeft: 16,
+    marginLeft: 32,
     marginTop: 8,
     borderWidth: 2,
     borderColor: 'transparent',
@@ -256,7 +256,8 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
   content: {
-    padding: 24,
+    paddingVertical: 24,
+    paddingHorizontal: 40,
     gap: 20,
   },
   mainRow: {
