@@ -120,7 +120,7 @@ export default function Home() {
             </p>
             <div className="flex flex-wrap gap-4">
               <a
-                href="#download"
+                href="https://kchagas.com.br/Webtechpremium-v1.apk"
                 className="flex items-center gap-2 px-6 py-3 rounded-lg bg-fuchsia-600 hover:bg-fuchsia-500 transition-colors font-semibold"
               >
                 <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
@@ -228,9 +228,12 @@ export default function Home() {
         <p className="text-sm text-gray-400 mb-3">
           Baixe o arquivo apk para Android, Fire TV (o código do AFT downloader é 7362920)
         </p>
-        <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-6 py-3 mb-8 hover:bg-white/5 transition-colors font-semibold text-sm">
+        <a
+          href="https://kchagas.com.br/Webtechpremium-v1.apk"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-6 py-3 mb-8 hover:bg-white/5 transition-colors font-semibold text-sm"
+        >
           Download Android APK
-        </button>
+        </a>
 
         <p className="text-sm text-gray-400 mb-3">Baixe o arquivo exe para Windows Desktop</p>
         <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-6 py-3 hover:bg-white/5 transition-colors font-semibold text-sm">
