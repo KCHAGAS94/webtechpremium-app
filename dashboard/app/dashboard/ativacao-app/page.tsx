@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type TipoAtivacao = 'ANUAL' | 'VITALICIO' | 'TRIAL';
 
@@ -292,6 +293,7 @@ export default function AtivacaoAppPage() {
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [transferindoLista, setTransferindoLista] = useState<Lista | null>(null);
+  const confirm = useConfirm();
 
   const loadListas = async () => {
     try {
@@ -312,7 +314,7 @@ export default function AtivacaoAppPage() {
   );
 
   const handleDelete = async (lista: Lista) => {
-    if (!confirm('Tem certeza que deseja deletar este app?')) return;
+    if (!(await confirm('Tem certeza que deseja deletar este app?', { confirmLabel: 'Deletar', danger: true }))) return;
 
     setListas(listas.filter((l) => l.id !== lista.id));
     try {
@@ -325,7 +327,7 @@ export default function AtivacaoAppPage() {
   const handleRemoveExpirados = async () => {
     const expirados = listas.filter((l) => l.expirado);
     if (expirados.length === 0) return;
-    if (!confirm(`Remover ${expirados.length} app(s) expirado(s)?`)) return;
+    if (!(await confirm(`Remover ${expirados.length} app(s) expirado(s)?`, { confirmLabel: 'Remover', danger: true }))) return;
 
     try {
       await Promise.all(

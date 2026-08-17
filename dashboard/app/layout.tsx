@@ -3,6 +3,7 @@
 import { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import './globals.css';
+import { ConfirmDialogProvider } from '@/components/confirm-dialog';
 
 export const metadata: Metadata = {
   title: 'WebTech Premium',
@@ -16,7 +17,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR">
-      <body>{children}</body>
+      <body>
+        <ConfirmDialogProvider>{children}</ConfirmDialogProvider>
+      </body>
     </html>
   );
 }

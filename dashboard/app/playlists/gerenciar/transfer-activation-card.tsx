@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 function formatMacAddress(value: string) {
   const hex = value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
@@ -24,6 +25,7 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
   const [novoMac, setNovoMac] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const confirm = useConfirm();
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -41,9 +43,10 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
       return;
     }
 
-    const confirmado = window.confirm(
+    const confirmado = await confirm(
       `Tem certeza que deseja trocar o MAC ativado de ${mac} para ${novoMac}?\n\n` +
-        'Essa ação vai apagar automaticamente todas as playlists cadastradas no MAC atual e não pode ser desfeita.'
+        'Essa ação vai apagar automaticamente todas as playlists cadastradas no MAC atual e não pode ser desfeita.',
+      { confirmLabel: 'Trocar MAC', danger: true }
     );
     if (!confirmado) return;
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type Lista = {
   id: number;
@@ -134,6 +135,7 @@ export default function UsuariosPage() {
   const [listas, setListas] = useState(mockListas);
   const [searchTerm, setSearchTerm] = useState('');
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
+  const confirm = useConfirm();
 
   const loadListas = async () => {
     try {
@@ -157,7 +159,7 @@ export default function UsuariosPage() {
   );
 
   const handleDelete = async (lista: Lista) => {
-    if (!confirm('Tem certeza que deseja deletar esta lista?')) return;
+    if (!(await confirm('Tem certeza que deseja deletar esta lista?', { confirmLabel: 'Deletar', danger: true }))) return;
 
     setListas(listas.filter((l) => l.id !== lista.id));
     try {

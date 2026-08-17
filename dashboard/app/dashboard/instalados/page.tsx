@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type AppInstalado = {
   id: number;
@@ -52,6 +53,7 @@ export default function InstaladosPage() {
   const [grantingId, setGrantingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [error, setError] = useState('');
+  const confirm = useConfirm();
 
   const loadMe = async () => {
     const res = await fetch('/api/auth/me');
@@ -81,7 +83,7 @@ export default function InstaladosPage() {
   });
 
   const handleGrantTrial = async (app: AppInstalado) => {
-    if (!confirm(`Conceder 7 dias grátis ao MAC ${app.mac}?`)) return;
+    if (!(await confirm(`Conceder 7 dias grátis ao MAC ${app.mac}?`))) return;
 
     setGrantingId(app.id);
     setError('');
@@ -106,7 +108,11 @@ export default function InstaladosPage() {
   };
 
   const handleDelete = async (app: AppInstalado) => {
-    if (!confirm(`Excluir o MAC ${app.mac}? Isso remove o dispositivo e todas as listas dele do painel.`)) return;
+    const ok = await confirm(
+      `Excluir o MAC ${app.mac}? Isso remove o dispositivo e todas as listas dele do painel.`,
+      { confirmLabel: 'Excluir', danger: true }
+    );
+    if (!ok) return;
 
     setDeletingId(app.id);
     setError('');

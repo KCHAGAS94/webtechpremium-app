@@ -226,7 +226,7 @@ export default function Home() {
         </div>
 
         <p className="text-sm text-gray-400 mb-3">
-          Baixe o arquivo apk para Android, Fire TV (o código do AFT downloader é 327187)
+          Baixe o arquivo apk para Android, Fire TV (o código do AFT downloader é 7362920)
         </p>
         <button className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-black/40 px-6 py-3 mb-8 hover:bg-white/5 transition-colors font-semibold text-sm">
           Download Android APK

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type Servidor = {
   id: number;
@@ -94,6 +95,7 @@ export default function ServidoresPage() {
   const [servidores, setServidores] = useState<Servidor[]>([]);
   const [editingServidor, setEditingServidor] = useState<Servidor | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const confirm = useConfirm();
 
   const loadServidores = async () => {
     try {
@@ -135,7 +137,7 @@ export default function ServidoresPage() {
   };
 
   const handleDelete = async (servidor: Servidor) => {
-    if (!confirm('Tem certeza que deseja deletar este servidor?')) return;
+    if (!(await confirm('Tem certeza que deseja deletar este servidor?', { confirmLabel: 'Deletar', danger: true }))) return;
 
     try {
       await fetch(`/api/painel/servidores?id=${servidor.id}`, { method: 'DELETE' });

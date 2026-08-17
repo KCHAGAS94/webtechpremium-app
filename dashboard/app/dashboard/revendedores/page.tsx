@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type Revendedor = {
   id: number;
@@ -14,6 +15,7 @@ export default function RevendedoresPage() {
   const [revendedores, setRevendedores] = useState<Revendedor[]>([]);
   const [form, setForm] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
+  const confirm = useConfirm();
 
   const loadMe = async () => {
     const res = await fetch('/api/auth/me');
@@ -54,7 +56,7 @@ export default function RevendedoresPage() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Remover este revendedor?')) return;
+    if (!(await confirm('Remover este revendedor?', { confirmLabel: 'Remover', danger: true }))) return;
     await fetch(`/api/revendedores?id=${id}`, { method: 'DELETE' });
     await loadRevendedores();
   };
