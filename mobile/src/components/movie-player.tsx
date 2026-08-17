@@ -520,14 +520,16 @@ export function MoviePlayer({
             </View>
 
             <View style={styles.middleRow} pointerEvents="box-none">
-              <VerticalSlider
-                icon="☀"
-                value={brightness}
-                onChange={handleBrightnessChange}
-                onInteractionStart={handleScrubStart}
-                onInteractionEnd={handleScrubEnd}
-                accessibilityLabel="Brilho"
-              />
+              {!Platform.isTV && (
+                <VerticalSlider
+                  icon="☀"
+                  value={brightness}
+                  onChange={handleBrightnessChange}
+                  onInteractionStart={handleScrubStart}
+                  onInteractionEnd={handleScrubEnd}
+                  accessibilityLabel="Brilho"
+                />
+              )}
 
               <View style={styles.centerControls}>
                 <SkipButton
@@ -569,14 +571,16 @@ export function MoviePlayer({
                 />
               </View>
 
-              <VerticalSlider
-                icon="🔊"
-                value={volume}
-                onChange={handleVolumeChange}
-                onInteractionStart={handleScrubStart}
-                onInteractionEnd={handleScrubEnd}
-                accessibilityLabel="Volume"
-              />
+              {!Platform.isTV && (
+                <VerticalSlider
+                  icon="🔊"
+                  value={volume}
+                  onChange={handleVolumeChange}
+                  onInteractionStart={handleScrubStart}
+                  onInteractionEnd={handleScrubEnd}
+                  accessibilityLabel="Volume"
+                />
+              )}
             </View>
 
             <View style={styles.bottomBar}>
