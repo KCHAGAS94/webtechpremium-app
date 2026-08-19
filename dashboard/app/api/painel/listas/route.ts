@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
 import { isExpirado } from '@/lib/hls-url';
 import { getAuthUser } from '@/lib/auth';
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  let existingLista: Awaited<ReturnType<typeof prisma.lista.findUnique>> | null = null;
+  let existingLista: Prisma.ListaGetPayload<{ include: { app: true } }> | null = null;
   if (id) {
     existingLista = await prisma.lista.findUnique({ where: { id }, include: { app: true } });
     if (!existingLista || (auth.role !== 'ADMIN' && existingLista.app.userId !== auth.id)) {
