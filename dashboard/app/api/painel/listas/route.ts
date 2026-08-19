@@ -92,8 +92,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  let existingLista: Awaited<ReturnType<typeof prisma.lista.findUnique>> | null = null;
   if (id) {
-    const existingLista = await prisma.lista.findUnique({ where: { id }, include: { app: true } });
+    existingLista = await prisma.lista.findUnique({ where: { id }, include: { app: true } });
     if (!existingLista || (auth.role !== 'ADMIN' && existingLista.app.userId !== auth.id)) {
       return NextResponse.json({ error: 'Lista não encontrada' }, { status: 404 });
     }
@@ -132,7 +133,20 @@ export async function POST(request: NextRequest) {
   let dataExpiracao: Date | null = null;
   let tipoAtivacao: 'ANUAL' | 'VITALICIO' | 'TRIAL' | null = null;
 
-  if (!id && tipo) {
+  // Upgrade de um app em teste grátis: só permitido enquanto o tipo
+  // cadastrado ainda é TRIAL, e só para ANUAL/VITALICIO (não faz sentido
+  // "ativar" de volta pra TRIAL). Cobra crédito e recalcula a data de
+  // expiração exatamente como na ativação nova — a diferença é que aqui
+  // troca o tipo/data de uma Lista já existente em vez de criar uma.
+  const isTrialUpgrade = Boolean(id) && Boolean(tipo) && existingLista?.tipo === 'TRIAL';
+
+  if (isTrialUpgrade) {
+    if (tipo !== 'ANUAL' && tipo !== 'VITALICIO') {
+      return NextResponse.json({ error: 'Tipo de ativação inválido' }, { status: 400 });
+    }
+  }
+
+  if ((!id && tipo) || isTrialUpgrade) {
     if (tipo !== 'ANUAL' && tipo !== 'VITALICIO' && tipo !== 'TRIAL') {
       return NextResponse.json({ error: 'Tipo de ativação inválido' }, { status: 400 });
     }
@@ -169,10 +183,16 @@ export async function POST(request: NextRequest) {
   });
 
   const lista = id
-    ? // Edição: dataExpiracao/tipo nunca mudam depois da ativação.
+    ? // Edição normal: dataExpiracao/tipo nunca mudam. Exceção: upgrade de
+      // TRIAL para ANUAL/VITALICIO, tratado acima e aplicado aqui.
       await prisma.lista.update({
         where: { id },
-        data: { appId: app.id, nome: nome || 'Lista', url: url || '' },
+        data: {
+          appId: app.id,
+          nome: nome || 'Lista',
+          url: url || '',
+          ...(isTrialUpgrade && { tipo: tipoAtivacao, dataExpiracao }),
+        },
       })
     : await prisma.lista.create({
         data: {
