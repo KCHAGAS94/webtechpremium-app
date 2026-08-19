@@ -614,12 +614,6 @@ export default function AtivacaoAppPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => setEditingLista(lista)}
-                  className="text-blue-500 hover:text-blue-700 text-lg"
-                >
-                  ✏️
-                </button>
-                <button
                   onClick={() => handleDelete(lista)}
                   className="text-red-500 hover:text-red-700 text-lg"
                 >
@@ -705,12 +699,6 @@ export default function AtivacaoAppPage() {
                         🔁
                       </button>
                     )}
-                    <button
-                      onClick={() => setEditingLista(lista)}
-                      className="text-blue-500 hover:text-blue-700 font-semibold text-xl"
-                    >
-                      ✏️
-                    </button>
                     <button
                       onClick={() => handleDelete(lista)}
                       className="text-red-500 hover:text-red-700 font-semibold text-xl"

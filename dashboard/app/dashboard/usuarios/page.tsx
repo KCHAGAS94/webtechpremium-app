@@ -41,6 +41,8 @@ function EditModal({
 
   if (!lista) return null;
 
+  const isEditing = Boolean(lista.id);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -81,8 +83,14 @@ function EditModal({
               onChange={handleChange}
               maxLength={17}
               placeholder="00:1A:3M:A3:02:11"
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
+              disabled={isEditing}
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase disabled:bg-gray-200 disabled:text-gray-500 disabled:cursor-not-allowed"
             />
+            {isEditing && (
+              <p className="text-xs text-gray-500 mt-1">
+                O MAC não pode ser alterado por aqui. Use "Transferir" na tela Ativação App.
+              </p>
+            )}
           </div>
 
           <div>
