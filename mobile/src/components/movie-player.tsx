@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
   middleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: Platform.isTV ? 'center' : 'space-between',
     paddingHorizontal: 56,
   },
   centerControls: {
