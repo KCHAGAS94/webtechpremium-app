@@ -482,6 +482,7 @@ export default function AtivacaoAppPage() {
         return data.error || 'Falha ao salvar app';
       }
       await loadListas();
+      if (!lista.id) window.dispatchEvent(new Event('webtech:credits-changed'));
     } catch (error) {
       console.error('Falha ao salvar app no painel', error);
       return 'Falha ao salvar app';
@@ -519,6 +520,7 @@ export default function AtivacaoAppPage() {
         return data.error || 'Falha ao ativar app';
       }
       await loadListas();
+      window.dispatchEvent(new Event('webtech:credits-changed'));
     } catch (error) {
       console.error('Falha ao ativar app', error);
       return 'Falha ao ativar app';

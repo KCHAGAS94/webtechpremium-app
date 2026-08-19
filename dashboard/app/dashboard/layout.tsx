@@ -31,16 +31,25 @@ export default function DashboardLayout({
   const router = useRouter();
 
   useEffect(() => {
-    axios
-      .get('/api/auth/me')
-      .then((res) => {
-        setIsAdmin(res.data.user?.role === 'ADMIN');
-        setMe(res.data.user ? { name: res.data.user.name, credits: res.data.user.credits } : null);
-      })
-      .catch(() => {
-        setIsAdmin(false);
-        setMe(null);
-      });
+    const loadMe = () => {
+      axios
+        .get('/api/auth/me')
+        .then((res) => {
+          setIsAdmin(res.data.user?.role === 'ADMIN');
+          setMe(res.data.user ? { name: res.data.user.name, credits: res.data.user.credits } : null);
+        })
+        .catch(() => {
+          setIsAdmin(false);
+          setMe(null);
+        });
+    };
+
+    loadMe();
+
+    // Páginas que gastam crédito (ativação, compra) disparam esse evento
+    // pra sidebar recarregar o saldo sem precisar de um estado global.
+    window.addEventListener('webtech:credits-changed', loadMe);
+    return () => window.removeEventListener('webtech:credits-changed', loadMe);
   }, []);
 
   const menuItems = [...baseMenuItems, ...(isAdmin ? adminMenuItems : [])];
