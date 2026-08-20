@@ -111,30 +111,62 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
           ))}
 
           <View style={styles.row}>
-            <TouchableOpacity style={[keyStyle, styles.wideKey]} onPress={onClose}>
+            <TouchableOpacity
+              style={[keyStyle, styles.wideKey, focusedKey === 'done' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('done')}
+              onPress={onClose}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Concluído</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[keyStyle, styles.wideKey]} onPress={handleClear}>
+            <TouchableOpacity
+              style={[keyStyle, styles.wideKey, focusedKey === 'clear' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('clear')}
+              onPress={handleClear}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Limpar</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[keyStyle, styles.wideKey]} onPress={handleToggleMode}>
+            <TouchableOpacity
+              style={[keyStyle, styles.wideKey, focusedKey === 'mode' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('mode')}
+              onPress={handleToggleMode}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>
                 {mode === 'letters' ? '#+=' : 'ABC'}
               </ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={keyStyle} onPress={handleMoveLeft}>
+            <TouchableOpacity
+              style={[keyStyle, focusedKey === 'left' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('left')}
+              onPress={handleMoveLeft}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>◀</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[keyStyle, styles.spaceKey]} onPress={handleSpace}>
+            <TouchableOpacity
+              style={[keyStyle, styles.spaceKey, focusedKey === 'space' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('space')}
+              onPress={handleSpace}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Espaço</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={keyStyle} onPress={handleMoveRight}>
+            <TouchableOpacity
+              style={[keyStyle, focusedKey === 'right' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('right')}
+              onPress={handleMoveRight}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>▶</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[keyStyle, styles.wideKey]} onPress={handleBackspace}>
+            <TouchableOpacity
+              style={[keyStyle, styles.wideKey, focusedKey === 'backspace' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('backspace')}
+              onPress={handleBackspace}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>⌫</ThemedText>
             </TouchableOpacity>
-            <TouchableOpacity style={[keyStyle, styles.wideKey]} onPress={() => setLargeKeys((v) => !v)}>
+            <TouchableOpacity
+              style={[keyStyle, styles.wideKey, focusedKey === 'largeKeys' && styles.keyFocused]}
+              onFocus={() => setFocusedKey('largeKeys')}
+              onPress={() => setLargeKeys((v) => !v)}
+            >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>
                 {largeKeys ? 'A-' : 'A+'}
               </ThemedText>
