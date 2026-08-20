@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useConfirm } from '@/components/confirm-dialog';
+import { useMacExists } from '@/lib/use-mac-exists';
+import { MacStatus } from '@/components/mac-status';
 
 function formatMacAddress(value: string) {
   const hex = value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
@@ -26,6 +28,7 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const confirm = useConfirm();
+  const macStatus = useMacExists(novoMac);
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -38,8 +41,8 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
   const handleTransfer = async () => {
     setError('');
 
-    if (novoMac.replace(/:/g, '').length !== 12) {
-      setError('Informe um endereço MAC válido');
+    if (macStatus !== 'valid') {
+      setError('Adicione um MAC válido');
       return;
     }
 
@@ -116,8 +119,12 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
         value={novoMac}
         onChange={(e) => setNovoMac(formatMacAddress(e.target.value))}
         maxLength={17}
-        className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 mb-6"
+        className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
       />
+      {macStatus === 'checking' && <p className="text-sm text-gray-400 mb-6 mt-1">Verificando…</p>}
+      {macStatus === 'valid' && <p className="text-sm text-green-400 mb-6 mt-1">✅ MAC válido</p>}
+      {macStatus === 'invalid' && <p className="text-sm text-red-400 mb-6 mt-1">Adicione um MAC válido</p>}
+      {macStatus === 'idle' && <div className="mb-6" />}
 
       <div className="flex gap-3 rounded-xl bg-yellow-900/20 border border-yellow-600/30 p-4 mb-6">
         <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0 text-yellow-500" fill="none" stroke="currentColor" strokeWidth="2">
@@ -143,7 +150,7 @@ export function TransferActivationCard({ mac, onTransferred }: Props) {
         </button>
         <button
           type="button"
-          disabled={loading}
+          disabled={loading || macStatus !== 'valid'}
           onClick={handleTransfer}
           className="rounded-lg bg-white text-[#0b0a12] font-semibold px-6 py-2.5 hover:bg-gray-200 transition-colors disabled:opacity-60"
         >

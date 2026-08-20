@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useConfirm } from '@/components/confirm-dialog';
+import { useMacExists } from '@/lib/use-mac-exists';
+import { MacStatus } from '@/components/mac-status';
 
 type TipoAtivacao = 'ANUAL' | 'VITALICIO' | 'TRIAL';
 
@@ -56,6 +58,7 @@ function EditModal({
   const [formData, setFormData] = useState<Lista>(lista || ({} as Lista));
   const [error, setError] = useState('');
   const isNew = !lista?.id;
+  const macStatus = useMacExists(formData.mac ?? '');
 
   useEffect(() => {
     if (lista) setFormData(lista);
@@ -81,6 +84,10 @@ function EditModal({
   };
 
   const handleSave = async () => {
+    if (isNew && macStatus !== 'valid') {
+      setError('Adicione um MAC válido');
+      return;
+    }
     const errorMessage = await onSave(formData);
     if (errorMessage) {
       setError(errorMessage);
@@ -109,8 +116,10 @@ function EditModal({
               onChange={handleChange}
               maxLength={17}
               placeholder="00:1A:3M:A3:02:11"
-              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
+              disabled={!isNew}
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase disabled:bg-gray-200 disabled:text-gray-500"
             />
+            {isNew && <MacStatus status={macStatus} />}
           </div>
 
           {isNew ? (
@@ -169,7 +178,8 @@ function EditModal({
         <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
           <button
             onClick={handleSave}
-            className="flex-1 bg-green-500 text-white px-6 py-3 rounded font-semibold hover:bg-green-600 transition"
+            disabled={isNew && macStatus !== 'valid'}
+            className="flex-1 bg-green-500 text-white px-6 py-3 rounded font-semibold hover:bg-green-600 disabled:opacity-50 transition"
           >
             ✓ Salvar
           </button>
@@ -197,6 +207,7 @@ function TransferModal({
   const [novoMac, setNovoMac] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const macStatus = useMacExists(novoMac);
 
   useEffect(() => {
     setNovoMac('');
@@ -206,6 +217,10 @@ function TransferModal({
   if (!lista) return null;
 
   const handleConfirm = async () => {
+    if (macStatus !== 'valid') {
+      setError('Adicione um MAC válido');
+      return;
+    }
     setLoading(true);
     const errorMessage = await onTransfer(novoMac);
     setLoading(false);
@@ -243,6 +258,7 @@ function TransferModal({
               placeholder="00:1A:3M:A3:02:11"
               className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase"
             />
+            <MacStatus status={macStatus} />
           </div>
           <p className="text-xs text-gray-500">
             O MAC atual deixa de existir no painel. O tipo de ativação e a data de expiração continuam
@@ -255,7 +271,7 @@ function TransferModal({
         <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
           <button
             onClick={handleConfirm}
-            disabled={loading || !novoMac}
+            disabled={loading || macStatus !== 'valid'}
             className="flex-1 bg-green-500 text-white px-6 py-3 rounded font-semibold hover:bg-green-600 disabled:opacity-50 transition"
           >
             {loading ? 'Transferindo...' : '✓ Transferir'}
