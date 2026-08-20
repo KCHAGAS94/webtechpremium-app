@@ -700,6 +700,7 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                       player={player}
                       nativeControls={false}
                       onFirstFrameRender={() => setIsBuffering(false)}
+                      surfaceType="textureView"
                     />
                   )}
                   {isBuffering && status !== 'error' && (

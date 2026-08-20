@@ -426,7 +426,13 @@ export function MoviePlayer({
             focusable={Platform.isTV ? !controlsVisible : undefined}
             hasTVPreferredFocus={Platform.isTV ? !controlsVisible : undefined}
           >
-            <VideoView style={StyleSheet.absoluteFill} player={player} nativeControls={false} contentFit="contain" />
+            <VideoView
+              style={StyleSheet.absoluteFill}
+              player={player}
+              nativeControls={false}
+              contentFit="contain"
+              surfaceType="textureView"
+            />
           </Pressable>
         )}
 
