@@ -95,14 +95,6 @@ model Session {
   @@index([appId])
 }
 
-model Servidor {
-  id        Int      @id @default(autoincrement())
-  nome      String
-  url       String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 // usuario/senha/servidor were merged into a single manually-pasted M3U link
 // (e.g. http://host:port/get.php?username=...&password=...&type=m3u_plus) —
 // the reseller now pastes the full URL instead of the panel building it from

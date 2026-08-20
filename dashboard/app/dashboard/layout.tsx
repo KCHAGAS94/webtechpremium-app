@@ -9,7 +9,6 @@ const baseMenuItems = [
   { label: 'USUÁRIOS', icon: '👥', href: '/dashboard/usuarios' },
   { label: 'ATIVAÇÃO APP', icon: '📱', href: '/dashboard/ativacao-app' },
   { label: 'TRANSFERÊNCIAS', icon: '🔁', href: '/dashboard/transferencias' },
-  { label: 'SERVIDORES', icon: '🖥️', href: '/dashboard/servidores' },
   { label: 'CRÉDITO', icon: '💳', href: '/dashboard/creditos' },
 ];
 
