@@ -137,6 +137,10 @@ model Lista {
   // ("Proteja sua playlist com um PIN"). Só se aplica a origem APP — exige
   // digitar o PIN certo antes de editar ou excluir essa lista por lá.
   pinHash       String?
+  // Nota livre do revendedor/admin sobre onde esse MAC está instalado (ex.
+  // "sala de estar - cliente João"). Puramente informativa, não afeta a
+  // ativação em si.
+  observacao    String?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 

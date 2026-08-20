@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
         expirado: isExpirado(lista.dataExpiracao),
         instaladoEm: lista.app.createdAt.toISOString(),
         tipo: lista.tipo,
+        observacao: lista.observacao ?? '',
       })),
     },
     { status: 200 }
@@ -73,7 +74,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
   }
 
-  const { id, mac, nome, url, enforceUniqueMac, tipo } = await request.json();
+  const { id, mac, nome, url, enforceUniqueMac, tipo, observacao } = await request.json();
 
   if (!mac) {
     return NextResponse.json({ error: 'MAC é obrigatório' }, { status: 400 });
@@ -192,6 +193,7 @@ export async function POST(request: NextRequest) {
           appId: app.id,
           nome: nome || 'Lista',
           url: url || '',
+          observacao: observacao ?? undefined,
           ...(isTrialUpgrade && { tipo: tipoAtivacao, dataExpiracao }),
         },
       })
@@ -202,6 +204,7 @@ export async function POST(request: NextRequest) {
           url: url || '',
           dataExpiracao,
           criadoPorId: auth.id,
+          observacao: observacao || null,
           ...(tipoAtivacao && { tipo: tipoAtivacao }),
         },
       });

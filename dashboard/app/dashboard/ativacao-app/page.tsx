@@ -15,6 +15,7 @@ type Lista = {
   expirado: boolean;
   instaladoEm: string;
   tipo: TipoAtivacao | null;
+  observacao: string;
 };
 
 const ATIVACAO_LABEL: Record<TipoAtivacao, string> = {
@@ -64,7 +65,7 @@ function EditModal({
   if (!lista) return null;
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData({
@@ -149,6 +150,18 @@ function EditModal({
               </p>
             </div>
           )}
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Observação</label>
+            <textarea
+              name="observacao"
+              value={formData.observacao ?? ''}
+              onChange={handleChange}
+              rows={3}
+              placeholder="Ex: instalado na sala de estar - cliente João"
+              className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 resize-none"
+            />
+          </div>
 
           {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
         </div>
@@ -451,7 +464,12 @@ export default function AtivacaoAppPage() {
       expirado: false,
       instaladoEm: '',
       tipo: null,
+      observacao: '',
     });
+  };
+
+  const handleEditClick = (lista: Lista) => {
+    setEditingLista(lista);
   };
 
   const handleSave = async (lista: Lista): Promise<string | void> => {
@@ -470,6 +488,7 @@ export default function AtivacaoAppPage() {
           url: lista.url,
           enforceUniqueMac: true,
           tipo: lista.id ? undefined : lista.tipo,
+          observacao: lista.observacao,
         }),
       });
       if (!response.ok) {
@@ -614,6 +633,13 @@ export default function AtivacaoAppPage() {
                   </button>
                 )}
                 <button
+                  onClick={() => handleEditClick(lista)}
+                  className="text-blue-500 hover:text-blue-700 text-lg"
+                  title="Editar observação"
+                >
+                  📝
+                </button>
+                <button
                   onClick={() => handleDelete(lista)}
                   className="text-red-500 hover:text-red-700 text-lg"
                 >
@@ -634,6 +660,12 @@ export default function AtivacaoAppPage() {
                 <div className="text-xs text-gray-400">Tipo</div>
                 <div className="text-gray-700">{lista.tipo ? ATIVACAO_LABEL[lista.tipo] : '—'}</div>
               </div>
+              {lista.observacao && (
+                <div className="col-span-2">
+                  <div className="text-xs text-gray-400">Observação</div>
+                  <div className="text-gray-700">{lista.observacao}</div>
+                </div>
+              )}
             </div>
             <div>
               {lista.expirado ? (
@@ -660,6 +692,7 @@ export default function AtivacaoAppPage() {
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Tipo</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Observação</th>
                 <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
               </tr>
             </thead>
@@ -680,6 +713,9 @@ export default function AtivacaoAppPage() {
                       </span>
                     )}
                   </td>
+                  <td className="px-6 py-3 text-gray-600 max-w-xs truncate" title={lista.observacao}>
+                    {lista.observacao || '—'}
+                  </td>
                   <td className="px-6 py-3 flex justify-center gap-2">
                     {lista.tipo === 'TRIAL' && (
                       <button
@@ -699,6 +735,13 @@ export default function AtivacaoAppPage() {
                         🔁
                       </button>
                     )}
+                    <button
+                      onClick={() => handleEditClick(lista)}
+                      className="text-blue-500 hover:text-blue-700 font-semibold text-xl"
+                      title="Editar observação"
+                    >
+                      📝
+                    </button>
                     <button
                       onClick={() => handleDelete(lista)}
                       className="text-red-500 hover:text-red-700 font-semibold text-xl"
