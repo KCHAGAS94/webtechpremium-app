@@ -419,6 +419,17 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   });
   const { status, error } = useEvent(player, 'statusChange', { status: player.status, error: undefined });
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+
+  // Safety net for the preview's buffering spinner: `onFirstFrameRender` only
+  // fires once per VideoView mount, but the preview VideoView gets unmounted
+  // while fullscreen is open and remounted on close (see the `!isFullscreen`
+  // guard below). If a reload happens in fullscreen, that remount can land
+  // after the render event already fired for this `player` instance, leaving
+  // `isBuffering` stuck true forever even though the video is visibly
+  // playing underneath. `isPlaying` is the ground truth here.
+  useEffect(() => {
+    if (isPlaying) setIsBuffering(false);
+  }, [isPlaying]);
   const { currentOffsetFromLive } = useEvent(player, 'timeUpdate', {
     currentTime: player.currentTime,
     currentLiveTimestamp: null,
