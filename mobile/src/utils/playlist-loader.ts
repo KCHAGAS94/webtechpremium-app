@@ -62,6 +62,30 @@ const TRUNCATION_CHECK_TAIL_BYTES = 4096;
 // large real-world catalogs can be tens of MB of text.
 const DOWNLOAD_ATTEMPT_TIMEOUT_MS = 90000;
 
+// Combined progress reported to callers is download-phase-fraction * this
+// weight, plus parse-phase-fraction * (1 - this). Download dominates wall
+// time on real playlists (tens of seconds vs ~1-2s to parse even 250k+
+// lines, see parseM3uFile), so it gets most of the bar; the remainder still
+// keeps the bar visibly moving during the fast parse pass instead of jumping
+// straight from ~85% to 100%.
+const DOWNLOAD_PROGRESS_WEIGHT = 0.85;
+// Arbitrary fixed denominator so the combined progress can be expressed in
+// the existing { processedLines, totalLines } shape (kept unchanged so
+// App.tsx's `processedLines / totalLines` doesn't need to know phases exist).
+const PROGRESS_SCALE = 1_000_000;
+// Some providers serve the M3U over chunked transfer-encoding with no
+// Content-Length (totalBytes comes back -1 from downloadFileAsync's
+// onProgress) — there's no real total to divide by in that case. This
+// reference size makes the bar approach, but never reach, 100% purely from
+// bytes-written growth, so it still visibly advances instead of sitting at
+// 0% for the whole download like before.
+const UNKNOWN_TOTAL_REFERENCE_BYTES = 40 * 1024 * 1024;
+
+function downloadFraction(bytesWritten: number, totalBytes: number): number {
+  if (totalBytes > 0) return Math.min(bytesWritten / totalBytes, 1);
+  return Math.min(0.9, bytesWritten / (bytesWritten + UNKNOWN_TOTAL_REFERENCE_BYTES));
+}
+
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
@@ -103,7 +127,11 @@ function looksComplete(file: File): boolean {
   }
 }
 
-async function downloadPlaylistVerified(url: string, dest: File): Promise<void> {
+async function downloadPlaylistVerified(
+  url: string,
+  dest: File,
+  onDownloadProgress?: (fraction: number) => void
+): Promise<void> {
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
     try {
@@ -111,6 +139,9 @@ async function downloadPlaylistVerified(url: string, dest: File): Promise<void> 
         File.downloadFileAsync(url, dest, {
           headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
           idempotent: true,
+          onProgress: onDownloadProgress
+            ? ({ bytesWritten, totalBytes }) => onDownloadProgress(downloadFraction(bytesWritten, totalBytes))
+            : undefined,
         }),
         DOWNLOAD_ATTEMPT_TIMEOUT_MS,
         'Tempo esgotado ao baixar a playlist'
@@ -276,9 +307,22 @@ export async function loadPlaylist(
   // never happens — the same approach production IPTV apps use for large
   // M3U/Xtream lists.
   const persisted = persistedPlaylistFile(mac);
-  await downloadPlaylistVerified(url, persisted);
+  await downloadPlaylistVerified(url, persisted, (fraction) => {
+    onProgress?.({
+      processedLines: Math.round(fraction * DOWNLOAD_PROGRESS_WEIGHT * PROGRESS_SCALE),
+      totalLines: PROGRESS_SCALE,
+    });
+  });
 
-  const channels = await parseM3uFile(persisted, onProgress);
+  const channels = await parseM3uFile(persisted, (parseProgress) => {
+    const parseFraction = parseProgress.totalLines > 0 ? parseProgress.processedLines / parseProgress.totalLines : 0;
+    onProgress?.({
+      processedLines: Math.round(
+        (DOWNLOAD_PROGRESS_WEIGHT + parseFraction * (1 - DOWNLOAD_PROGRESS_WEIGHT)) * PROGRESS_SCALE
+      ),
+      totalLines: PROGRESS_SCALE,
+    });
+  });
   const { tv, filmes, series } = await classify(channels);
 
   // Séries still needs the real genre from the Xtream API — the M3U only
