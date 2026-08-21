@@ -33,3 +33,18 @@ export async function GET(request: NextRequest) {
     { status: 200 }
   );
 }
+
+export async function DELETE(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth || auth.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  }
+
+  const id = request.nextUrl.searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'Parâmetro id é obrigatório' }, { status: 400 });
+  }
+
+  await prisma.lista.deleteMany({ where: { id: Number(id) } }).catch(() => null);
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

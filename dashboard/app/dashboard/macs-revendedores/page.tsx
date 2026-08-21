@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type TipoAtivacao = 'ANUAL' | 'VITALICIO';
 
@@ -29,6 +30,7 @@ export default function MacsRevendedoresPage() {
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const confirm = useConfirm();
 
   const loadMe = async () => {
     const res = await fetch('/api/auth/me');
@@ -47,6 +49,12 @@ export default function MacsRevendedoresPage() {
     loadMe();
     loadRegistros();
   }, []);
+
+  const handleDelete = async (id: number) => {
+    if (!(await confirm('Remover este MAC?', { confirmLabel: 'Remover', danger: true }))) return;
+    await fetch(`/api/admin/macs-revendedores?id=${id}`, { method: 'DELETE' });
+    await loadRegistros();
+  };
 
   const filtered = registros.filter((r) => {
     const term = searchTerm.toLowerCase();
@@ -114,6 +122,14 @@ export default function MacsRevendedoresPage() {
                 <div className="text-gray-700">{r.dataExpiracao ? formatData(r.dataExpiracao) : 'Vitalício'}</div>
               </div>
             </div>
+            <div className="flex justify-end">
+              <button
+                onClick={() => handleDelete(r.id)}
+                className="text-red-500 hover:text-red-700 text-sm font-semibold"
+              >
+                Excluir
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -129,6 +145,7 @@ export default function MacsRevendedoresPage() {
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Tipo</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
+                <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -153,6 +170,14 @@ export default function MacsRevendedoresPage() {
                         Não
                       </span>
                     )}
+                  </td>
+                  <td className="px-6 py-3 text-center">
+                    <button
+                      onClick={() => handleDelete(r.id)}
+                      className="text-red-500 hover:text-red-700 text-lg"
+                    >
+                      🗑️
+                    </button>
                   </td>
                 </tr>
               ))}
