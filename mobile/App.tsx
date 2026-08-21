@@ -387,11 +387,29 @@ function AppContent() {
     const panelPlaylists = await fetchDevicePlaylists(mac).catch(() => null);
     const noListaLinked = panelPlaylists !== null && panelPlaylists.length === 0;
 
-    if (cached && disk && !isExpired && !noListaLinked) {
+    // Detects a reseller having reassigned/edited this MAC's lista since our
+    // last successful load. Editing a lista in the painel (as opposed to
+    // linking a different one) keeps the same id but changes its url, so
+    // comparing ids alone isn't enough — a stale cached/disk playlist would
+    // otherwise be reused forever even after the painel's url changes.
+    const serverActivePlaylist = panelPlaylists?.find((p) => p.id === cached?.activePlaylistId) ?? null;
+    const playlistChanged =
+      panelPlaylists !== null && !!cached && (!serverActivePlaylist || serverActivePlaylist.url !== activePlaylist?.url);
+
+    if (cached && disk && !isExpired && !noListaLinked && !playlistChanged) {
       setPlaylists(cached.panelPlaylists);
       setActivePlaylistId(cached.activePlaylistId);
       setChannels([...disk.tv, ...disk.filmes, ...disk.series]);
       setCurrentScreen('home');
+    } else if (playlistChanged && serverActivePlaylist && !isExpired) {
+      // Server truth for this MAC changed — re-fetch it now (showing the
+      // "Carregando sua lista..." progress screen, same as a manual
+      // "Recarregar Lista") instead of silently falling back to the stale
+      // cached/disk copy.
+      setPlaylists(panelPlaylists ?? []);
+      setBooting(false);
+      await activatePlaylist(serverActivePlaylist, mac, panelPlaylists ?? []);
+      return;
     } else {
       // Expired: still restore whatever cached playlists/channels we have
       // (so the "Minhas listas" screen can show what was active and its
