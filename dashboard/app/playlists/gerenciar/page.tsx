@@ -40,6 +40,16 @@ function parseXtreamUrl(url: string): { servidor: string; usuario: string; senha
   }
 }
 
+// Só mostra "Protegido" quando a URL Xtream tem senha de fato preenchida —
+// se o revendedor cadastrou sem senha, exibe a URL normalmente.
+function hasXtreamPassword(url: string): boolean {
+  try {
+    return !!new URL(url).searchParams.get('password');
+  } catch {
+    return false;
+  }
+}
+
 const SIDEBAR_ITEMS = [
   {
     key: 'gerenciamento',
@@ -96,6 +106,7 @@ function GerenciarPlaylistsContent() {
   const [servidor, setServidor] = useState('');
   const [usuario, setUsuario] = useState('');
   const [senha, setSenha] = useState('');
+  const [mostrarSenha, setMostrarSenha] = useState(false);
   const [protegerComPin, setProtegerComPin] = useState(false);
   const [pin, setPin] = useState('');
   const [confirmarPin, setConfirmarPin] = useState('');
@@ -111,7 +122,7 @@ function GerenciarPlaylistsContent() {
           nome: lista.nome,
           url: lista.url,
           tipo: lista.url.includes('get.php') ? 'XC' : 'M3U',
-          protegido: lista.url.includes('get.php'),
+          protegido: lista.url.includes('get.php') && hasXtreamPassword(lista.url),
           protegidoPorPin: !!lista.protegidoPorPin,
         }))
       );
@@ -145,6 +156,7 @@ function GerenciarPlaylistsContent() {
     setServidor('');
     setUsuario('');
     setSenha('');
+    setMostrarSenha(false);
     setProtegerComPin(false);
     setPin('');
     setConfirmarPin('');
@@ -510,14 +522,35 @@ function GerenciarPlaylistsContent() {
                     required
                     className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
                   />
-                  <input
-                    type="password"
-                    placeholder="Senha *"
-                    value={senha}
-                    onChange={(e) => setSenha(e.target.value)}
-                    required
-                    className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
-                  />
+                  <div className="relative">
+                    <input
+                      type={mostrarSenha ? 'text' : 'password'}
+                      placeholder="Senha *"
+                      value={senha}
+                      onChange={(e) => setSenha(e.target.value)}
+                      required
+                      className="w-full rounded-lg bg-transparent border border-white/20 px-4 py-3 pr-11 text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setMostrarSenha((v) => !v)}
+                      aria-label={mostrarSenha ? 'Ocultar senha' : 'Mostrar senha'}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                    >
+                      {mostrarSenha ? (
+                        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M10.58 10.58a2 2 0 002.83 2.83" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9.88 5.09A10.94 10.94 0 0112 5c5 0 9 4 10 7-.42 1.27-1.17 2.6-2.22 3.77M6.35 6.35C4.13 7.76 2.5 9.9 2 12c1 3 5 7 10 7 1.24 0 2.42-.24 3.5-.68" />
+                        </svg>
+                      ) : (
+                        <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
                 </>
               )}
 
