@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
   const revendedores = await prisma.user.findMany({
     where: { role: 'REVENDA' },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, credits: true, createdAt: true },
   });
 
   return NextResponse.json({ revendedores }, { status: 200 });
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 
-  const { email, password, name } = await request.json();
+  const { email, password, name, credits } = await request.json();
 
   if (!email || !password) {
     return NextResponse.json({ error: 'Email e senha são obrigatórios' }, { status: 400 });
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
+  const initialCredits = Number.isFinite(Number(credits)) ? Math.max(0, Math.trunc(Number(credits))) : 0;
 
   const revendedor = await prisma.user.create({
     data: {
@@ -43,8 +44,9 @@ export async function POST(request: NextRequest) {
       password: hashedPassword,
       name: name || email.split('@')[0],
       role: 'REVENDA',
+      credits: initialCredits,
     },
-    select: { id: true, name: true, email: true, createdAt: true },
+    select: { id: true, name: true, email: true, credits: true, createdAt: true },
   });
 
   return NextResponse.json({ revendedor }, { status: 201 });
