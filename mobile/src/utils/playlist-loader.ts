@@ -47,8 +47,39 @@ const LINES_PER_YIELD = 20000;
 const MAX_DOWNLOAD_ATTEMPTS = 3;
 const TRUNCATION_CHECK_TAIL_BYTES = 4096;
 
+// File.downloadFileAsync has no built-in timeout option, and a server that
+// accepts the connection but then stalls mid-response (keep-alive left open,
+// no more bytes, no clean close either) makes it hang forever instead of
+// rejecting — no error ever reaches downloadPlaylistVerified's try/catch
+// below, so nothing retries and nothing surfaces to the caller. That's what
+// made activation get stuck on the loading screen indefinitely for some
+// providers. Racing each attempt against this timeout guarantees it always
+// settles one way or another, even though the native download itself can't
+// be cancelled and keeps running in the background until it does.
+// The native download API exposes no progress events, so this can't tell a
+// truly stalled connection apart from a legitimately large/slow playlist
+// still downloading — it can only bound the worst case. Generous on purpose:
+// large real-world catalogs can be tens of MB of text.
+const DOWNLOAD_ATTEMPT_TIMEOUT_MS = 90000;
+
 function yieldToEventLoop(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
 }
 
 // Heuristic: a well-formed M3U's last non-blank line is a stream URL (or the
@@ -76,10 +107,14 @@ async function downloadPlaylistVerified(url: string, dest: File): Promise<void> 
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_DOWNLOAD_ATTEMPTS; attempt++) {
     try {
-      await File.downloadFileAsync(url, dest, {
-        headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
-        idempotent: true,
-      });
+      await withTimeout(
+        File.downloadFileAsync(url, dest, {
+          headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
+          idempotent: true,
+        }),
+        DOWNLOAD_ATTEMPT_TIMEOUT_MS,
+        'Tempo esgotado ao baixar a playlist'
+      );
       if (looksComplete(dest)) return;
       lastError = new Error('Download da playlist parece incompleto (conexão encerrada no meio da lista)');
     } catch (err) {

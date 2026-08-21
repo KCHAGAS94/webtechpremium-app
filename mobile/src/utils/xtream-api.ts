@@ -104,12 +104,29 @@ type LiveStream = {
   category_id: string;
 };
 
+// fetch() has no default timeout — a provider whose player_api.php accepts
+// the connection but never responds (dead upstream, overloaded box) leaves
+// this pending forever instead of rejecting, which used to hang
+// loadFastCatalog (and, through it, the whole "Carregando sua lista..."
+// screen) indefinitely with no way to recover short of force-closing the
+// app. AbortController + a fixed budget guarantees every call here settles.
+const XTREAM_REQUEST_TIMEOUT_MS = 15000;
+
 async function fetchXtream<T>(creds: XtreamCredentials, action: string, extraParams = ''): Promise<T> {
   const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}${extraParams}`;
-  // Same Cloudflare User-Agent block as playlist-loader.ts's playlist fetch.
-  const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  return response.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), XTREAM_REQUEST_TIMEOUT_MS);
+  try {
+    // Same Cloudflare User-Agent block as playlist-loader.ts's playlist fetch.
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function toGenreByName<T extends { name: string; category_id: string }>(
@@ -410,9 +427,16 @@ export async function fetchVodMovies(creds: XtreamCredentials): Promise<M3uChann
  */
 export async function fetchAccountExpiration(creds: XtreamCredentials): Promise<Date | null> {
   const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}`;
-  const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' } });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const data = await response.json();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), XTREAM_REQUEST_TIMEOUT_MS);
+  let data: { user_info?: { exp_date?: unknown } };
+  try {
+    const response = await fetch(url, { headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' }, signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    data = await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
   const expDate = data?.user_info?.exp_date;
   if (expDate === null || expDate === undefined || expDate === '' || expDate === '0') return null;
   const seconds = Number(expDate);
