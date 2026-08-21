@@ -17,8 +17,16 @@ export function OPTIONS() {
 // registration — the admin "Instalados" page used to require a manual
 // "Dar 7 dias grátis" click per MAC, which doesn't scale. The button there
 // stays as a catch-up for devices registered before this existed.
+//
+// Exceção: um MAC que já transferiu uma ativação pra fora (macOrigem em
+// TransferenciaAtivacao) some do painel junto com seu App — sem essa
+// checagem, ele voltaria a parecer "nunca visto" na próxima vez que o app
+// conectasse nele e ganharia outro trial de 7 dias, permitindo repetir o
+// ciclo transferir-e-reativar indefinidamente pra farmar trials grátis.
 async function registerDevice(macAddress: string) {
   const systemUser = await getOrCreateSystemUser();
+  const jaTransferiu = await prisma.transferenciaAtivacao.findFirst({ where: { macOrigem: macAddress } });
+
   const expiraTrial = new Date();
   expiraTrial.setDate(expiraTrial.getDate() + 7);
 
@@ -28,14 +36,9 @@ async function registerDevice(macAddress: string) {
       name: macAddress,
       version: '1.0.0',
       userId: systemUser.id,
-      listas: {
-        create: {
-          nome: 'Teste grátis',
-          url: '',
-          tipo: 'TRIAL',
-          dataExpiracao: expiraTrial,
-        },
-      },
+      ...(jaTransferiu
+        ? {}
+        : { listas: { create: { nome: 'Teste grátis', url: '', tipo: 'TRIAL', dataExpiracao: expiraTrial } } }),
     },
     include: {
       listas: {
