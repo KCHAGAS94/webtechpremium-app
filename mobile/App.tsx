@@ -330,13 +330,34 @@ function AppContent() {
       setChannels([...fast.tv, ...fast.filmes]);
     }
 
-    const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await fullPromise;
-    setChannels([...(fast?.tv ?? tv), ...(fast?.filmes ?? filmes), ...series]);
+    // fullPromise (the M3U download+parse) can fail on its own even when
+    // loadFastCatalog above succeeded — e.g. a provider whose Xtream JSON API
+    // works but whose get.php M3U export is disabled/404s. Left uncaught,
+    // that rejection used to leave the user stuck on the "Carregando sua
+    // lista..." progress screen forever (activationProgress never reached
+    // null). Only Séries actually depends on this call; TV ao Vivo/Filmes
+    // already came from loadFastCatalog, so a failure here is recoverable as
+    // long as fast catalog gave us something to show.
+    try {
+      const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await fullPromise;
+      setChannels([...(fast?.tv ?? tv), ...(fast?.filmes ?? filmes), ...series]);
+      if (freshSeriesMeta) {
+        setSeriesMetaByShowName(freshSeriesMeta);
+      }
+    } catch (err) {
+      if (!fast || (fast.tv.length === 0 && fast.filmes.length === 0)) {
+        setActivationProgress(null);
+        setPlaylists(panelPlaylists);
+        setReloadPlaylistError(
+          err instanceof Error ? `Falha ao carregar a playlist: ${err.message}` : 'Falha ao carregar a playlist.'
+        );
+        setCurrentScreen('playlist');
+        return;
+      }
+    }
+
     setCurrentScreen('home');
     setActivationProgress(null);
-    if (freshSeriesMeta) {
-      setSeriesMetaByShowName(freshSeriesMeta);
-    }
     if (mac) {
       setCachedPlaylistState(mac, { panelPlaylists, activePlaylistId: playlist.id });
     }
