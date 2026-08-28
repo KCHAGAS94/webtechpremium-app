@@ -494,6 +494,13 @@ function AppContent() {
     setCheckingStatus(true);
     setNotActiveMessage(null);
     try {
+      // fetchDevicePlaylists hits /api/devices, which registers this MAC in
+      // the painel if it isn't there yet (see registerDevice server-side).
+      // device-status alone never does that — it only reads. Without this,
+      // a MAC that failed to register on first boot (painel unreachable at
+      // that moment) could never appear in "Instalados" no matter how many
+      // times the user pressed this button.
+      await fetchDevicePlaylists(deviceMac).catch(() => null);
       const status = await fetchDeviceStatus(deviceMac);
       setDeviceStatus(status);
       if (status?.expirado !== false) {

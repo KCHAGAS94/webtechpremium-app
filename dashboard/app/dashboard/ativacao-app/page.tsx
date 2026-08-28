@@ -59,6 +59,11 @@ function EditModal({
   const [error, setError] = useState('');
   const isNew = !lista?.id;
   const macStatus = useMacExists(formData.mac ?? '');
+  // MAC ainda não visto pelo app (o dispositivo nunca chegou a contatar o
+  // painel — rede instável, app não aberto, etc.) não deve travar a
+  // ativação: /api/painel/listas cria o App via upsert se ele não existir
+  // ainda, então basta o formato do endereço estar correto.
+  const macFormatValid = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(formData.mac ?? '');
 
   useEffect(() => {
     if (lista) setFormData(lista);
@@ -84,7 +89,7 @@ function EditModal({
   };
 
   const handleSave = async () => {
-    if (isNew && macStatus !== 'valid') {
+    if (isNew && !macFormatValid) {
       setError('Adicione um MAC válido');
       return;
     }
@@ -119,7 +124,13 @@ function EditModal({
               disabled={!isNew}
               className="w-full px-4 py-2 border border-gray-300 rounded bg-gray-50 uppercase disabled:bg-gray-200 disabled:text-gray-500"
             />
-            {isNew && <MacStatus status={macStatus} />}
+            {isNew && macStatus === 'valid' && <MacStatus status={macStatus} />}
+            {isNew && macStatus === 'checking' && <MacStatus status={macStatus} />}
+            {isNew && macStatus === 'invalid' && (
+              <p className="text-xs text-amber-600 mt-1">
+                MAC ainda não visto pelo app — será cadastrado agora mesmo.
+              </p>
+            )}
           </div>
 
           {isNew ? (
@@ -178,7 +189,7 @@ function EditModal({
         <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
           <button
             onClick={handleSave}
-            disabled={isNew && macStatus !== 'valid'}
+            disabled={isNew && !macFormatValid}
             className="flex-1 bg-green-500 text-white px-6 py-3 rounded font-semibold hover:bg-green-600 disabled:opacity-50 transition"
           >
             ✓ Salvar
