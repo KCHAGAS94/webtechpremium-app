@@ -398,27 +398,59 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   // Séries comes straight from the Xtream API when available — get_series is
   // one small, reliable JSON call for the whole show list (episodes are
   // loaded lazily per-show in handleOpenShow below). This replaced grouping
-  // episodes out of the M3U (still done via groupSeriesShows as a fallback
-  // for non-Xtream playlists) because that M3U endpoint turned out to be
-  // unreliable on its own: it streams a dynamically-generated response with
-  // no `Content-Length`, and two consecutive downloads of the "same"
-  // playlist came back with wildly different sizes — the source itself was
-  // inconsistent, not just the network.
+  // episodes out of the M3U as the primary source because that M3U endpoint
+  // turned out to be unreliable on its own: it streams a dynamically-generated
+  // response with no `Content-Length`, and two consecutive downloads of the
+  // "same" playlist came back with wildly different sizes — the source itself
+  // was inconsistent, not just the network. groupSeriesShows is still used
+  // for non-Xtream playlists (no API to call at all) AND as a last-resort
+  // fallback below when get_series comes back empty/broken but the M3U
+  // itself does carry series — some providers only expose series through the
+  // M3U group-title/`/series/` entries and never populate get_series.
   useEffect(() => {
     const credentials = parseXtreamCredentials(playlistUrl);
     if (credentials) {
       let cancelled = false;
       setIsGrouping(true);
 
+      // Falls back to grouping series out of the already-parsed M3U when the
+      // Xtream `get_series` endpoint comes back empty or keeps failing — some
+      // providers have a broken/empty get_series while the M3U itself does
+      // carry series (group-title/`/series/` entries, classified by
+      // categorizeGroup during the playlist parse). Only used as a last
+      // resort so playlists where get_series already works (the common case)
+      // are completely unaffected.
+      const fallbackToM3uGrouping = async () => {
+        if (cancelled) return;
+        if (bucketChannels.length === 0) {
+          setAllShows([]);
+          setIsGrouping(false);
+          return;
+        }
+        const shows = await groupSeriesShows(
+          bucketChannels,
+          (partialShows) => {
+            if (!cancelled) setAllShows(partialShows);
+          },
+          metaByShowName
+        );
+        if (!cancelled) {
+          setAllShows(shows);
+          setIsGrouping(false);
+        }
+      };
+
       const loadWithRetries = async () => {
         for (let attempt = 0; attempt <= FETCH_SERIES_MAX_RETRIES; attempt++) {
           try {
             const shows = await fetchSeriesShows(credentials);
-            if (!cancelled) {
+            if (cancelled) return;
+            if (shows.length > 0) {
               setAllShows(shows);
               setIsGrouping(false);
+              return;
             }
-            return;
+            break;
           } catch {
             if (cancelled) return;
             if (attempt < FETCH_SERIES_MAX_RETRIES) {
@@ -426,7 +458,7 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
             }
           }
         }
-        if (!cancelled) setIsGrouping(false);
+        await fallbackToM3uGrouping();
       };
       loadWithRetries();
 
