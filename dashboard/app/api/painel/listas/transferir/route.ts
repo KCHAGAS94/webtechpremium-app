@@ -51,9 +51,13 @@ export async function POST(request: NextRequest) {
 
   const appOrigemId = lista.appId;
 
+  // O App de destino passa a pertencer a quem transferiu a ativação: sem
+  // isso, um MAC ainda em TRIAL (dono = quem instalou o app) continuaria
+  // com esse dono depois de receber uma ativação paga, e a lista sumiria da
+  // tela "Ativação App" de quem efetivamente pagou por ela.
   const novoApp = await prisma.app.upsert({
     where: { macAddress: novoMacAddress },
-    update: {},
+    update: { userId: lista.app.userId },
     create: { macAddress: novoMacAddress, name: novoMacAddress, version: '1.0.0', userId: lista.app.userId },
   });
 
