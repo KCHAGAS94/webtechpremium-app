@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 
@@ -49,8 +49,16 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
   // long as the modal is open purely to catch that hardware input; its
   // software keyboard is disabled so it doesn't fight with the on-screen
   // grid, and both end up driving the same `value`/`cursor` state.
+  //
+  // On Android TV this backfired: focusing it stole native focus away from
+  // whichever key had it (the remote's D-pad "just" moved a text cursor
+  // inside this invisible field instead of navigating between keys), so the
+  // last-focused key stayed visually highlighted forever — a TV remote is
+  // never a "physical keyboard" in the sense this exists for, so it's opt-in
+  // to non-TV platforms only.
   const hiddenInputRef = useRef<TextInput>(null);
   useEffect(() => {
+    if (Platform.isTV) return;
     const timer = setTimeout(() => hiddenInputRef.current?.focus(), 50);
     return () => clearTimeout(timer);
   }, []);
