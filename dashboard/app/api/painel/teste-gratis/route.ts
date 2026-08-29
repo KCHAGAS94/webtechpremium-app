@@ -11,10 +11,13 @@ const ATIVACAO_CREDITS: Record<'ANUAL' | 'VITALICIO', number> = {
   VITALICIO: 5,
 };
 
-// Lista todo MAC ainda em teste grátis (tipo TRIAL, não expirado) — de
-// qualquer revendedor. Diferente de "Ativação App" e "Usuários", que só
-// mostram os MACs do próprio dono: aqui o objetivo é justamente deixar
-// qualquer revendedor ver e reivindicar um MAC em teste antes de outro.
+// Lista todo MAC ainda em teste grátis (tipo TRIAL) — de qualquer
+// revendedor, expirado ou não. Diferente de "Ativação App" e "Usuários",
+// que só mostram os MACs do próprio dono: aqui o objetivo é justamente
+// deixar qualquer revendedor ver e reivindicar um MAC em teste antes de
+// outro. Um trial expirado continua listado (com `expirado: true`) em vez
+// de simplesmente sumir — ele nunca chegou a virar ativação paga, então
+// segue disponível para qualquer um ativar.
 export async function GET(request: NextRequest) {
   const auth = getAuthUser(request);
   if (!auth) {
@@ -27,19 +30,48 @@ export async function GET(request: NextRequest) {
     include: { app: true },
   });
 
-  const ativos = listas.filter((lista) => !isExpirado(lista.dataExpiracao));
-
   return NextResponse.json(
     {
-      listas: ativos.map((lista) => ({
+      listas: listas.map((lista) => ({
         id: lista.id,
         mac: lista.app.macAddress,
         instaladoEm: lista.app.createdAt.toISOString(),
         expiracaoData: lista.dataExpiracao ? lista.dataExpiracao.toISOString().slice(0, 10) : '',
+        expirado: isExpirado(lista.dataExpiracao),
       })),
     },
     { status: 200 }
   );
+}
+
+// Só admin pode excluir um MAC ainda em teste grátis (ex.: instalação de
+// teste, MAC nunca vai ser usado de verdade) — revendedor não tem esse
+// botão na tela.
+export async function DELETE(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth) {
+    return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+  }
+  if (auth.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Só o administrador pode excluir' }, { status: 403 });
+  }
+
+  const id = request.nextUrl.searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'Parâmetro id é obrigatório' }, { status: 400 });
+  }
+
+  const lista = await prisma.lista.findUnique({ where: { id: Number(id) } });
+  if (!lista || lista.tipo !== 'TRIAL') {
+    return NextResponse.json({ error: 'MAC não está em teste grátis' }, { status: 404 });
+  }
+
+  // Apaga o App junto: um App sem nenhuma Lista não tem mais motivo pra
+  // existir no painel (mesma lógica de /api/painel/listas/transferir).
+  await prisma.lista.delete({ where: { id: lista.id } });
+  await prisma.app.delete({ where: { id: lista.appId } }).catch(() => null);
+
+  return NextResponse.json({ ok: true }, { status: 200 });
 }
 
 // Ativa (compra) um MAC que ainda está em teste grátis, cobrando crédito de
@@ -58,12 +90,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'id e tipo (ANUAL ou VITALICIO) são obrigatórios' }, { status: 400 });
   }
 
+  // Expirado ou não, um TRIAL sempre pode ser ativado — o trial em si nunca
+  // virou ativação paga, então não faz sentido bloquear por ele ter passado
+  // dos 7 dias.
   const lista = await prisma.lista.findUnique({ where: { id: Number(id) }, include: { app: true } });
   if (!lista || lista.tipo !== 'TRIAL') {
     return NextResponse.json({ error: 'MAC não está em teste grátis' }, { status: 404 });
-  }
-  if (isExpirado(lista.dataExpiracao)) {
-    return NextResponse.json({ error: 'Teste grátis desse MAC já expirou' }, { status: 400 });
   }
 
   const cost = ATIVACAO_CREDITS[tipo as 'ANUAL' | 'VITALICIO'];

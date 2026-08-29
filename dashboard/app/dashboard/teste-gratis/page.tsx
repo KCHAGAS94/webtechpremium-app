@@ -2,12 +2,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useConfirm } from '@/components/confirm-dialog';
 
 type TesteGratis = {
   id: number;
   mac: string;
   instaladoEm: string;
   expiracaoData: string;
+  expirado: boolean;
 };
 
 const ATIVACAO_LABEL: Record<'ANUAL' | 'VITALICIO', string> = {
@@ -80,8 +82,10 @@ function ActivateModal({
 
         <div className="p-6 space-y-4">
           <p className="text-sm text-gray-600">
-            MAC: <span className="font-mono">{item.mac}</span> — em teste grátis até{' '}
-            {formatData(item.expiracaoData)}.
+            MAC: <span className="font-mono">{item.mac}</span>
+            {item.expirado
+              ? ' — teste grátis expirou em ' + formatData(item.expiracaoData) + '.'
+              : ' — em teste grátis até ' + formatData(item.expiracaoData) + '.'}
           </p>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de ativação</label>
@@ -169,6 +173,9 @@ export default function TesteGratisPage() {
   const [ativandoItem, setAtivandoItem] = useState<TesteGratis | null>(null);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [error, setError] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const confirm = useConfirm();
 
   const loadItens = async () => {
     const res = await fetch('/api/painel/teste-gratis');
@@ -179,7 +186,36 @@ export default function TesteGratisPage() {
 
   useEffect(() => {
     loadItens();
+    fetch('/api/auth/me')
+      .then((res) => res.json())
+      .then((data) => setIsAdmin(data.user?.role === 'ADMIN'))
+      .catch(() => setIsAdmin(false));
   }, []);
+
+  const handleDelete = async (item: TesteGratis) => {
+    const ok = await confirm(`Excluir o MAC ${item.mac}? Isso remove o dispositivo do painel.`, {
+      confirmLabel: 'Excluir',
+      danger: true,
+    });
+    if (!ok) return;
+
+    setDeletingId(item.id);
+    setError('');
+    try {
+      const res = await fetch(`/api/painel/teste-gratis?id=${item.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || 'Falha ao excluir MAC');
+        return;
+      }
+      setItens((prev) => prev.filter((i) => i.id !== item.id));
+    } catch (e) {
+      console.error('Falha ao excluir MAC', e);
+      setError('Falha ao excluir MAC');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const filtered = itens.filter((item) => item.mac.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -214,8 +250,9 @@ export default function TesteGratisPage() {
       <div>
         <h2 className="text-2xl font-bold text-white">Teste grátis</h2>
         <p className="text-sm text-gray-400">
-          MACs recém-instalados, ainda no teste grátis de 7 dias. Ative qualquer um deles antes que
-          outro revendedor o faça — ao ativar, o MAC passa a aparecer só no seu painel.
+          MACs instalados que nunca foram ativados — em teste grátis ou já expirados. Ative qualquer
+          um deles antes que outro revendedor o faça — ao ativar, o MAC passa a aparecer só no seu
+          painel.
         </p>
       </div>
 
@@ -238,9 +275,15 @@ export default function TesteGratisPage() {
           <div key={item.id} className="bg-white rounded-lg shadow p-4 space-y-2">
             <div className="flex justify-between items-start">
               <span className="font-mono text-xs text-gray-600">{item.mac}</span>
-              <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
-                Teste grátis
-              </span>
+              {item.expirado ? (
+                <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                  Expirado
+                </span>
+              ) : (
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
+                  Teste grátis
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
               <div>
@@ -252,12 +295,23 @@ export default function TesteGratisPage() {
                 <div className="text-gray-700">{formatData(item.expiracaoData)}</div>
               </div>
             </div>
-            <button
-              onClick={() => setAtivandoItem(item)}
-              className="w-full bg-green-500 text-white px-4 py-2 rounded font-semibold hover:bg-green-600 transition"
-            >
-              ✓ Ativar
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setAtivandoItem(item)}
+                className="flex-1 bg-green-500 text-white px-4 py-2 rounded font-semibold hover:bg-green-600 transition"
+              >
+                ✓ Ativar
+              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => handleDelete(item)}
+                  disabled={deletingId === item.id}
+                  className="flex-1 bg-red-600 text-white px-4 py-2 rounded font-semibold hover:bg-red-700 disabled:opacity-50 transition"
+                >
+                  {deletingId === item.id ? 'Excluindo...' : '🗑️ Excluir'}
+                </button>
+              )}
+            </div>
           </div>
         ))}
       </div>
@@ -270,6 +324,7 @@ export default function TesteGratisPage() {
               <tr>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Mac</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Instalado em</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Status</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expira</th>
                 <th className="px-6 py-3 text-center font-semibold text-gray-700 bg-gray-100">Ações</th>
               </tr>
@@ -281,14 +336,36 @@ export default function TesteGratisPage() {
                   <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
                     {formatDataHora(item.instaladoEm)}
                   </td>
+                  <td className="px-6 py-3">
+                    {item.expirado ? (
+                      <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-semibold">
+                        Expirado
+                      </span>
+                    ) : (
+                      <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs font-semibold">
+                        Teste grátis
+                      </span>
+                    )}
+                  </td>
                   <td className="px-6 py-3 text-gray-600">{formatData(item.expiracaoData)}</td>
                   <td className="px-6 py-3 text-center">
-                    <button
-                      onClick={() => setAtivandoItem(item)}
-                      className="bg-green-500 text-white px-3 py-1.5 rounded font-semibold text-xs hover:bg-green-600 transition whitespace-nowrap"
-                    >
-                      ✓ Ativar
-                    </button>
+                    <div className="flex justify-center gap-2">
+                      <button
+                        onClick={() => setAtivandoItem(item)}
+                        className="bg-green-500 text-white px-3 py-1.5 rounded font-semibold text-xs hover:bg-green-600 transition whitespace-nowrap"
+                      >
+                        ✓ Ativar
+                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(item)}
+                          disabled={deletingId === item.id}
+                          className="bg-red-600 text-white px-3 py-1.5 rounded font-semibold text-xs hover:bg-red-700 disabled:opacity-50 transition whitespace-nowrap"
+                        >
+                          {deletingId === item.id ? 'Excluindo...' : '🗑️ Excluir'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
