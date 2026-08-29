@@ -40,10 +40,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (appDestino) {
-    if (auth.role !== 'ADMIN' && appDestino.userId !== auth.id) {
-      return NextResponse.json({ error: 'MAC de destino pertence a outro revendedor' }, { status: 403 });
-    }
     if (appDestino.listas.length > 0) {
+      // Já tem ativação paga: só bloqueia por dono se de fato pertencer a
+      // outra ativação em uso. MAC ainda em teste grátis (sem lista com
+      // tipo) pode ser tomado por qualquer revendedor, mesmo que o App já
+      // exista sob outro userId — o dono do App não muda na transferência.
       return NextResponse.json({ error: 'MAC de destino já possui uma ativação' }, { status: 409 });
     }
   }
