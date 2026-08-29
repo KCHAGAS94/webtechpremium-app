@@ -55,6 +55,16 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
     return () => clearTimeout(timer);
   }, []);
 
+  // `hasTVPreferredFocus` must only apply on the very first mount — if left
+  // recomputed as `char === '1'` on every render, Android TV's focus engine
+  // re-claims focus onto the '1' key on any re-render (e.g. after each
+  // keystroke), snapping the highlight back to '1' even though the user has
+  // since moved the D-pad to another key.
+  const initialFocusRef = useRef(true);
+  useEffect(() => {
+    initialFocusRef.current = false;
+  }, []);
+
   const handleKey = (char: string) => {
     onChangeText(value.slice(0, cursor) + char + value.slice(cursor));
     onCursorChange(cursor + 1);
@@ -100,7 +110,7 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
                 <TouchableOpacity
                   key={char}
                   style={[keyStyle, focusedKey === char && styles.keyFocused]}
-                  hasTVPreferredFocus={char === '1'}
+                  hasTVPreferredFocus={initialFocusRef.current && char === '1'}
                   onFocus={() => setFocusedKey(char)}
                   onPress={() => handleKey(char)}
                 >
