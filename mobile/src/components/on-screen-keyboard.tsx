@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 
@@ -35,7 +35,7 @@ const SYMBOL_ROWS = [
 export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, onClose }: Props) {
   const [mode, setMode] = useState<'letters' | 'symbols'>('letters');
   // Which key currently has D-pad focus, so we can render a visible ring —
-  // TouchableOpacity gives no focus styling for free like a web button does.
+  // Pressable gives no focus styling for free like a web button does.
   const [focusedKey, setFocusedKey] = useState<string | null>('1');
   // For people with bigger fingers who keep mis-tapping neighboring keys —
   // toggled per session, not persisted, since it's a quick in-the-moment fix.
@@ -89,7 +89,7 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
           above the panel fully visible while typing, instead of the whole
           screen dimming under the modal. Tapping it (outside the panel)
           closes the keyboard, same as "Concluído" — the panel's own
-          TouchableOpacity children intercept their own touches first. */}
+          Pressable children intercept their own touches first. */}
       <Pressable style={styles.backdrop} onPress={onClose}>
         {/* No-op onPress stops the tap from bubbling to the backdrop above —
             without this, tapping empty padding inside the panel (not on a
@@ -107,7 +107,7 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
           {rows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
               {row.map((char) => (
-                <TouchableOpacity
+                <Pressable
                   key={char}
                   style={[keyStyle, focusedKey === char && styles.keyFocused]}
                   hasTVPreferredFocus={initialFocusRef.current && char === '1'}
@@ -115,27 +115,27 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
                   onPress={() => handleKey(char)}
                 >
                   <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>{char}</ThemedText>
-                </TouchableOpacity>
+                </Pressable>
               ))}
             </View>
           ))}
 
           <View style={styles.row}>
-            <TouchableOpacity
+            <Pressable
               style={[keyStyle, styles.wideKey, focusedKey === 'done' && styles.keyFocused]}
               onFocus={() => setFocusedKey('done')}
               onPress={onClose}
             >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Concluído</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, styles.wideKey, focusedKey === 'clear' && styles.keyFocused]}
               onFocus={() => setFocusedKey('clear')}
               onPress={handleClear}
             >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Limpar</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, styles.wideKey, focusedKey === 'mode' && styles.keyFocused]}
               onFocus={() => setFocusedKey('mode')}
               onPress={handleToggleMode}
@@ -143,36 +143,36 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>
                 {mode === 'letters' ? '#+=' : 'ABC'}
               </ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, focusedKey === 'left' && styles.keyFocused]}
               onFocus={() => setFocusedKey('left')}
               onPress={handleMoveLeft}
             >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>◀</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, styles.spaceKey, focusedKey === 'space' && styles.keyFocused]}
               onFocus={() => setFocusedKey('space')}
               onPress={handleSpace}
             >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Espaço</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, focusedKey === 'right' && styles.keyFocused]}
               onFocus={() => setFocusedKey('right')}
               onPress={handleMoveRight}
             >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>▶</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, styles.wideKey, focusedKey === 'backspace' && styles.keyFocused]}
               onFocus={() => setFocusedKey('backspace')}
               onPress={handleBackspace}
             >
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>⌫</ThemedText>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[keyStyle, styles.wideKey, focusedKey === 'largeKeys' && styles.keyFocused]}
               onFocus={() => setFocusedKey('largeKeys')}
               onPress={() => setLargeKeys((v) => !v)}
@@ -180,7 +180,7 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
               <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>
                 {largeKeys ? 'A-' : 'A+'}
               </ThemedText>
-            </TouchableOpacity>
+            </Pressable>
           </View>
         </Pressable>
       </Pressable>
