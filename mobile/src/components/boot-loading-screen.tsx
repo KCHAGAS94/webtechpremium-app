@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -45,18 +45,26 @@ export function BootLoadingScreen({ text = 'Carregando sua lista...', progress }
   const targetPct = showBar ? Math.max(0, Math.min(1, progress as number)) : 0;
   const targetPercent = Math.round(targetPct * 100);
 
+  // Kept in a ref (not a state dependency) so the interval below is set up
+  // once per showBar toggle instead of being torn down and recreated on
+  // every single +1% tick — on a weak Android TV CPU that teardown/rebuild
+  // overhead was eating into the 30ms budget, making ticks land late and
+  // bunch up, which is what actually produced the "jumps straight from 0%
+  // to 33% to 89%" the animation was supposed to prevent in the first place.
+  const targetRef = useRef(targetPercent);
+  targetRef.current = targetPercent;
+
   const [displayPercent, setDisplayPercent] = useState(0);
   useEffect(() => {
     if (!showBar) {
       setDisplayPercent(0);
       return;
     }
-    if (displayPercent >= targetPercent) return;
     const timer = setInterval(() => {
-      setDisplayPercent((p) => Math.min(p + 1, targetPercent));
+      setDisplayPercent((p) => (p >= targetRef.current ? p : p + 1));
     }, DISPLAY_STEP_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [showBar, targetPercent, displayPercent]);
+  }, [showBar]);
 
   const pct = displayPercent / 100;
 
