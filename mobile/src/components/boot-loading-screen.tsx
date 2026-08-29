@@ -34,9 +34,31 @@ const TIP_INTERVAL_MS = 3000;
  * still loading in the background), so taps went unanswered and it read as
  * the app being frozen/buggy instead of just working.
  */
+// The native download only fires onProgress a handful of times (sometimes
+// just once near the end), so the raw `progress` prop can jump straight from
+// 0% to 86% in a single update. Smoothing it into a steady +1%-per-tick climb
+// here makes the bar always look like it's actively progressing.
+const DISPLAY_STEP_INTERVAL_MS = 30;
+
 export function BootLoadingScreen({ text = 'Carregando sua lista...', progress }: BootLoadingScreenProps) {
   const showBar = typeof progress === 'number' && Number.isFinite(progress);
-  const pct = showBar ? Math.max(0, Math.min(1, progress as number)) : 0;
+  const targetPct = showBar ? Math.max(0, Math.min(1, progress as number)) : 0;
+  const targetPercent = Math.round(targetPct * 100);
+
+  const [displayPercent, setDisplayPercent] = useState(0);
+  useEffect(() => {
+    if (!showBar) {
+      setDisplayPercent(0);
+      return;
+    }
+    if (displayPercent >= targetPercent) return;
+    const timer = setInterval(() => {
+      setDisplayPercent((p) => Math.min(p + 1, targetPercent));
+    }, DISPLAY_STEP_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [showBar, targetPercent, displayPercent]);
+
+  const pct = displayPercent / 100;
 
   const [tipIndex, setTipIndex] = useState(0);
   useEffect(() => {
