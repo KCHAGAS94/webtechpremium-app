@@ -575,6 +575,7 @@ export default function AtivacaoAppPage() {
             <thead className="bg-gray-100 border-b border-gray-300 sticky top-0 z-10">
               <tr>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Mac</th>
+                <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Instalado em</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Tipo</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Data expira</th>
                 <th className="px-6 py-3 text-left font-semibold text-gray-700 bg-gray-100">Expirado</th>
@@ -586,6 +587,9 @@ export default function AtivacaoAppPage() {
               {filteredListas.map((lista) => (
                 <tr key={lista.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-6 py-3 text-gray-600 font-mono text-xs">{lista.mac}</td>
+                  <td className="px-6 py-3 text-gray-600 whitespace-nowrap">
+                    {formatInstaladoEm(lista.instaladoEm)}
+                  </td>
                   <td className="px-6 py-3 text-gray-600">{lista.tipo ? ATIVACAO_LABEL[lista.tipo] : '—'}</td>
                   <td className="px-6 py-3 text-gray-600">{lista.expiracaoData || 'Vitalício'}</td>
                   <td className="px-6 py-3">

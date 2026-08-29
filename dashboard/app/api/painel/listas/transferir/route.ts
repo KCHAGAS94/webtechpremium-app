@@ -6,7 +6,9 @@ import { getAuthUser } from '@/lib/auth';
 // cobrar créditos de novo: tipo e dataExpiracao são preservados, só o
 // dispositivo (App) muda. Como o dispositivo muda, todas as demais listas
 // (playlists) cadastradas no MAC de origem deixam de fazer sentido e são
-// apagadas junto — o MAC de origem sempre some do painel após a troca.
+// apagadas junto — o MAC de origem some da tela "Ativação App", mas volta a
+// valer como teste grátis (ver trialExpira abaixo) em vez de sumir do
+// painel de vez.
 export async function POST(request: NextRequest) {
   const auth = getAuthUser(request);
   if (!auth) {
@@ -86,9 +88,22 @@ export async function POST(request: NextRequest) {
 
   // A ativação já foi movida para o novo App; qualquer outra lista que
   // ainda aponte para o MAC de origem (playlists do usuário final) fica
-  // órfã de dispositivo ativo e é apagada automaticamente, junto com o App.
+  // órfã de dispositivo ativo e é apagada. O App de origem, porém,
+  // continua existindo — volta a valer como teste grátis (mesma regra de
+  // 7 dias contados da instalação original), reaparecendo na tela "Teste
+  // grátis" em vez de simplesmente sumir do painel.
   const listasApagadas = await prisma.lista.deleteMany({ where: { appId: appOrigemId } });
-  await prisma.app.delete({ where: { id: appOrigemId } }).catch(() => null);
+  const trialExpira = new Date(lista.app.createdAt);
+  trialExpira.setDate(trialExpira.getDate() + 7);
+  await prisma.lista.create({
+    data: {
+      appId: appOrigemId,
+      nome: 'Teste grátis',
+      url: '',
+      tipo: 'TRIAL',
+      dataExpiracao: trialExpira,
+    },
+  });
 
   return NextResponse.json(
     { lista: listaMovida, listasApagadas: listasApagadas.count },
