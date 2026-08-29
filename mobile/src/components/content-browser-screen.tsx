@@ -26,6 +26,7 @@ import { loadHiddenGroups } from '@/utils/hidden-groups-storage';
 import { addLiveWatchHistoryEntry } from '@/utils/live-watch-history-storage';
 import type { M3uChannel } from '@/utils/m3u-parser';
 import { normalizeSearchText } from '@/utils/text-normalize';
+import { useRemoteKeys } from '@/utils/remote-keys';
 import { isHlsStreamUrl } from '@/utils/stream-format';
 import { useTranslation } from '@/i18n/language-context';
 import type { TranslationKey } from '@/i18n/translations';
@@ -573,6 +574,24 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   const handleNextChannel = useCallback(() => handleStepChannel(1), [handleStepChannel]);
   const handlePreviousChannel = useCallback(() => handleStepChannel(-1), [handleStepChannel]);
   const canStepChannel = filteredChannels.length > 1;
+
+  // Aiwa (and most Android TV) remotes have dedicated channel/color buttons
+  // that don't map to any D-pad key — without this, only the on-screen
+  // ⏮/⏭ buttons could switch channels. See plugins/withRemoteKeys.js for the
+  // native side that turns these keycodes into the "RemoteKeyEvent" this
+  // listens for.
+  useRemoteKeys({
+    CHANNEL_UP: handleNextChannel,
+    CHANNEL_DOWN: handlePreviousChannel,
+    PROG_RED: handleToggleFavorite,
+    PROG_GREEN: handleCloseFullscreen,
+    PROG_YELLOW: handleGoLive,
+    PROG_BLUE: () => {
+      setIsFullscreen(false);
+      setSearchCursor(search.length);
+      setKeyboardOpen(true);
+    },
+  });
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
