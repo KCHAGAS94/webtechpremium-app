@@ -330,6 +330,13 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
   // identical pattern (and fuller explanation) in series-screen.tsx.
   const gridListRef = useRef<FlatList<M3uChannel>>(null);
   const [lastOpenedMovieId, setLastOpenedMovieId] = useState<string | null>(null);
+  // Pixel scroll offset, kept up to date on every scroll — restoring this
+  // directly on the way back (see the effect below) is exact, unlike
+  // scrollToIndex: that recomputes an offset from an *estimated* row height,
+  // which drifts from the real layout because title height varies (1 vs 2
+  // lines) — on a ~28k-item catalog that drift was enough to land several
+  // rows away from where the user actually was.
+  const scrollOffsetRef = useRef(0);
   // Cycles Adicionado → A-Z → Z-A → Adicionado on each tap of the sort
   // button (see handleToggleSort/sortLabelText below).
   const [sortMode, setSortMode] = useState<SortMode>('added');
@@ -429,20 +436,18 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
 
   // Runs after the grid remounts (the whole screen, including this FlatList,
   // unmounts while a movie's details are open and mounts fresh once closed —
-  // see the early `if (viewingMovie)` return below) to scroll the
-  // last-opened movie back into view. hasTVPreferredFocus on its PosterCard
-  // (see renderCard) handles the focus half; scrollToIndex handles actually
+  // see the early `if (viewingMovie)` return below) to restore the exact
+  // scroll position the user left. hasTVPreferredFocus on its PosterCard
+  // (see renderCard) handles the focus half; scrollToOffset handles actually
   // being visible on screen, since a freshly mounted FlatList always starts
   // at the top regardless of what has focus.
   useEffect(() => {
-    if (viewingMovie || !lastOpenedMovieId) return;
-    const index = sortedChannels.findIndex((c) => c.id === lastOpenedMovieId);
-    if (index === -1) return;
+    if (viewingMovie) return;
     const timer = setTimeout(() => {
-      gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
+      gridListRef.current?.scrollToOffset({ offset: scrollOffsetRef.current, animated: false });
     }, 0);
     return () => clearTimeout(timer);
-  }, [viewingMovie, lastOpenedMovieId, sortedChannels]);
+  }, [viewingMovie]);
 
   const handlePlay = useCallback(() => {
     if (viewingMovie) setPlayingMovie(viewingMovie);
@@ -619,12 +624,10 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
               extraData={[favorites, lastOpenedMovieId]}
-              onScrollToIndexFailed={({ index }) =>
-                setTimeout(
-                  () => gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }),
-                  50
-                )
-              }
+              onScroll={(e) => {
+                scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={100}
               initialNumToRender={20}
               maxToRenderPerBatch={20}
               windowSize={7}

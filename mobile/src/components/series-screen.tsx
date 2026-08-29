@@ -374,6 +374,14 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
   // read back from the FlatList's own scroll state; it has to be kept here.
   const gridListRef = useRef<FlatList<SeriesShow>>(null);
   const [lastOpenedShowId, setLastOpenedShowId] = useState<string | null>(null);
+  // Pixel scroll offset, kept up to date on every scroll — restoring this
+  // directly on the way back (see the effect below) is exact, unlike
+  // scrollToIndex: that recomputes an offset from an *estimated* row height,
+  // which drifts from the real layout because title height varies (1 vs 2
+  // lines) — on a huge catalog that drift was enough to land several rows
+  // away from where the user actually was (see the identical fix in
+  // movies-screen.tsx).
+  const scrollOffsetRef = useRef(0);
   // Cycles Adicionado → A-Z → Z-A → Adicionado on each tap of the sort
   // button (see handleToggleSort/SORT_LABEL below).
   const [sortMode, setSortMode] = useState<SortMode>('added');
@@ -610,22 +618,20 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
 
   // Runs after the grid remounts (see the `if (viewingShow)` early return
   // below — the whole screen, including this FlatList, unmounts while a show
-  // is open and mounts fresh when it closes) to scroll the last-opened show
-  // back into view. hasTVPreferredFocus on its PosterCard (see renderCard)
-  // handles the focus half; scrollToIndex handles the "actually visible on
-  // screen" half, since a freshly mounted FlatList always starts at the top
-  // regardless of what has focus.
+  // is open and mounts fresh when it closes) to restore the exact scroll
+  // position the user left. hasTVPreferredFocus on its PosterCard (see
+  // renderCard) handles the focus half; scrollToOffset handles the "actually
+  // visible on screen" half, since a freshly mounted FlatList always starts
+  // at the top regardless of what has focus.
   useEffect(() => {
-    if (viewingShow || !lastOpenedShowId) return;
-    const index = sortedShows.findIndex((s) => s.id === lastOpenedShowId);
-    if (index === -1) return;
+    if (viewingShow) return;
     // A frame late so the FlatList has laid out at least once — calling this
     // in the same tick as mount can miss on some devices.
     const timer = setTimeout(() => {
-      gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 });
+      gridListRef.current?.scrollToOffset({ offset: scrollOffsetRef.current, animated: false });
     }, 0);
     return () => clearTimeout(timer);
-  }, [viewingShow, lastOpenedShowId, sortedShows]);
+  }, [viewingShow]);
 
   const handleCloseShow = useCallback(() => {
     setViewingShow(null);
@@ -809,12 +815,10 @@ export function SeriesScreen({ channels, metaByShowName, playlistUrl, activeNav,
               renderItem={renderCard}
               numColumns={NUM_COLUMNS}
               extraData={[favorites, loadingShowId, lastOpenedShowId]}
-              onScrollToIndexFailed={({ index }) =>
-                setTimeout(
-                  () => gridListRef.current?.scrollToIndex({ index, animated: false, viewPosition: 0.3 }),
-                  50
-                )
-              }
+              onScroll={(e) => {
+                scrollOffsetRef.current = e.nativeEvent.contentOffset.y;
+              }}
+              scrollEventThrottle={100}
               initialNumToRender={20}
               maxToRenderPerBatch={20}
               windowSize={7}
