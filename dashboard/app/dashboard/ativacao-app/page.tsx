@@ -299,105 +299,6 @@ function TransferModal({
   );
 }
 
-function ActivateModal({
-  lista,
-  onClose,
-  onActivate,
-}: {
-  lista: Lista | null;
-  onClose: () => void;
-  onActivate: (tipo: 'ANUAL' | 'VITALICIO') => Promise<string | void>;
-}) {
-  const [tipo, setTipo] = useState<'ANUAL' | 'VITALICIO' | null>(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    setTipo(null);
-    setError('');
-    setLoading(false);
-  }, [lista]);
-
-  if (!lista) return null;
-
-  const handleConfirm = async () => {
-    if (!tipo) {
-      setError('Selecione o tipo de ativação');
-      return;
-    }
-    setLoading(true);
-    const errorMessage = await onActivate(tipo);
-    setLoading(false);
-    if (errorMessage) {
-      setError(errorMessage);
-      return;
-    }
-    onClose();
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white w-[90%] max-w-md rounded-lg shadow-lg">
-        <div className="flex justify-between items-center p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-800">Ativar app</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-3xl font-bold">
-            ✕
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-gray-600">
-            MAC: <span className="font-mono">{lista.mac}</span> — atualmente em teste grátis.
-          </p>
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo de ativação</label>
-            <div className="flex gap-3">
-              {(['ANUAL', 'VITALICIO'] as const).map((opcao) => (
-                <button
-                  key={opcao}
-                  type="button"
-                  onClick={() => {
-                    setTipo(opcao);
-                    setError('');
-                  }}
-                  className={`flex-1 px-4 py-2 rounded border font-semibold text-sm transition ${
-                    tipo === opcao
-                      ? 'border-green-500 bg-green-50 text-green-700'
-                      : 'border-gray-300 bg-gray-50 text-gray-600'
-                  }`}
-                >
-                  {ATIVACAO_LABEL[opcao]}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Anual expira automaticamente 1 ano após a ativação. Vitalício nunca expira.
-            </p>
-          </div>
-
-          {error && <p className="text-sm text-red-600 font-medium">{error}</p>}
-        </div>
-
-        <div className="border-t border-gray-200 p-6 flex gap-3 bg-gray-50">
-          <button
-            onClick={handleConfirm}
-            disabled={loading || !tipo}
-            className="flex-1 bg-green-500 text-white px-6 py-3 rounded font-semibold hover:bg-green-600 disabled:opacity-50 transition"
-          >
-            {loading ? 'Ativando...' : '✓ Ativar'}
-          </button>
-          <button
-            onClick={onClose}
-            className="flex-1 bg-gray-300 text-gray-700 px-6 py-3 rounded font-semibold hover:bg-gray-400 transition"
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function BuyCreditsModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
 
@@ -434,7 +335,6 @@ export default function AtivacaoAppPage() {
   const [editingLista, setEditingLista] = useState<Lista | null>(null);
   const [showBuyCredits, setShowBuyCredits] = useState(false);
   const [transferindoLista, setTransferindoLista] = useState<Lista | null>(null);
-  const [ativandoLista, setAtivandoLista] = useState<Lista | null>(null);
   const confirm = useConfirm();
 
   const loadListas = async () => {
@@ -541,38 +441,6 @@ export default function AtivacaoAppPage() {
     setEditingLista(null);
   };
 
-  const handleActivate = async (tipo: 'ANUAL' | 'VITALICIO'): Promise<string | void> => {
-    if (!ativandoLista) return;
-
-    try {
-      const response = await fetch('/api/painel/listas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: ativandoLista.id,
-          mac: ativandoLista.mac,
-          nome: ativandoLista.nome,
-          url: ativandoLista.url,
-          tipo,
-        }),
-      });
-      if (!response.ok) {
-        if (response.status === 402) {
-          setAtivandoLista(null);
-          setShowBuyCredits(true);
-          return;
-        }
-        const data = await response.json().catch(() => ({}));
-        return data.error || 'Falha ao ativar app';
-      }
-      await loadListas();
-      window.dispatchEvent(new Event('webtech:credits-changed'));
-    } catch (error) {
-      console.error('Falha ao ativar app', error);
-      return 'Falha ao ativar app';
-    }
-  };
-
   const handleTransfer = async (novoMac: string): Promise<string | void> => {
     if (!transferindoLista) return;
 
@@ -641,15 +509,6 @@ export default function AtivacaoAppPage() {
             <div className="flex justify-between items-start">
               <span className="font-mono text-xs text-gray-600">{lista.mac}</span>
               <div className="flex gap-3">
-                {lista.tipo === 'TRIAL' && (
-                  <button
-                    onClick={() => setAtivandoLista(lista)}
-                    className="text-green-500 hover:text-green-700 text-lg"
-                    title="Ativar"
-                  >
-                    ⭐
-                  </button>
-                )}
                 {lista.tipo && (
                   <button
                     onClick={() => setTransferindoLista(lista)}
@@ -744,15 +603,6 @@ export default function AtivacaoAppPage() {
                     {lista.observacao || '—'}
                   </td>
                   <td className="px-6 py-3 flex justify-center gap-2">
-                    {lista.tipo === 'TRIAL' && (
-                      <button
-                        onClick={() => setAtivandoLista(lista)}
-                        className="text-green-500 hover:text-green-700 font-semibold text-xl"
-                        title="Ativar"
-                      >
-                        ⭐
-                      </button>
-                    )}
                     {lista.tipo && (
                       <button
                         onClick={() => setTransferindoLista(lista)}
@@ -797,12 +647,6 @@ export default function AtivacaoAppPage() {
         lista={transferindoLista}
         onClose={() => setTransferindoLista(null)}
         onTransfer={handleTransfer}
-      />
-
-      <ActivateModal
-        lista={ativandoLista}
-        onClose={() => setAtivandoLista(null)}
-        onActivate={handleActivate}
       />
     </div>
   );
