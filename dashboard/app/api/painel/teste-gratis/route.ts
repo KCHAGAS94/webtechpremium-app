@@ -114,7 +114,12 @@ export async function POST(request: NextRequest) {
     dataExpiracao = expira;
   }
 
-  const [listaAtivada] = await prisma.$transaction([
+  const [, listaAtivada] = await prisma.$transaction([
+    // Qualquer playlist que outro revendedor tenha cadastrado nesse App
+    // enquanto ele ainda era só um TRIAL (tela "Usuários") perde o dono —
+    // sem isso ela continuava aparecendo pra quem cadastrou, mesmo o MAC
+    // agora pertencendo a quem pagou pela ativação.
+    prisma.lista.deleteMany({ where: { appId: lista.appId, id: { not: lista.id } } }),
     prisma.lista.update({
       where: { id: lista.id },
       data: { tipo, dataExpiracao },
