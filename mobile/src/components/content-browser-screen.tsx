@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
@@ -15,6 +16,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { FullscreenPlayer } from '@/components/fullscreen-player';
 import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
+import { PlayerControlButton } from '@/components/player-control-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import type { ContentCategory } from '@/utils/content-classifier';
@@ -707,7 +709,11 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
           <View style={styles.previewColumn}>
             <View style={styles.previewPlayer}>
               {selectedChannel ? (
-                <Pressable style={styles.previewPressable} onPress={handleExpandFullscreen}>
+                <Pressable
+                  style={styles.previewPressable}
+                  onPress={handleExpandFullscreen}
+                  focusable={Platform.isTV ? false : undefined}
+                >
                   {/* Only one VideoView may attach to `player` at a time: while
                       FullscreenPlayer's VideoView is mounted, this one must be
                       unmounted, otherwise expo-video hands the render surface
@@ -734,13 +740,14 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                     </View>
                   )}
                   {status !== 'error' && (
-                    <TouchableOpacity
+                    <PlayerControlButton
                       onPress={handleTogglePreviewPlayPause}
                       style={styles.previewPlayButton}
+                      focusedStyle={styles.previewPlayButtonFocused}
                       hitSlop={8}
                     >
                       <ThemedText style={styles.previewPlayIcon}>{isPlaying ? '⏸' : '▶'}</ThemedText>
-                    </TouchableOpacity>
+                    </PlayerControlButton>
                   )}
                   {isBehindLive && status !== 'error' && (
                     <TouchableOpacity style={styles.goLiveBadgePreview} onPress={handleGoLive}>
@@ -748,16 +755,26 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
                       <ThemedText style={styles.goLiveBadgePreviewText}>Voltar ao vivo</ThemedText>
                     </TouchableOpacity>
                   )}
-                  <TouchableOpacity onPress={handleToggleFavorite} style={styles.favoriteHint} hitSlop={8}>
+                  <PlayerControlButton
+                    onPress={handleToggleFavorite}
+                    style={styles.favoriteHint}
+                    focusedStyle={styles.favoriteHintFocused}
+                    hitSlop={8}
+                  >
                     <ThemedText
                       style={[styles.favoriteHintIcon, isSelectedChannelFavorite && styles.favoriteHintIconActive]}
                     >
                       {isSelectedChannelFavorite ? '♥' : '♡'}
                     </ThemedText>
-                  </TouchableOpacity>
-                  <View style={styles.expandHint} pointerEvents="none">
+                  </PlayerControlButton>
+                  <PlayerControlButton
+                    onPress={handleExpandFullscreen}
+                    style={styles.expandHint}
+                    focusedStyle={styles.expandHintFocused}
+                    hitSlop={8}
+                  >
                     <ThemedText style={styles.expandHintIcon}>⤢</ThemedText>
-                  </View>
+                  </PlayerControlButton>
                 </Pressable>
               ) : (
                 <ThemedText style={styles.previewPlaceholder}>▶</ThemedText>
@@ -1004,6 +1021,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#fff',
   },
+  expandHintFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
   favoriteHint: {
     position: 'absolute',
     top: 8,
@@ -1014,6 +1036,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  favoriteHintFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   favoriteHintIcon: {
     fontSize: 15,
@@ -1032,6 +1059,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  previewPlayButtonFocused: {
+    borderWidth: 2,
+    borderColor: '#4dd6ff',
+    backgroundColor: 'rgba(0,0,0,0.8)',
   },
   previewPlayIcon: {
     fontSize: 15,
