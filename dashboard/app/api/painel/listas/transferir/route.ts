@@ -36,15 +36,15 @@ export async function POST(request: NextRequest) {
 
   const appDestino = await prisma.app.findUnique({
     where: { macAddress: novoMacAddress },
-    include: { listas: { where: { tipo: { not: null } } } },
+    include: { listas: { where: { tipo: { in: ['ANUAL', 'VITALICIO'] } } } },
   });
 
   if (appDestino) {
     if (appDestino.listas.length > 0) {
-      // Já tem ativação paga: só bloqueia por dono se de fato pertencer a
-      // outra ativação em uso. MAC ainda em teste grátis (sem lista com
-      // tipo) pode ser tomado por qualquer revendedor, mesmo que o App já
-      // exista sob outro userId — o dono do App não muda na transferência.
+      // Só bloqueia se já tiver ativação paga (ANUAL/VITALICIO). TRIAL não
+      // conta como ativação em uso — MAC ainda em teste grátis pode ser
+      // tomado por qualquer revendedor, mesmo que o App já exista sob outro
+      // userId — o dono do App não muda na transferência.
       return NextResponse.json({ error: 'MAC de destino já possui uma ativação' }, { status: 409 });
     }
   }
