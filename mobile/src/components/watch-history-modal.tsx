@@ -43,6 +43,21 @@ function FocusableRow({
   );
 }
 
+function CloseButton({ onPress, hasTVPreferredFocus }: { onPress: () => void; hasTVPreferredFocus?: boolean }) {
+  const [focused, setFocused] = useState(!!hasTVPreferredFocus);
+  return (
+    <Pressable
+      style={[styles.closeButton, focused && styles.closeButtonFocused]}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onPress={onPress}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+    >
+      <Text allowFontScaling={false} style={styles.closeButtonText}>✕</Text>
+    </Pressable>
+  );
+}
+
 function FocusableActionButton({
   onPress,
   children,
@@ -104,21 +119,15 @@ export function WatchHistoryModal({ visible, title, entries, onClearAll, onClear
             <Text allowFontScaling={false} style={styles.headerTitle}>
               {title}
             </Text>
+            <CloseButton onPress={onClose} hasTVPreferredFocus />
           </View>
 
           {entries.length === 0 ? (
-            <>
-              <View style={styles.empty}>
-                <Text allowFontScaling={false} style={styles.emptyText}>
-                  Nenhum histórico ainda.
-                </Text>
-              </View>
-              <View style={styles.emptyActions}>
-                <FocusableActionButton onPress={onClose} hasTVPreferredFocus>
-                  <Text allowFontScaling={false} style={styles.actionButtonText}>FECHAR</Text>
-                </FocusableActionButton>
-              </View>
-            </>
+            <View style={styles.empty}>
+              <Text allowFontScaling={false} style={styles.emptyText}>
+                Nenhum histórico ainda.
+              </Text>
+            </View>
           ) : (
             <View style={styles.body}>
               <View style={[styles.sideActions, !IS_TV && mobileStyles.sideActions]}>
@@ -130,17 +139,14 @@ export function WatchHistoryModal({ visible, title, entries, onClearAll, onClear
                 <FocusableActionButton onPress={onClearAll}>
                   <Text allowFontScaling={false} style={styles.actionButtonText}>LIMPAR TUDO</Text>
                 </FocusableActionButton>
-                <FocusableActionButton onPress={onClose}>
-                  <Text allowFontScaling={false} style={styles.actionButtonText}>FECHAR</Text>
-                </FocusableActionButton>
               </View>
 
               <FlatList
                 data={entries}
                 keyExtractor={(item) => item.id}
                 style={[styles.list, !IS_TV && mobileStyles.list]}
-                renderItem={({ item, index }) => (
-                  <FocusableRow onPress={() => toggle(item.id)} hasTVPreferredFocus={index === 0}>
+                renderItem={({ item }) => (
+                  <FocusableRow onPress={() => toggle(item.id)}>
                     <View style={styles.rowText}>
                       <Text allowFontScaling={false} style={styles.rowTitle} numberOfLines={1}>
                         {item.title}
@@ -183,12 +189,37 @@ const styles = StyleSheet.create({
     backgroundColor: '#170066',
     paddingVertical: 14,
     paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     color: '#ffffff',
     fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
+  },
+  closeButton: {
+    position: 'absolute',
+    right: 12,
+    top: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: 1,
+    borderColor: '#1aa2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonFocused: {
+    borderColor: '#3ddc84',
+    backgroundColor: '#1f24c2',
+    transform: [{ scale: 1.08 }],
+  },
+  closeButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
   },
   body: {
     flexDirection: 'column',
@@ -210,16 +241,10 @@ const styles = StyleSheet.create({
     color: '#c7c7e6',
     fontSize: 13,
   },
-  emptyActions: {
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(26, 162, 255, 0.25)',
-  },
   // Fixed height instead of flex:1 + maxHeight (same fix as
   // hide-categories-modal.tsx's `list`): without it, `body`'s own height was
   // ambiguous whenever the entry list had little content, which let
-  // `sideActions`' three flex:1 buttons balloon past their intended size and
-  // push the last one (FECHAR) off the bottom of the screen.
+  // `sideActions`' flex:1 buttons balloon past their intended size.
   list: {
     height: 360,
   },
