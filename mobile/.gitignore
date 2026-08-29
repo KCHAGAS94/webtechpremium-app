@@ -12,10 +12,16 @@ web-build/
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+
+# release signing (see plugins/withReleaseSigning.js) — must survive
+# `expo prebuild`, which wipes /android, so it lives here instead; never
+# commit this, it's the app's real production signing key
+/credentials
 
 # Metro
 .metro-health-check*

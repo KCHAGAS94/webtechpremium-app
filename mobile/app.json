@@ -2,7 +2,7 @@
   "expo": {
     "name": "WebTech Premium",
     "slug": "webtechpremium-app",
-    "version": "1.1.0",
+    "version": "2.7",
     "orientation": "landscape",
     "icon": "./assets/images/logo_quadrada.png",
     "userInterfaceStyle": "dark",
@@ -21,7 +21,7 @@
       "permissions": [
         "android.permission.WRITE_SETTINGS"
       ],
-      "versionCode": 20
+      "versionCode": 27
     },
     "ios": {
       "bundleIdentifier": "com.webtechpremium.app"
@@ -33,6 +33,7 @@
       "./plugins/withLargeHeap",
       "./plugins/withAndroidTvLauncher",
       "./plugins/withRemoteKeys",
+      "./plugins/withReleaseSigning",
       "expo-video",
       "expo-brightness",
       [
