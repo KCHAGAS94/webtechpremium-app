@@ -17,6 +17,27 @@ export type ClassifiedPlaylist = {
 
 export type FastCatalog = Pick<ClassifiedPlaylist, 'tv' | 'filmes'>;
 
+// get_live_streams/get_vod_streams occasionally hiccup the same way
+// get_series does (a transient timeout/edge-cache miss, not the provider
+// actually having zero movies/channels) — same retry series-screen.tsx
+// already applies to get_series, just applied here instead since TV ao
+// Vivo/Filmes are fetched once up front rather than per-screen.
+const FETCH_FAST_CATALOG_MAX_RETRIES = 2;
+const FETCH_FAST_CATALOG_RETRY_DELAY_MS = 1200;
+
+async function fetchWithRetries<T>(fetch: () => Promise<T[]>): Promise<T[]> {
+  for (let attempt = 0; attempt <= FETCH_FAST_CATALOG_MAX_RETRIES; attempt++) {
+    try {
+      const result = await fetch();
+      if (result.length > 0 || attempt === FETCH_FAST_CATALOG_MAX_RETRIES) return result;
+    } catch {
+      if (attempt === FETCH_FAST_CATALOG_MAX_RETRIES) throw new Error('fetch failed after retries');
+    }
+    await new Promise((resolve) => setTimeout(resolve, FETCH_FAST_CATALOG_RETRY_DELAY_MS));
+  }
+  return [];
+}
+
 // Bucketing an already-parsed list is O(n) over plain objects (cheap even at
 // tens of thousands of entries), but we still yield periodically so it never
 // adds a second long synchronous stretch on top of the parse itself.
@@ -261,8 +282,8 @@ export async function loadFastCatalog(url: string): Promise<FastCatalog | null> 
   if (!credentials) return null;
 
   const [liveResult, vodResult] = await Promise.allSettled([
-    fetchLiveChannels(credentials),
-    fetchVodMovies(credentials),
+    fetchWithRetries(() => fetchLiveChannels(credentials)),
+    fetchWithRetries(() => fetchVodMovies(credentials)),
   ]);
   if (liveResult.status === 'rejected' && vodResult.status === 'rejected') return null;
 

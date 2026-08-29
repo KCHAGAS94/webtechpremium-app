@@ -341,7 +341,16 @@ function AppContent() {
     // long as fast catalog gave us something to show.
     try {
       const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await fullPromise;
-      setChannels([...(fast?.tv ?? tv), ...(fast?.filmes ?? filmes), ...series]);
+      // `fast?.tv ?? tv` looked right but isn't: when loadFastCatalog's
+      // Xtream call failed, `fast` still resolves with `tv`/`filmes` as `[]`
+      // (see loadFastCatalog) — an empty array is never nullish, so `??`
+      // never falls through to the M3U-parsed list here, silently leaving
+      // TV ao Vivo/Filmes empty even though the full parse just found them.
+      setChannels([
+        ...(fast?.tv.length ? fast.tv : tv),
+        ...(fast?.filmes.length ? fast.filmes : filmes),
+        ...series,
+      ]);
       if (freshSeriesMeta) {
         setSeriesMetaByShowName(freshSeriesMeta);
       }
