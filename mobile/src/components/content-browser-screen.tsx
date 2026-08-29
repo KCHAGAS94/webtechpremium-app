@@ -228,7 +228,14 @@ const ChannelRow = memo(function ChannelRow({
       onLongPress={onLongPress ? () => onLongPress(item) : undefined}
     >
       {item.logo ? (
-        <Image source={{ uri: item.logo }} style={styles.channelLogo} contentFit="contain" />
+        <Image
+          source={{ uri: item.logo }}
+          style={styles.channelLogo}
+          contentFit="contain"
+          recyclingKey={item.id}
+          cachePolicy="memory-disk"
+          priority="low"
+        />
       ) : (
         <View style={styles.channelLogoPlaceholder} />
       )}

@@ -147,6 +147,9 @@ const PosterCard = memo(function PosterCard({
           source={{ uri: item.logo }}
           style={styles.poster}
           contentFit="cover"
+          recyclingKey={item.id}
+          cachePolicy="memory-disk"
+          priority="low"
           onError={() => {
             if (retryKey < POSTER_MAX_RETRIES) {
               setRetryKey((k) => k + 1);

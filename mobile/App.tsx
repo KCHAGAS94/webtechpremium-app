@@ -32,6 +32,7 @@ import { fetchDevicePlaylists, fetchDeviceStatus, type DeviceStatus, type PanelP
 import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
 import { fetchAccountExpiration, parseXtreamCredentials, type SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
+import { consumeLastCrashLog } from './src/utils/crash-logger';
 import { popBackAction, useBackStackEntry } from './src/utils/back-stack';
 
 // Maps a dashboard/menu screen key to the content bucket its browser screen
@@ -369,6 +370,15 @@ function AppContent() {
   // in-memory state from before.
   const bootstrap = useCallback(async () => {
     setBooting(true);
+
+    // If the previous run ended in an uncaught JS exception, report it now —
+    // see crash-logger.ts. Doesn't catch a native OOM kill (that terminates
+    // the process below the JS layer), but rules JS exceptions in or out
+    // when diagnosing "the app just closed" reports.
+    consumeLastCrashLog().then((crash) => {
+      if (crash) console.warn('[crash] app did not exit cleanly last run:', crash);
+    });
+
     const mac = await getDeviceMac();
     setDeviceMac(mac);
 
