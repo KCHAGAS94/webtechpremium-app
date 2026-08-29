@@ -40,7 +40,11 @@ export async function GET(request: NextRequest) {
   const listas = await prisma.lista.findMany({
     where: {
       ...(appId && { appId: Number(appId) }),
-      ...(minhas ? { criadoPorId: auth.id } : { tipo: { not: null } }),
+      // TRIAL fica de fora da tela "Ativação App": ela só mostra ativação de
+      // verdade (ANUAL/VITALICIO); teste grátis tem tela própria
+      // ("Teste grátis") justamente para não se misturar com o que já foi
+      // pago.
+      ...(minhas ? { criadoPorId: auth.id } : { tipo: { in: ['ANUAL', 'VITALICIO'] } }),
       app: {
         ...(mac && { macAddress: mac.toUpperCase() }),
         ...(!minhas && auth.role !== 'ADMIN' && { userId: auth.id }),
