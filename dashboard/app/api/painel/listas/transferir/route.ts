@@ -61,6 +61,12 @@ export async function POST(request: NextRequest) {
     create: { macAddress: novoMacAddress, name: novoMacAddress, version: '1.0.0', userId: lista.app.userId },
   });
 
+  // Qualquer lista que já existisse no App de destino (ex.: o TRIAL de 7
+  // dias criado automaticamente quando o app foi instalado) perde sentido
+  // assim que ele recebe uma ativação paga — sem isso o mesmo MAC ficava
+  // aparecendo duas vezes na tela (Teste grátis + Vitalício/Anual).
+  await prisma.lista.deleteMany({ where: { appId: novoApp.id } });
+
   const listaMovida = await prisma.lista.update({
     where: { id: lista.id },
     data: { appId: novoApp.id },
