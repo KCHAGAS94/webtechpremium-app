@@ -182,9 +182,14 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // Uma ativação de verdade (tipoAtivacao setado) transfere a posse do App
+  // para quem ativou — o App pode já existir (auto-registrado por
+  // /api/devices antes de qualquer ativação), e nesse caso o upsert cairia
+  // no branch `update`, que sem isso deixaria o userId antigo (do sistema)
+  // e o MAC recém-ativado não apareceria na lista do próprio revendedor.
   const app = await prisma.app.upsert({
     where: { macAddress },
-    update: {},
+    update: tipoAtivacao ? { userId: auth.id } : {},
     create: { macAddress, name: macAddress, version: '1.0.0', userId: auth.id },
   });
 
