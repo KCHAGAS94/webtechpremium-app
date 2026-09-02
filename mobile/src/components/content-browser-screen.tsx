@@ -19,6 +19,7 @@ import { OnScreenKeyboard } from '@/components/on-screen-keyboard';
 import { PlayerControlButton } from '@/components/player-control-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { UnfavoriteConfirmModal } from '@/components/unfavorite-confirm-modal';
 import type { ContentCategory } from '@/utils/content-classifier';
 import { loadFavoriteGroups, saveFavoriteGroups } from '@/utils/favorite-groups-storage';
 import { loadFavorites, saveFavorites } from '@/utils/favorites-storage';
@@ -372,13 +373,48 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
     });
   }, [category, selectedChannel]);
 
-  const handleToggleFavoriteGroup = useCallback(
+  // TV ao vivo only: removing a favorited group/channel is easy to trigger by
+  // accident (double-press on a category row, a stray long-press on a
+  // channel row), so unfavoriting there is gated behind a confirmation
+  // modal. Adding a favorite stays instant either way.
+  const [pendingUnfavorite, setPendingUnfavorite] = useState<
+    { type: 'group'; groupTitle: string } | { type: 'channel'; channel: M3uChannel } | null
+  >(null);
+
+  const removeFavoriteGroup = useCallback(
     (groupTitle: string) => {
       setFavoriteGroups((prev) => {
         const next = new Set(prev);
-        if (next.has(groupTitle)) next.delete(groupTitle);
-        else next.add(groupTitle);
+        next.delete(groupTitle);
         saveFavoriteGroups(category, next);
+        return next;
+      });
+    },
+    [category]
+  );
+
+  const handleToggleFavoriteGroup = useCallback(
+    (groupTitle: string) => {
+      if (category === 'live' && favoriteGroups.has(groupTitle)) {
+        setPendingUnfavorite({ type: 'group', groupTitle });
+        return;
+      }
+      setFavoriteGroups((prev) => {
+        const next = new Set(prev);
+        next.add(groupTitle);
+        saveFavoriteGroups(category, next);
+        return next;
+      });
+    },
+    [category, favoriteGroups]
+  );
+
+  const removeFavoriteChannel = useCallback(
+    (channel: M3uChannel) => {
+      setFavorites((prev) => {
+        const next = new Set(prev);
+        next.delete(channel.name);
+        saveFavorites(category, next);
         return next;
       });
     },
@@ -389,16 +425,28 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
   // directly from the list, without needing to select/play it first.
   const handleToggleFavoriteChannel = useCallback(
     (channel: M3uChannel) => {
+      if (category === 'live' && favorites.has(channel.name)) {
+        setPendingUnfavorite({ type: 'channel', channel });
+        return;
+      }
       setFavorites((prev) => {
         const next = new Set(prev);
-        if (next.has(channel.name)) next.delete(channel.name);
-        else next.add(channel.name);
+        next.add(channel.name);
         saveFavorites(category, next);
         return next;
       });
     },
-    [category]
+    [category, favorites]
   );
+
+  const handleConfirmUnfavorite = useCallback(() => {
+    if (!pendingUnfavorite) return;
+    if (pendingUnfavorite.type === 'group') removeFavoriteGroup(pendingUnfavorite.groupTitle);
+    else removeFavoriteChannel(pendingUnfavorite.channel);
+    setPendingUnfavorite(null);
+  }, [pendingUnfavorite, removeFavoriteGroup, removeFavoriteChannel]);
+
+  const handleCancelUnfavorite = useCallback(() => setPendingUnfavorite(null), []);
 
   const isSelectedChannelFavorite = !!selectedChannel && favorites.has(selectedChannel.name);
 
@@ -822,6 +870,10 @@ export function ContentBrowserScreen({ channels, category, activeNav, onNavigate
           onNextChannel={canStepChannel ? handleNextChannel : undefined}
           onPreviousChannel={canStepChannel ? handlePreviousChannel : undefined}
         />
+      )}
+
+      {pendingUnfavorite && (
+        <UnfavoriteConfirmModal onConfirm={handleConfirmUnfavorite} onCancel={handleCancelUnfavorite} />
       )}
     </ThemedView>
   );

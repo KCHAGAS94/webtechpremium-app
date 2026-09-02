@@ -168,6 +168,28 @@ const dictionaries = {
     ja: '視聴を続ける',
     zh: '继续观看',
   },
+
+  unfavorite_confirm_message: {
+    pt: 'Deseja realmente desfavoritar?',
+    en: 'Do you really want to unfavorite this?',
+    es: '¿Realmente desea quitar de favoritos?',
+    ja: '本当にお気に入りを解除しますか？',
+    zh: '确定要取消收藏吗？',
+  },
+  unfavorite_confirm_confirm: {
+    pt: 'Desfavoritar',
+    en: 'Unfavorite',
+    es: 'Quitar',
+    ja: '解除',
+    zh: '取消收藏',
+  },
+  unfavorite_confirm_cancel: {
+    pt: 'Cancelar',
+    en: 'Cancel',
+    es: 'Cancelar',
+    ja: 'キャンセル',
+    zh: '取消',
+  },
 } satisfies Record<string, Record<LanguageCode, string>>;
 
 export type TranslationKey = keyof typeof dictionaries;
