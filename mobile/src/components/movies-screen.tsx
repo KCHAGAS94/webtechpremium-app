@@ -494,12 +494,7 @@ export function MoviesScreen({ channels, playlistUrl, activeNav, onNavigate }: P
 
   const renderCategory = useCallback(
     ({ item }: { item: Category }) => (
-      <CategoryRow
-        item={item}
-        isActive={item.id === selectedCategory}
-        onPress={setSelectedCategory}
-        hasTVPreferredFocus={item.id === selectedCategory}
-      />
+      <CategoryRow item={item} isActive={item.id === selectedCategory} onPress={setSelectedCategory} />
     ),
     [selectedCategory]
   );
