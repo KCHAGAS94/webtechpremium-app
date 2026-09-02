@@ -21,7 +21,9 @@ export async function GET(request: NextRequest) {
     {
       registros: listas.map((lista) => ({
         id: lista.id,
+        appId: lista.app.id,
         mac: lista.app.macAddress,
+        revendedorId: lista.app.user.id,
         revendedorNome: lista.app.user.name,
         revendedorEmail: lista.app.user.email,
         tipo: lista.tipo,
@@ -32,6 +34,30 @@ export async function GET(request: NextRequest) {
     },
     { status: 200 }
   );
+}
+
+// Corrige o "dono" de um App (App.userId) cuja atribuição ficou errada em
+// MACs ativados antes do fix que reatribui o App ao ativar (ver
+// dashboard/app/api/painel/listas/route.ts). Não mexe em Lista nenhuma —
+// só reamarra o App ao revendedor correto.
+export async function PATCH(request: NextRequest) {
+  const auth = getAuthUser(request);
+  if (!auth || auth.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
+  }
+
+  const { appId, revendedorId } = await request.json();
+  if (!appId || !revendedorId) {
+    return NextResponse.json({ error: 'Parâmetros appId e revendedorId são obrigatórios' }, { status: 400 });
+  }
+
+  const revendedor = await prisma.user.findUnique({ where: { id: Number(revendedorId) } });
+  if (!revendedor || revendedor.role !== 'REVENDA') {
+    return NextResponse.json({ error: 'Revendedor inválido' }, { status: 400 });
+  }
+
+  await prisma.app.update({ where: { id: Number(appId) }, data: { userId: Number(revendedorId) } });
+  return NextResponse.json({ ok: true }, { status: 200 });
 }
 
 export async function DELETE(request: NextRequest) {
