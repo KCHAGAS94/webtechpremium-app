@@ -41,6 +41,7 @@ export default function MacsRevendedoresPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editing, setEditing] = useState<Registro | null>(null);
   const [novoRevendedorId, setNovoRevendedorId] = useState('');
+  const [novoTipo, setNovoTipo] = useState<TipoAtivacao | ''>('');
   const [saving, setSaving] = useState(false);
   const confirm = useConfirm();
 
@@ -79,6 +80,7 @@ export default function MacsRevendedoresPage() {
   const openEdit = (r: Registro) => {
     setEditing(r);
     setNovoRevendedorId(String(r.revendedorId));
+    setNovoTipo(r.tipo ?? '');
   };
 
   const handleSaveRevendedor = async () => {
@@ -88,7 +90,13 @@ export default function MacsRevendedoresPage() {
       const res = await fetch('/api/admin/macs-revendedores', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ appId: editing.appId, revendedorId: Number(novoRevendedorId) }),
+        body: JSON.stringify({
+          appId: editing.appId,
+          revendedorId: Number(novoRevendedorId),
+          // Só manda listaId/tipo quando o registro nunca teve tipo (legado);
+          // a API ignora se a Lista já tiver um tipo definido.
+          ...(editing.tipo === null && novoTipo && { listaId: editing.id, tipo: novoTipo }),
+        }),
       });
       if (res.ok) {
         setEditing(null);
@@ -263,6 +271,23 @@ export default function MacsRevendedoresPage() {
                 </option>
               ))}
             </select>
+            {editing.tipo === null && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">
+                  Este MAC nunca teve um tipo de ativação — sem isso ele não aparece na tela
+                  &quot;Ativação App&quot; do revendedor. Defina um tipo para corrigir:
+                </p>
+                <select
+                  value={novoTipo}
+                  onChange={(e) => setNovoTipo(e.target.value as TipoAtivacao | '')}
+                  className="w-full border border-gray-300 rounded px-3 py-2 text-gray-700"
+                >
+                  <option value="">Manter sem tipo</option>
+                  <option value="VITALICIO">Vitalício</option>
+                  <option value="ANUAL">Anual (expira em 1 ano a partir de hoje)</option>
+                </select>
+              </div>
+            )}
             <div className="flex justify-end gap-3">
               <button
                 onClick={() => setEditing(null)}

@@ -38,15 +38,17 @@ export async function GET(request: NextRequest) {
 
 // Corrige o "dono" de um App (App.userId) cuja atribuição ficou errada em
 // MACs ativados antes do fix que reatribui o App ao ativar (ver
-// dashboard/app/api/painel/listas/route.ts). Não mexe em Lista nenhuma —
-// só reamarra o App ao revendedor correto.
+// dashboard/app/api/painel/listas/route.ts). Opcionalmente também corrige
+// Lista.tipo em registros legados que nunca tiveram um tipo de ativação
+// setado (tipo null) — sem tipo ANUAL/VITALICIO essas linhas nunca aparecem
+// na tela "Ativação App" do revendedor, mesmo com o dono correto.
 export async function PATCH(request: NextRequest) {
   const auth = getAuthUser(request);
   if (!auth || auth.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 });
   }
 
-  const { appId, revendedorId } = await request.json();
+  const { appId, revendedorId, listaId, tipo } = await request.json();
   if (!appId || !revendedorId) {
     return NextResponse.json({ error: 'Parâmetros appId e revendedorId são obrigatórios' }, { status: 400 });
   }
@@ -57,6 +59,22 @@ export async function PATCH(request: NextRequest) {
   }
 
   await prisma.app.update({ where: { id: Number(appId) }, data: { userId: Number(revendedorId) } });
+
+  if (listaId && tipo) {
+    if (tipo !== 'ANUAL' && tipo !== 'VITALICIO') {
+      return NextResponse.json({ error: 'Tipo de ativação inválido' }, { status: 400 });
+    }
+    const lista = await prisma.lista.findUnique({ where: { id: Number(listaId) } });
+    if (lista && lista.tipo === null) {
+      let dataExpiracao: Date | null = null;
+      if (tipo === 'ANUAL') {
+        dataExpiracao = new Date();
+        dataExpiracao.setFullYear(dataExpiracao.getFullYear() + 1);
+      }
+      await prisma.lista.update({ where: { id: Number(listaId) }, data: { tipo, dataExpiracao } });
+    }
+  }
+
   return NextResponse.json({ ok: true }, { status: 200 });
 }
 
