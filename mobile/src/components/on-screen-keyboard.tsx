@@ -1,7 +1,59 @@
-import { useEffect, useRef, useState } from 'react';
-import { Modal, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+
+type KeyButtonProps = {
+  label: string;
+  keyId: string;
+  focused: boolean;
+  baseStyle: StyleProp<ViewStyle>;
+  textStyle: StyleProp<TextStyle>;
+  hasTVPreferredFocus?: boolean;
+  onFocusKey: (keyId: string) => void;
+  onPressKey: (keyId: string) => void;
+};
+
+// Every key used to be an inline Pressable, so a single state change
+// anywhere in OnScreenKeyboard (typing a character, or just moving D-pad
+// focus from one key to the next) re-rendered all ~50 of them every time.
+// On a weak Android TV box that's slow enough to visibly lag behind a quick
+// "press a key, immediately D-pad to another" sequence — the focus ring
+// looked like it was dragging to catch up. Wrapping each key in its own
+// memoized component means a focus move only re-renders the two keys whose
+// `focused` prop actually changed (the old one going false, the new one
+// going true), not the whole grid.
+const KeyButton = memo(function KeyButton({
+  label,
+  keyId,
+  focused,
+  baseStyle,
+  textStyle,
+  hasTVPreferredFocus,
+  onFocusKey,
+  onPressKey,
+}: KeyButtonProps) {
+  return (
+    <Pressable
+      style={[baseStyle, focused && styles.keyFocused]}
+      hasTVPreferredFocus={hasTVPreferredFocus}
+      onFocus={() => onFocusKey(keyId)}
+      onPress={() => onPressKey(keyId)}
+    >
+      <ThemedText style={[styles.keyText, textStyle]}>{label}</ThemedText>
+    </Pressable>
+  );
+});
 
 type Props = {
   value: string;
@@ -41,7 +93,20 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
   // toggled per session, not persisted, since it's a quick in-the-moment fix.
   const [largeKeys, setLargeKeys] = useState(false);
   const rows = mode === 'letters' ? LETTER_ROWS : SYMBOL_ROWS;
-  const keyStyle = largeKeys ? [styles.key, styles.keyLarge] : styles.key;
+  // Memoized so KeyButton's `baseStyle` prop keeps the same array reference
+  // across renders (as long as largeKeys hasn't actually toggled) — a fresh
+  // array every render would defeat KeyButton's React.memo just as badly as
+  // a fresh inline style would.
+  const keyStyle = useMemo<StyleProp<ViewStyle>>(
+    () => (largeKeys ? [styles.key, styles.keyLarge] : styles.key),
+    [largeKeys]
+  );
+  const keyTextStyle = useMemo<StyleProp<TextStyle>>(
+    () => (largeKeys ? styles.keyTextLarge : undefined),
+    [largeKeys]
+  );
+  const wideKeyStyle = useMemo<StyleProp<ViewStyle>>(() => [keyStyle, styles.wideKey], [keyStyle]);
+  const spaceKeyStyle = useMemo<StyleProp<ViewStyle>>(() => [keyStyle, styles.spaceKey], [keyStyle]);
 
   // A physical/USB/Bluetooth keyboard sends key events to whatever native
   // view currently has focus — the on-screen keys above are just touch
@@ -91,6 +156,66 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
   const handleMoveLeft = () => onCursorChange(Math.max(0, cursor - 1));
   const handleMoveRight = () => onCursorChange(Math.min(value.length, cursor + 1));
 
+  // handlePressKey's identity must never change (see the useCallback below)
+  // so it can be handed to every KeyButton without breaking their memoization
+  // — but it needs the *current* value/cursor/mode, which change on every
+  // keystroke. A ref sidesteps that: it's updated on every render (a plain
+  // assignment, not a re-render trigger) and read from inside the stable
+  // callback instead of being captured in its closure.
+  const actionsRef = useRef({
+    handleKey,
+    handleBackspace,
+    handleClear,
+    handleSpace,
+    handleToggleMode,
+    handleMoveLeft,
+    handleMoveRight,
+    onClose,
+  });
+  actionsRef.current = {
+    handleKey,
+    handleBackspace,
+    handleClear,
+    handleSpace,
+    handleToggleMode,
+    handleMoveLeft,
+    handleMoveRight,
+    onClose,
+  };
+
+  const handleFocusKey = useCallback((keyId: string) => setFocusedKey(keyId), []);
+  const handlePressKey = useCallback((keyId: string) => {
+    const actions = actionsRef.current;
+    switch (keyId) {
+      case 'done':
+        actions.onClose();
+        return;
+      case 'clear':
+        actions.handleClear();
+        return;
+      case 'mode':
+        actions.handleToggleMode();
+        return;
+      case 'left':
+        actions.handleMoveLeft();
+        return;
+      case 'space':
+        actions.handleSpace();
+        return;
+      case 'right':
+        actions.handleMoveRight();
+        return;
+      case 'backspace':
+        actions.handleBackspace();
+        return;
+      case 'largeKeys':
+        setLargeKeys((v) => !v);
+        return;
+      default:
+        actions.handleKey(keyId);
+    }
+  }, []);
+
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
       {/* Transparent backdrop keeps the real search box and the filtered list
@@ -115,80 +240,94 @@ export function OnScreenKeyboard({ value, cursor, onChangeText, onCursorChange, 
           {rows.map((row, rowIndex) => (
             <View key={rowIndex} style={styles.row}>
               {row.map((char) => (
-                <Pressable
+                <KeyButton
                   key={char}
-                  style={[keyStyle, focusedKey === char && styles.keyFocused]}
+                  keyId={char}
+                  label={char}
+                  focused={focusedKey === char}
+                  baseStyle={keyStyle}
+                  textStyle={keyTextStyle}
                   hasTVPreferredFocus={initialFocusRef.current && char === '1'}
-                  onFocus={() => setFocusedKey(char)}
-                  onPress={() => handleKey(char)}
-                >
-                  <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>{char}</ThemedText>
-                </Pressable>
+                  onFocusKey={handleFocusKey}
+                  onPressKey={handlePressKey}
+                />
               ))}
             </View>
           ))}
 
           <View style={styles.row}>
-            <Pressable
-              style={[keyStyle, styles.wideKey, focusedKey === 'done' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('done')}
-              onPress={onClose}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Concluído</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, styles.wideKey, focusedKey === 'clear' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('clear')}
-              onPress={handleClear}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Limpar</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, styles.wideKey, focusedKey === 'mode' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('mode')}
-              onPress={handleToggleMode}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>
-                {mode === 'letters' ? '#+=' : 'ABC'}
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, focusedKey === 'left' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('left')}
-              onPress={handleMoveLeft}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>◀</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, styles.spaceKey, focusedKey === 'space' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('space')}
-              onPress={handleSpace}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>Espaço</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, focusedKey === 'right' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('right')}
-              onPress={handleMoveRight}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>▶</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, styles.wideKey, focusedKey === 'backspace' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('backspace')}
-              onPress={handleBackspace}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>⌫</ThemedText>
-            </Pressable>
-            <Pressable
-              style={[keyStyle, styles.wideKey, focusedKey === 'largeKeys' && styles.keyFocused]}
-              onFocus={() => setFocusedKey('largeKeys')}
-              onPress={() => setLargeKeys((v) => !v)}
-            >
-              <ThemedText style={[styles.keyText, largeKeys && styles.keyTextLarge]}>
-                {largeKeys ? 'A-' : 'A+'}
-              </ThemedText>
-            </Pressable>
+            <KeyButton
+              keyId="done"
+              label="Concluído"
+              focused={focusedKey === 'done'}
+              baseStyle={wideKeyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="clear"
+              label="Limpar"
+              focused={focusedKey === 'clear'}
+              baseStyle={wideKeyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="mode"
+              label={mode === 'letters' ? '#+=' : 'ABC'}
+              focused={focusedKey === 'mode'}
+              baseStyle={wideKeyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="left"
+              label="◀"
+              focused={focusedKey === 'left'}
+              baseStyle={keyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="space"
+              label="Espaço"
+              focused={focusedKey === 'space'}
+              baseStyle={spaceKeyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="right"
+              label="▶"
+              focused={focusedKey === 'right'}
+              baseStyle={keyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="backspace"
+              label="⌫"
+              focused={focusedKey === 'backspace'}
+              baseStyle={wideKeyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
+            <KeyButton
+              keyId="largeKeys"
+              label={largeKeys ? 'A-' : 'A+'}
+              focused={focusedKey === 'largeKeys'}
+              baseStyle={wideKeyStyle}
+              textStyle={keyTextStyle}
+              onFocusKey={handleFocusKey}
+              onPressKey={handlePressKey}
+            />
           </View>
         </Pressable>
       </Pressable>
