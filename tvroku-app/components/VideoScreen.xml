@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="VideoScreen" extends="Group">
+    <interface>
+        <field id="contentTitle" type="string" onChange="onContentChange" />
+        <field id="streamUrl" type="string" onChange="onContentChange" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/VideoScreen.brs" />
+
+    <children>
+        <Video
+            id="video"
+            width="1920" height="1080"
+            translation="[0, 0]"
+        />
+    </children>
+</component>

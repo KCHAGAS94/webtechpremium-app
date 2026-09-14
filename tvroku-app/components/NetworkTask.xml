@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="NetworkTask" extends="Task">
+    <interface>
+        <!-- input: device MAC address -->
+        <field id="mac" type="string" />
+        <!-- output: "ok" | "no-playlist" | "expired" | "error" -->
+        <field id="status" type="string" alwaysNotify="true" />
+        <!-- output: content built from the Xtream catalog, grouped by category -->
+        <field id="catalog" type="node" alwaysNotify="true" />
+        <function name="executeTask" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/NetworkTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Constants.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Xtream.brs" />
+</component>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SeriesInfoTask" extends="Task">
+    <interface>
+        <field id="seriesId" type="string" />
+        <field id="xtBaseUrl" type="string" />
+        <field id="xtUsername" type="string" />
+        <field id="xtPassword" type="string" />
+        <!-- output: "ok" | "error" -->
+        <field id="status" type="string" alwaysNotify="true" />
+        <field id="episodes" type="node" alwaysNotify="true" />
+        <function name="executeTask" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/SeriesInfoTask.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Xtream.brs" />
+</component>

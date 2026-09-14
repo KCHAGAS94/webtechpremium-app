@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="SettingsPage" extends="Group">
+    <script type="text/brightscript" uri="pkg:/components/pages/SettingsPage.brs" />
+
+    <children>
+        <Label id="titleLabel" text="Configuracoes" translation="[64, 40]" font="font:LargeSystemFont" color="0xFFFFFFFF" />
+        <Label id="infoLabel" text="Em breve." translation="[64, 160]" width="1792" wrap="true" font="font:MediumSystemFont" color="0xB0B4BAFF" />
+    </children>
+</component>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="MoviesPage" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContentChange" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/pages/MoviesPage.brs" />
+
+    <children>
+        <Label id="titleLabel" text="Filmes" translation="[64, 40]" font="font:LargeSystemFont" color="0xFFFFFFFF" />
+        <Label id="emptyLabel" visible="false" translation="[64, 480]" width="1792" wrap="true" horizAlign="center" font="font:LargeSystemFont" color="0xB0B4BAFF" />
+        <RowList
+            id="rowList"
+            translation="[64, 120]"
+            itemSize="[1792, 840]"
+            rowItemSize="[[280, 158]]"
+            rowItemSpacing="[[24, 0]]"
+            rowLabelOffset="[[8, -44]]"
+            rowHeights="[220]"
+            rowSpacings="[24]"
+            showRowLabel="[true]"
+            vertFocusAnimationStyle="fixedFocusWrap"
+        />
+    </children>
+</component>

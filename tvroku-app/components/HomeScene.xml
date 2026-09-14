@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="HomeScene" extends="Scene">
+    <script type="text/brightscript" uri="pkg:/components/HomeScene.brs" />
+    <script type="text/brightscript" uri="pkg:/source/Constants.brs" />
+
+    <children>
+        <Rectangle
+            id="bg"
+            width="1920" height="1080"
+            color="0x0A0826FF"
+        />
+
+        <Rectangle
+            id="bgGlow"
+            width="1400" height="900"
+            translation="[260, 90]"
+            color="0x1B1450FF"
+        />
+
+        <Poster
+            id="logo"
+            translation="[64, 40]"
+            width="140"
+            height="140"
+            loadDisplayMode="scaleToFit"
+            uri="pkg:/images/logo.png"
+        />
+
+        <Label
+            id="statusLabel"
+            translation="[64, 480]"
+            width="1792"
+            wrap="true"
+            horizAlign="center"
+            font="font:LargeSystemFont"
+            color="0xB0B4BAFF"
+            text="Carregando sua lista..."
+        />
+
+        <Label
+            id="expiryLabel"
+            visible="false"
+            translation="[64, 960]"
+            width="1792"
+            horizAlign="center"
+            font="font:MediumSystemFont"
+            color="0xB0B4BAFF"
+        />
+
+        <Group id="menu" visible="false" translation="[64, 220]" />
+    </children>
+</component>

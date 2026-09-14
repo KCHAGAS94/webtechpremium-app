@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="LivePage" extends="Group">
+    <interface>
+        <field id="content" type="node" onChange="onContentChange" />
+    </interface>
+    <script type="text/brightscript" uri="pkg:/components/pages/LivePage.brs" />
+
+    <children>
+        <Rectangle id="bg" width="1920" height="1080" color="0x0A0826FF" />
+
+        <!-- Header -->
+        <Rectangle id="headerBg" width="1920" height="90" color="0x120F3AFF" />
+        <Label id="tabCasa" text="Casa" translation="[64, 32]" font="font:MediumBoldSystemFont" color="0xB0B4BAFF" />
+        <Label id="tabLive" text="TV ao Vivo" translation="[220, 32]" font="font:MediumBoldSystemFont" color="0x22E5FFFF" />
+        <Label id="tabMovies" text="Filmes" translation="[460, 32]" font="font:MediumBoldSystemFont" color="0xB0B4BAFF" />
+        <Label id="tabSeries" text="Series" translation="[620, 32]" font="font:MediumBoldSystemFont" color="0xB0B4BAFF" />
+        <Rectangle id="searchBox" width="480" height="56" translation="[1376, 17]" color="0x1C1A4AFF" />
+        <Label id="searchLabel" text="Buscar canal" translation="[1400, 34]" font="font:MediumSystemFont" color="0x6B6F7AFF" />
+
+        <!-- Sidebar (categories) -->
+        <Group id="sidebar" translation="[0, 90]" />
+
+        <!-- Item grid -->
+        <Label id="gridTitle" translation="[420, 110]" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Group id="itemsGrid" translation="[420, 160]" />
+        <Label id="emptyLabel" visible="false" translation="[420, 400]" width="1080" wrap="true" horizAlign="center" font="font:LargeSystemFont" color="0xB0B4BAFF" />
+
+        <!-- Preview panel -->
+        <Rectangle id="previewBg" width="380" height="990" translation="[1540, 90]" color="0x120F3AFF" />
+        <Poster id="previewPoster" translation="[1580, 130]" width="300" height="300" loadDisplayMode="scaleToFit" />
+        <Label id="previewTitle" translation="[1580, 450]" width="300" wrap="true" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+    </children>
+</component>
