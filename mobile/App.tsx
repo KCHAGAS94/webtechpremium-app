@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -29,7 +29,7 @@ import { getDeviceMac } from './src/utils/device-id';
 import type { ContentCategory } from './src/utils/content-classifier';
 import { type M3uChannel } from './src/utils/m3u-parser';
 import { fetchDevicePlaylists, fetchDeviceStatus, type DeviceStatus, type PanelPlaylist } from './src/utils/panel-api';
-import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk } from './src/utils/playlist-loader';
+import { loadFastCatalog, loadPlaylist, loadPlaylistFromDisk, type FastCatalog } from './src/utils/playlist-loader';
 import { fetchAccountExpiration, parseXtreamCredentials, type SeriesMeta } from './src/utils/xtream-api';
 import { getCachedPlaylistState, setCachedPlaylistState } from './src/utils/playlist-cache';
 import { consumeLastCrashLog } from './src/utils/crash-logger';
@@ -155,6 +155,12 @@ function AppContent() {
   const [seriesMetaByShowName, setSeriesMetaByShowName] = useState<Map<string, SeriesMeta>>(new Map());
   const [playlists, setPlaylists] = useState<PanelPlaylist[]>([]);
   const [activePlaylistId, setActivePlaylistId] = useState<number | null>(null);
+  // Guards the background fullPromise continuation in activatePlaylist below
+  // against a stale write: if the user reloads/switches playlist again while
+  // the previous call's M3U download+parse is still running in the
+  // background, that old continuation must not clobber the new playlist's
+  // channels/seriesMetaByShowName once it finally resolves.
+  const activatingPlaylistIdRef = useRef<number | null>(null);
   const [reloadingPlaylist, setReloadingPlaylist] = useState(false);
   const [reloadPlaylistError, setReloadPlaylistError] = useState('');
   const [reloadingChannels, setReloadingChannels] = useState(false);
@@ -167,12 +173,10 @@ function AppContent() {
   // fetch) — shows BootLoadingScreen so that gap doesn't render an empty
   // Home/activation screen that looks broken rather than loading.
   const [booting, setBooting] = useState(true);
-  // Full-screen progress shown while activatePlaylist downloads+parses a
-  // freshly activated playlist's M3U (Séries) — without this, currentScreen
-  // flipped to 'home' as soon as the fast Xtream catalog landed while that
-  // download/parse kept running invisibly in the background, so early taps
-  // went unanswered and looked like the app had frozen/crashed rather than
-  // still loading.
+  // Full-screen progress shown only while waiting on the initial Xtream
+  // catalog fetch (or, for a non-Xtream/API-down source, the full M3U
+  // download+parse — see activatePlaylist). Once the fast catalog lands,
+  // Home shows right away and this goes back to null.
   const [activationProgress, setActivationProgress] = useState<number | null>(null);
   // Freshly checked at every boot (see bootstrap) against the painel's
   // /app/device-status, independent of whatever stale cached playlist
@@ -305,71 +309,110 @@ function AppContent() {
     // low-RAM Android TV boxes when switching between large playlists.
     setChannels([]);
     setActivePlaylistId(playlist.id);
+    activatingPlaylistIdRef.current = playlist.id;
     // /devices (which is where `playlist` here always comes from — the
     // painel's own playlist picker, or the "Recarregar" reload) never
     // returns an expired lista, so activating one always clears the
     // expired gate from bootstrap's fresh check.
     setExpired(false);
 
-    // Keeps the user on a full-screen progress bar (instead of an
-    // apparently-ready-but-unresponsive Home) until the full M3U
-    // download+parse below finishes — see the activationProgress comment.
     setActivationProgress(0);
+
+    const isCurrent = () => activatingPlaylistIdRef.current === playlist.id;
+    let navigated = false;
+    // An object property instead of a bare `let` so TypeScript doesn't
+    // narrow it down to its initial `null` across the `await fullPromise`
+    // below — a plain `let` only ever reassigned inside a `.then()`
+    // closure gets narrowed by TS as if that reassignment can never have
+    // happened yet, which turns `latest.fast?.tv` into a `never` access
+    // error even though the closure may well have already run by then.
+    const latest: { fast: FastCatalog | null } = { fast: null };
+
+    // Idempotent: only the first caller to reach 100%-ish actually flips the
+    // screen. Whoever gets there first — the fast Xtream catalog, or the
+    // M3U download+parse's own progress hitting 1 — wins; the other source
+    // still merges its data in via setChannels once it lands, screen or no
+    // screen (see the two call sites below).
+    const ensureHome = () => {
+      if (navigated || !isCurrent()) return;
+      navigated = true;
+      setCurrentScreen('home');
+      setActivationProgress(null);
+      if (mac) {
+        setCachedPlaylistState(mac, { panelPlaylists, activePlaylistId: playlist.id });
+      }
+    };
 
     // loadFastCatalog (TV ao Vivo/Filmes straight from the Xtream API, a
     // couple of small JSON calls) and loadPlaylist (the M3U download+parse,
-    // still needed for Séries and for persisting the file boot reads back)
-    // run concurrently, but Home isn't shown until both are done — see
-    // activationProgress.
+    // needed for Séries' fallback/genre metadata and to persist the file for
+    // the offline/cold-boot restore) run concurrently. Home is shown as soon
+    // as either one is actually ready — like VU Player Pro, whose lists come
+    // up in a few seconds instead of minutes — rather than waiting on both.
+    // Séries doesn't need `channels` either: it fetches its own show list
+    // straight from get_series (see series-screen.tsx), the same way the
+    // "Recarregar" boot-restore path already works via loadPlaylistFromDisk.
     const fullPromise = loadPlaylist(playlist.url, mac, (progress) => {
-      if (progress.totalLines > 0) {
-        setActivationProgress(progress.processedLines / progress.totalLines);
+      if (!isCurrent() || progress.totalLines <= 0) return;
+      const fraction = progress.processedLines / progress.totalLines;
+      setActivationProgress((current) => (navigated ? current : fraction));
+      // Once the download+parse itself is fully done, all that's left in
+      // fullPromise is the best-effort Séries-genre enrichment call
+      // (fetchSeriesMetaByName) — that's never worth keeping the user
+      // stuck on the loading screen for. Show whatever's ready right now
+      // (the fast catalog, if it already landed) and let fullPromise's own
+      // .then below merge in Séries/genres whenever it actually finishes.
+      if (fraction >= 1) {
+        setChannels([...(latest.fast?.tv ?? []), ...(latest.fast?.filmes ?? [])]);
+        ensureHome();
       }
     });
-    const fast = await loadFastCatalog(playlist.url).catch(() => null);
-    if (fast) {
-      setChannels([...fast.tv, ...fast.filmes]);
-    }
+    // Own catch so a rejection here (a provider whose get.php M3U export is
+    // disabled/404s, say) doesn't surface as an unhandled rejection now that
+    // nothing above always awaits this promise inline.
+    fullPromise.catch(() => {});
 
-    // fullPromise (the M3U download+parse) can fail on its own even when
-    // loadFastCatalog above succeeded — e.g. a provider whose Xtream JSON API
-    // works but whose get.php M3U export is disabled/404s. Left uncaught,
-    // that rejection used to leave the user stuck on the "Carregando sua
-    // lista..." progress screen forever (activationProgress never reached
-    // null). Only Séries actually depends on this call; TV ao Vivo/Filmes
-    // already came from loadFastCatalog, so a failure here is recoverable as
-    // long as fast catalog gave us something to show.
+    loadFastCatalog(playlist.url)
+      .then((fast) => {
+        if (!isCurrent()) return;
+        latest.fast = fast;
+        if (fast) {
+          setChannels([...fast.tv, ...fast.filmes]);
+          ensureHome();
+        }
+      })
+      .catch(() => {});
+
     try {
       const { tv, filmes, series, seriesMetaByShowName: freshSeriesMeta } = await fullPromise;
-      // `fast?.tv ?? tv` looked right but isn't: when loadFastCatalog's
-      // Xtream call failed, `fast` still resolves with `tv`/`filmes` as `[]`
-      // (see loadFastCatalog) — an empty array is never nullish, so `??`
-      // never falls through to the M3U-parsed list here, silently leaving
-      // TV ao Vivo/Filmes empty even though the full parse just found them.
+      if (!isCurrent()) return;
+      // `latest.fast?.tv ?? tv` looked right but isn't: when loadFastCatalog's
+      // Xtream call failed, `latest.fast` still resolves with `tv`/`filmes` as
+      // `[]` (see loadFastCatalog) — an empty array is never nullish, so `??`
+      // never falls through to the M3U-parsed list here, silently leaving TV
+      // ao Vivo/Filmes empty even though the full parse just found them.
       setChannels([
-        ...(fast?.tv.length ? fast.tv : tv),
-        ...(fast?.filmes.length ? fast.filmes : filmes),
+        ...(latest.fast?.tv.length ? latest.fast.tv : tv),
+        ...(latest.fast?.filmes.length ? latest.fast.filmes : filmes),
         ...series,
       ]);
       if (freshSeriesMeta) {
         setSeriesMetaByShowName(freshSeriesMeta);
       }
+      ensureHome();
     } catch (err) {
-      if (!fast || (fast.tv.length === 0 && fast.filmes.length === 0)) {
+      // Only a hard failure if nothing ever got the user to Home — if
+      // ensureHome already fired (fast catalog or 100% progress), Séries'
+      // own get_series fallback and/or the fast catalog already have
+      // something on screen, so this failure is recoverable, not fatal.
+      if (!navigated) {
         setActivationProgress(null);
         setPlaylists(panelPlaylists);
         setReloadPlaylistError(
           err instanceof Error ? `Falha ao carregar a playlist: ${err.message}` : 'Falha ao carregar a playlist.'
         );
         setCurrentScreen('playlist');
-        return;
       }
-    }
-
-    setCurrentScreen('home');
-    setActivationProgress(null);
-    if (mac) {
-      setCachedPlaylistState(mac, { panelPlaylists, activePlaylistId: playlist.id });
     }
   };
 
@@ -503,7 +546,19 @@ function AppContent() {
   }
 
   if (activationProgress !== null) {
-    return <BootLoadingScreen text="Carregando sua lista..." progress={activationProgress} />;
+    // Once the bar reaches 100%, whatever's left (loadFastCatalog still
+    // settling, or fullPromise's trailing Séries-genre call) has no more
+    // bytes/lines to report progress on — sitting on a frozen "100%" reads
+    // as the app being stuck. Switching to the plain indeterminate spinner
+    // here (same screen used for the initial boot check) keeps showing
+    // *something* is still happening instead of a number that stopped
+    // moving, right up until ensureHome actually flips the screen.
+    return (
+      <BootLoadingScreen
+        text="Carregando sua lista..."
+        progress={activationProgress < 1 ? activationProgress : undefined}
+      />
+    );
   }
 
   // "Verificar status do app" on ActivationStatusModal — re-polls the painel

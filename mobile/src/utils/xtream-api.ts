@@ -109,24 +109,52 @@ type LiveStream = {
 // this pending forever instead of rejecting, which used to hang
 // loadFastCatalog (and, through it, the whole "Carregando sua lista..."
 // screen) indefinitely with no way to recover short of force-closing the
-// app. AbortController + a fixed budget guarantees every call here settles.
+// app. AbortController + a fixed budget is the first line of defense.
 const XTREAM_REQUEST_TIMEOUT_MS = 15000;
+
+// Belt and suspenders on top of the AbortController above: on some
+// devices/networks (a carrier/router that silently blackholes the
+// connection instead of resetting it, for instance) the OS-level socket
+// doesn't actually tear down when `controller.abort()` fires, so the
+// `fetch()` promise itself never settles even though we asked it to. Racing
+// against a plain timer that owes nothing to fetch's own cancellation
+// guarantees this function always returns/throws by the deadline either
+// way — the abandoned native request may keep running invisibly in the
+// background, but it can no longer block JS logic or leave a screen stuck.
+function raceTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Tempo esgotado ao consultar a API Xtream')), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
 
 async function fetchXtream<T>(creds: XtreamCredentials, action: string, extraParams = ''): Promise<T> {
   const url = `${creds.baseUrl}/player_api.php?username=${encodeURIComponent(creds.username)}&password=${encodeURIComponent(creds.password)}&action=${action}${extraParams}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), XTREAM_REQUEST_TIMEOUT_MS);
-  try {
-    // Same Cloudflare User-Agent block as playlist-loader.ts's playlist fetch.
-    const response = await fetch(url, {
-      headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
-      signal: controller.signal,
-    });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
-  } finally {
-    clearTimeout(timer);
-  }
+  const run = async () => {
+    try {
+      // Same Cloudflare User-Agent block as playlist-loader.ts's playlist fetch.
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'VLC/3.0.18 LibVLC/3.0.18' },
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return (await response.json()) as T;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  return raceTimeout(run(), XTREAM_REQUEST_TIMEOUT_MS + 2000);
 }
 
 function toGenreByName<T extends { name: string; category_id: string }>(
