@@ -7,7 +7,6 @@ sub init()
     m.cardFillSelected = "0x2A2870FF"
     m.borderSelected = "0x22E5FFFF"
     m.borderIdle = "0x00000000"
-fix(tvroku): renomeia botão de recarregar lista no menu Home
 
     BuildMenu()
 
