@@ -7,22 +7,34 @@ end function
 
 sub init()
     m.sidebar = m.top.findNode("sidebar")
+    m.sidebarContent = CreateObject("roSGNode", "Group")
+    m.sidebar.appendChild(m.sidebarContent)
+
     m.itemsGrid = m.top.findNode("itemsGrid")
+    m.itemsGridContent = CreateObject("roSGNode", "Group")
+    m.itemsGrid.appendChild(m.itemsGridContent)
+
     m.gridTitle = m.top.findNode("gridTitle")
     m.emptyLabel = m.top.findNode("emptyLabel")
     m.previewPoster = m.top.findNode("previewPoster")
     m.previewTitle = m.top.findNode("previewTitle")
 
     m.sidebarRowH = 64
-    m.gridCols = 4
-    m.cardW = 250
-    m.cardH = 170
-    m.cardSpacing = 20
+    m.sidebarWidth = 480
+    m.gridCols = 1
+    m.cardW = 620
+    m.cardH = 90
+    m.cardSpacing = 12
+    m.listX = 500
+    m.listBaseY = 160
+    m.listVisibleH = 1080 - m.listBaseY
 
     m.focusRegion = "sidebar"
     m.sidebarIndex = 0
     m.gridIndex = 0
     m.gridCards = []
+    m.sidebarScroll = 0
+    m.gridScroll = 0
 
     m.top.setFocus(true)
 end sub
@@ -52,7 +64,7 @@ sub BuildCategories()
 end sub
 
 sub BuildSidebar()
-    m.sidebar.removeChildren(m.sidebar.GetChildren(-1, 0))
+    m.sidebarContent.removeChildren(m.sidebarContent.GetChildren(-1, 0))
     m.sidebarRows = []
 
     y = 24
@@ -61,7 +73,7 @@ sub BuildSidebar()
         row.translation = [0, y]
 
         highlight = CreateObject("roSGNode", "Rectangle")
-        highlight.width = 380
+        highlight.width = m.sidebarWidth
         highlight.height = m.sidebarRowH
         highlight.color = "0x00000000"
         row.appendChild(highlight)
@@ -69,20 +81,24 @@ sub BuildSidebar()
         nameLabel = CreateObject("roSGNode", "Label")
         nameLabel.text = category.title
         nameLabel.translation = [24, 18]
+        nameLabel.width = m.sidebarWidth - 100
+        nameLabel.height = 32
         nameLabel.font = "font:MediumSystemFont"
         nameLabel.color = "0xE6E8ECFF"
         row.appendChild(nameLabel)
 
         countLabel = CreateObject("roSGNode", "Label")
         countLabel.text = category.items.Count().ToStr()
-        countLabel.translation = [300, 18]
+        countLabel.translation = [m.sidebarWidth - 70, 18]
+        countLabel.width = 60
+        countLabel.horizAlign = "right"
         countLabel.font = "font:MediumSystemFont"
         countLabel.color = "0x8A8FA3FF"
         row.appendChild(countLabel)
 
         category.highlight = highlight
         m.sidebarRows.Push(row)
-        m.sidebar.appendChild(row)
+        m.sidebarContent.appendChild(row)
         y = y + m.sidebarRowH
     end for
 end sub
@@ -92,6 +108,15 @@ sub HighlightSidebar()
         category.highlight.color = "0x00000000"
     end for
     m.categories[m.sidebarIndex].highlight.color = "0x1C1A4AFF"
+
+    visibleH = 990
+    rowY = 24 + m.sidebarIndex * m.sidebarRowH
+    scroll = m.sidebarScroll
+    if rowY < scroll then scroll = rowY
+    if rowY + m.sidebarRowH > scroll + visibleH then scroll = rowY + m.sidebarRowH - visibleH
+    if scroll < 0 then scroll = 0
+    m.sidebarScroll = scroll
+    m.sidebarContent.translation = [0, -scroll]
 end sub
 
 sub SelectCategory(index as integer)
@@ -104,9 +129,11 @@ sub SelectCategory(index as integer)
 end sub
 
 sub BuildGrid(items as object)
-    m.itemsGrid.removeChildren(m.itemsGrid.GetChildren(-1, 0))
+    m.itemsGridContent.removeChildren(m.itemsGridContent.GetChildren(-1, 0))
     m.gridCards = []
     m.gridIndex = 0
+    m.gridScroll = 0
+    m.itemsGridContent.translation = [0, 0]
 
     if items.Count() = 0
         m.emptyLabel.visible = true
@@ -133,24 +160,25 @@ sub BuildGrid(items as object)
         card.appendChild(border)
 
         poster = CreateObject("roSGNode", "Poster")
-        poster.translation = [4, 4]
-        poster.width = m.cardW - 8
-        poster.height = m.cardH - 46
+        poster.translation = [10, 10]
+        poster.width = m.cardH - 20
+        poster.height = m.cardH - 20
         poster.loadDisplayMode = "scaleToFit"
         if item.HDPosterUrl <> invalid and item.HDPosterUrl <> "" then poster.uri = item.HDPosterUrl
         card.appendChild(poster)
 
         label = CreateObject("roSGNode", "Label")
         label.text = item.Title
-        label.translation = [8, m.cardH - 38]
-        label.width = m.cardW - 16
-        label.height = 32
-        label.font = "font:SmallSystemFont"
+        label.translation = [m.cardH + 10, 0]
+        label.width = m.cardW - m.cardH - 30
+        label.height = m.cardH
+        label.vertAlign = "center"
+        label.font = "font:MediumSystemFont"
         label.color = "0xE6E8ECFF"
         card.appendChild(label)
 
         m.gridCards.Push({ node: card, border: border, item: item })
-        m.itemsGrid.appendChild(card)
+        m.itemsGridContent.appendChild(card)
     end for
 
     HighlightGrid()
@@ -170,6 +198,14 @@ sub HighlightGrid()
     else
         m.previewPoster.uri = ""
     end if
+
+    rowY = m.gridIndex * (m.cardH + m.cardSpacing)
+    scroll = m.gridScroll
+    if rowY < scroll then scroll = rowY
+    if rowY + m.cardH > scroll + m.listVisibleH then scroll = rowY + m.cardH - m.listVisibleH
+    if scroll < 0 then scroll = 0
+    m.gridScroll = scroll
+    m.itemsGridContent.translation = [0, -scroll]
 end sub
 
 sub PlayCurrentItem()

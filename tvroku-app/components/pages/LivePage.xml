@@ -18,16 +18,17 @@
         <Label id="searchLabel" text="Buscar canal" translation="[1400, 34]" font="font:MediumSystemFont" color="0x6B6F7AFF" />
 
         <!-- Sidebar (categories) -->
-        <Group id="sidebar" translation="[0, 90]" />
+        <Group id="sidebar" translation="[0, 90]" clippingRect="[0, 0, 480, 990]" />
 
-        <!-- Item grid -->
-        <Label id="gridTitle" translation="[420, 110]" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
-        <Group id="itemsGrid" translation="[420, 160]" />
-        <Label id="emptyLabel" visible="false" translation="[420, 400]" width="1080" wrap="true" horizAlign="center" font="font:LargeSystemFont" color="0xB0B4BAFF" />
+        <!-- Item list -->
+        <Label id="gridTitle" translation="[500, 110]" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Group id="itemsGrid" translation="[500, 160]" clippingRect="[0, 0, 620, 920]" />
+        <Label id="emptyLabel" visible="false" translation="[500, 400]" width="620" wrap="true" horizAlign="center" font="font:LargeSystemFont" color="0xB0B4BAFF" />
 
         <!-- Preview panel -->
-        <Rectangle id="previewBg" width="380" height="990" translation="[1540, 90]" color="0x120F3AFF" />
-        <Poster id="previewPoster" translation="[1580, 130]" width="300" height="300" loadDisplayMode="scaleToFit" />
-        <Label id="previewTitle" translation="[1580, 450]" width="300" wrap="true" font="font:MediumBoldSystemFont" color="0xFFFFFFFF" />
+        <Rectangle id="previewBg" width="700" height="990" translation="[1180, 90]" color="0x120F3AFF" />
+        <Rectangle id="previewVideoBg" width="620" height="380" translation="[1220, 130]" color="0x000000FF" />
+        <Poster id="previewPoster" translation="[1220, 130]" width="620" height="380" loadDisplayMode="scaleToFit" />
+        <Label id="previewTitle" translation="[1220, 540]" width="620" wrap="true" font="font:LargeBoldSystemFont" color="0xFFFFFFFF" />
     </children>
 </component>
