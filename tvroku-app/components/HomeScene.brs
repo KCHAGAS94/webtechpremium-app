@@ -7,6 +7,7 @@ sub init()
     m.cardFillSelected = "0x2A2870FF"
     m.borderSelected = "0x22E5FFFF"
     m.borderIdle = "0x00000000"
+fix(tvroku): renomeia botão de recarregar lista no menu Home
 
     BuildMenu()
 
@@ -23,7 +24,7 @@ sub BuildMenu()
         { x: 380, y: 0, w: 300, h: 180, label: "Filmes", kind: "vod", left: 0, right: 2, up: 1, down: 3 }
         { x: 700, y: 0, w: 300, h: 180, label: "Séries", kind: "series", left: 1, right: 5, up: 2, down: 4 }
         { x: 380, y: 200, w: 300, h: 180, label: "Conta", kind: "account", left: 0, right: 4, up: 1, down: 3 }
-        { x: 700, y: 200, w: 300, h: 180, label: "Recarregar", kind: "reload", left: 3, right: 6, up: 2, down: 4 }
+        { x: 700, y: 200, w: 300, h: 180, label: "Mudar lista de reprodução", kind: "reload", left: 3, right: 6, up: 2, down: 4 }
         { x: 1020, y: 0, w: 260, h: 110, label: "Configurações", kind: "settings", left: 2, right: 5, up: 5, down: 6 }
         { x: 1020, y: 135, w: 260, h: 110, label: "Recarregar", kind: "reload", left: 4, right: 6, up: 5, down: 7 }
         { x: 1020, y: 270, w: 260, h: 110, label: "Sair", kind: "exit", left: 4, right: 7, up: 6, down: 7 }
