@@ -149,9 +149,7 @@ sub BuildGrid(items as object)
         label.color = "0xE6E8ECFF"
         card.appendChild(label)
 
-        card.item = item
-        card.border = border
-        m.gridCards.Push(card)
+        m.gridCards.Push({ node: card, border: border, item: item })
         m.itemsGrid.appendChild(card)
     end for
 
