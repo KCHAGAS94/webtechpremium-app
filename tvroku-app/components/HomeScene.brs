@@ -54,7 +54,9 @@ sub BuildMenu()
         label.horizAlign = "center"
         label.vertAlign = "center"
         label.wrap = true
-        if data.w < 300
+        if Len(data.label) > 16
+            label.font = "font:SmallSystemFont"
+        else if data.w < 300
             label.font = "font:MediumSystemFont"
         else
             label.font = "font:LargeSystemFont"

@@ -10,13 +10,6 @@
             color="0x0A0826FF"
         />
 
-        <Rectangle
-            id="bgGlow"
-            width="1400" height="900"
-            translation="[260, 90]"
-            color="0x1B1450FF"
-        />
-
         <Poster
             id="logo"
             translation="[64, 40]"
@@ -47,6 +40,6 @@
             color="0xB0B4BAFF"
         />
 
-        <Group id="menu" visible="false" translation="[64, 220]" />
+        <Group id="menu" visible="false" translation="[320, 350]" />
     </children>
 </component>
